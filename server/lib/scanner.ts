@@ -103,16 +103,38 @@ export function scanOpenSpec(repoDir: string): ScanResult {
   return { specs, activeChanges, archivedChanges };
 }
 
+interface HistoryEntry {
+  slug: string;
+  date: string | null;
+  description: string;
+  status: "active" | "archived";
+}
+
 export function readSpec(
   repoDir: string,
   topic: string,
-): { topic: string; content: string; relatedChanges: string[] } | null {
+): { topic: string; content: string; relatedChanges: string[]; history: HistoryEntry[] } | null {
   const specPath = path.join(openspecDir(repoDir), "specs", topic, "spec.md");
   const content = readFileOrNull(specPath);
   if (content === null) return null;
 
   const relatedChanges = findRelatedChanges(repoDir, topic);
-  return { topic, content, relatedChanges };
+
+  // 建立歷史紀錄，含日期與描述
+  const base = openspecDir(repoDir);
+  const changesDir = path.join(base, "changes");
+  const archiveDir = path.join(changesDir, "archive");
+
+  const history: HistoryEntry[] = relatedChanges.map((slug) => {
+    const { date, description } = parseSlug(slug);
+    const isArchived = fs.existsSync(path.join(archiveDir, slug));
+    return { slug, date, description, status: isArchived ? "archived" : "active" };
+  });
+
+  // 按日期降序排列
+  history.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  return { topic, content, relatedChanges, history };
 }
 
 export function readChange(repoDir: string, slug: string): ChangeDetail | null {

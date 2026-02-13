@@ -27,7 +27,7 @@ export function Dashboard() {
       <h1 className="text-2xl font-bold">Overview</h1>
 
       {/* 統計卡片 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Specs" value={data.specsCount} />
         <StatCard label="Active Changes" value={data.changesCount.active} />
         <StatCard label="Archived Changes" value={data.changesCount.archived} />
@@ -82,7 +82,7 @@ export function Dashboard() {
       </section>
 
       {/* 導覽卡片 */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link
           to="/specs"
           className="bg-bg-secondary border border-border rounded p-6 hover:border-accent transition-colors"

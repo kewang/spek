@@ -1,18 +1,40 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRepo } from "../contexts/RepoContext";
 import { useBrowse, useDetect } from "../hooks/useOpenSpec";
 
+type PathStatus = "checking" | "valid" | "invalid";
+
 export function SelectRepo() {
-  const { setRepoPath, recentPaths } = useRepo();
+  const { setRepoPath, recentPaths, removePath } = useRepo();
   const navigate = useNavigate();
 
   const [inputPath, setInputPath] = useState("");
   const [browsePath, setBrowsePath] = useState("");
   const [showBrowser, setShowBrowser] = useState(false);
+  const [pathStatuses, setPathStatuses] = useState<Record<string, PathStatus>>({});
 
   const detect = useDetect(inputPath);
   const browse = useBrowse(browsePath);
+
+  // 非同步驗證最近路徑
+  useEffect(() => {
+    if (recentPaths.length === 0) return;
+    const initial: Record<string, PathStatus> = {};
+    for (const p of recentPaths) initial[p] = "checking";
+    setPathStatuses(initial);
+
+    for (const p of recentPaths) {
+      fetch(`/api/fs/detect?path=${encodeURIComponent(p)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          setPathStatuses((prev) => ({ ...prev, [p]: data.hasOpenSpec ? "valid" : "invalid" }));
+        })
+        .catch(() => {
+          setPathStatuses((prev) => ({ ...prev, [p]: "invalid" }));
+        });
+    }
+  }, [recentPaths]);
 
   function openRepo(repoPath: string) {
     setRepoPath(repoPath);
@@ -132,18 +154,47 @@ export function SelectRepo() {
           <div>
             <h3 className="text-text-secondary text-sm mb-2">Recent</h3>
             <div className="space-y-1">
-              {recentPaths.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => {
-                    setInputPath(p);
-                    openRepo(p);
-                  }}
-                  className="block w-full text-left px-3 py-2 bg-bg-secondary border border-border rounded text-sm text-text-primary font-mono hover:border-accent transition-colors"
-                >
-                  {p}
-                </button>
-              ))}
+              {recentPaths.map((p) => {
+                const status = pathStatuses[p];
+                return (
+                  <div key={p} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setInputPath(p);
+                        if (status === "valid") openRepo(p);
+                      }}
+                      className="flex-1 text-left px-3 py-2 bg-bg-secondary border border-border rounded text-sm text-text-primary font-mono hover:border-accent transition-colors flex items-center gap-2"
+                    >
+                      {/* 狀態指標 */}
+                      {status === "checking" && (
+                        <span className="w-4 h-4 border-2 border-text-muted border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                      )}
+                      {status === "valid" && (
+                        <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {status === "invalid" && (
+                        <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                      <span className="truncate">{p}</span>
+                    </button>
+                    {status === "invalid" && (
+                      <button
+                        onClick={() => removePath(p)}
+                        className="p-2 text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                        title="Remove path"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

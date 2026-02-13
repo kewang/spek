@@ -8,6 +8,7 @@ interface RepoContextValue {
   setRepoPath: (path: string) => void;
   recentPaths: string[];
   clearRepoPath: () => void;
+  removePath: (path: string) => void;
 }
 
 const RepoContext = createContext<RepoContextValue | null>(null);
@@ -45,8 +46,14 @@ export function RepoProvider({ children }: { children: ReactNode }) {
     setRepoPathState("");
   }, []);
 
+  const removePath = useCallback((pathToRemove: string) => {
+    const updated = loadRecentPaths().filter((p) => p !== pathToRemove);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setRecentPaths(updated);
+  }, []);
+
   return (
-    <RepoContext.Provider value={{ repoPath, setRepoPath, recentPaths, clearRepoPath }}>
+    <RepoContext.Provider value={{ repoPath, setRepoPath, recentPaths, clearRepoPath, removePath }}>
       {children}
     </RepoContext.Provider>
   );

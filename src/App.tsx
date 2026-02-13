@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { RepoProvider } from "./contexts/RepoContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { Layout } from "./components/Layout";
 import { SelectRepo } from "./pages/SelectRepo";
 import { Dashboard } from "./pages/Dashboard";
@@ -27,8 +28,10 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <RepoProvider>
-      <RouterProvider router={router} />
-    </RepoProvider>
+    <ThemeProvider>
+      <RepoProvider>
+        <RouterProvider router={router} />
+      </RepoProvider>
+    </ThemeProvider>
   );
 }

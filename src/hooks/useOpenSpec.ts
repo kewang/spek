@@ -68,10 +68,18 @@ export function useSpecs(): FetchState<SpecInfo[]> {
   return useFetch<SpecInfo[]>(url);
 }
 
+interface SpecHistoryEntry {
+  slug: string;
+  date: string | null;
+  description: string;
+  status: "active" | "archived";
+}
+
 interface SpecDetail {
   topic: string;
   content: string;
   relatedChanges: string[];
+  history: SpecHistoryEntry[];
 }
 
 export function useSpec(topic: string): FetchState<SpecDetail> {
@@ -172,6 +180,7 @@ export type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecHistoryEntry,
   ChangeInfo,
   ChangesData,
   ChangeDetail,

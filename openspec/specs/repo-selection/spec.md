@@ -25,7 +25,7 @@ The system SHALL provide a directory browser that calls the browse API, allowing
 - **AND** user can select the current directory as the repo path
 
 ### Requirement: Recent paths persistence
-The system SHALL persist the most recent 5 repo paths in localStorage. On page load, previously used paths SHALL be displayed for quick selection.
+The system SHALL persist the most recent 5 repo paths in localStorage. On page load, previously used paths SHALL be displayed for quick selection. Each recent path SHALL be validated asynchronously against the detect API to show its current status (valid, invalid, or checking).
 
 #### Scenario: Save path on successful detection
 - **WHEN** user successfully opens a repo (path with valid openspec/)
@@ -34,6 +34,15 @@ The system SHALL persist the most recent 5 repo paths in localStorage. On page l
 #### Scenario: Display recent paths on load
 - **WHEN** user visits the SelectRepo page
 - **THEN** previously saved paths are displayed as clickable options
+
+#### Scenario: Validate recent paths asynchronously
+- **WHEN** the SelectRepo page loads with saved recent paths
+- **THEN** the system calls the detect API for each path in parallel
+- **AND** each path displays a status indicator: spinner (checking), green checkmark (valid openspec/ found), or red indicator (path invalid or no openspec/)
+
+#### Scenario: Remove invalid path
+- **WHEN** a recent path is determined to be invalid
+- **THEN** a delete button appears next to the path allowing the user to remove it from the list
 
 ### Requirement: Auto-navigate to dashboard
 The system SHALL automatically navigate to the Dashboard page after the user selects a valid repo path.
