@@ -60,7 +60,19 @@ export function Layout() {
             </svg>
           </button>
         )}
-        <span className="text-accent font-bold text-lg">spek</span>
+        <span className="text-accent font-bold text-lg flex items-center gap-1.5">
+          <svg className="w-6 h-6" viewBox="0 0 32 32" fill="none">
+            <path
+              d="M 20 8.5 C 20 8.5, 23 8.5, 23 11.5 C 23 14.5, 20 16, 16 16 C 12 16, 9 17.5, 9 20.5 C 9 23.5, 12 23.5, 12 23.5"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+            />
+            <path d="M 12.8 8.5 L 14.3 7 L 15.8 8.5 L 14.3 10 Z" fill="currentColor" opacity="0.9" />
+            <path d="M 16.2 23.5 L 17.7 22 L 19.2 23.5 L 17.7 25 Z" fill="currentColor" opacity="0.7" />
+          </svg>
+          spek
+        </span>
         <div className="flex-1 flex justify-center">
           <button
             onClick={() => setSearchOpen(true)}

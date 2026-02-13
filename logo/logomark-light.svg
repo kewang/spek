@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="amber-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景圓角方形（淺色版） -->
+  <rect width="512" height="512" rx="96" fill="#f8fafc"/>
+
+  <!-- S 形路徑 -->
+  <path
+    d="M 320 136
+       C 320 136, 368 136, 368 184
+       C 368 232, 320 256, 256 256
+       C 192 256, 144 280, 144 328
+       C 144 376, 192 376, 192 376"
+    fill="none"
+    stroke="url(#amber-glow)"
+    stroke-width="56"
+    stroke-linecap="round"
+  />
+
+  <!-- 上方菱形光點 -->
+  <path
+    d="M 204 136 L 228 112 L 252 136 L 228 160 Z"
+    fill="#d97706"
+    opacity="0.9"
+  />
+
+  <!-- 下方菱形光點 -->
+  <path
+    d="M 260 376 L 284 352 L 308 376 L 284 400 Z"
+    fill="#92400e"
+    opacity="0.9"
+  />
+</svg>

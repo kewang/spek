@@ -1,4 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="4" fill="#0a0c0f"/>
-  <text x="16" y="22" font-size="18" font-weight="bold" fill="#f59e0b" text-anchor="middle" font-family="sans-serif">S</text>
+  <defs>
+    <linearGradient id="ag" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="32" height="32" rx="6" fill="#0a0c0f"/>
+
+  <!-- S 形路徑（為小尺寸優化） -->
+  <path
+    d="M 20 8.5
+       C 20 8.5, 23 8.5, 23 11.5
+       C 23 14.5, 20 16, 16 16
+       C 12 16, 9 17.5, 9 20.5
+       C 9 23.5, 12 23.5, 12 23.5"
+    fill="none"
+    stroke="url(#ag)"
+    stroke-width="3.5"
+    stroke-linecap="round"
+  />
+
+  <!-- 上方菱形光點 -->
+  <path d="M 12.8 8.5 L 14.3 7 L 15.8 8.5 L 14.3 10 Z" fill="#fbbf24"/>
+
+  <!-- 下方菱形光點 -->
+  <path d="M 16.2 23.5 L 17.7 22 L 19.2 23.5 L 17.7 25 Z" fill="#d97706"/>
 </svg>
