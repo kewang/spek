@@ -70,3 +70,10 @@ GET /api/openspec/search?dir=...&q=...   # 全文搜尋
 - 程式碼用英文撰寫
 - 註解與文件使用繁體中文（台灣用語）
 - OpenSpec 資料結構詳見 `docs/prd.md` 第 3 節
+
+## Workflow
+
+- **所有變更都必須使用 OpenSpec 工作流程**：每個功能、修復或修改都要先建立 OpenSpec change，經過 proposal → design → tasks 流程後再實作
+- 使用 `/openspec-new-change` 建立新的 change
+- 實作完成後使用 `/openspec-verify-change` 驗證，再用 `/openspec-archive-change` 封存
+- **Archive 時必須**：更新相關文件（CLAUDE.md、README 等若有影響），並建立 git commit

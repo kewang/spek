@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #0a0c0f;
+  --color-bg-secondary: #111318;
+  --color-bg-tertiary: #1a1d24;
+  --color-border: #2a2d35;
+  --color-text-primary: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  line-height: 1.75;
+}
+
+code, pre {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
