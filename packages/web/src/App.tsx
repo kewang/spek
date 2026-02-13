@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import { RepoProvider } from "./contexts/RepoContext";
+import { RepoProvider, useRepo } from "./contexts/RepoContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ApiAdapterProvider } from "./api/ApiAdapterContext";
+import { FetchAdapter } from "./api/FetchAdapter";
 import { Layout } from "./components/Layout";
 import { SelectRepo } from "./pages/SelectRepo";
 import { Dashboard } from "./pages/Dashboard";
@@ -26,11 +29,22 @@ const router = createBrowserRouter([
   },
 ]);
 
+function AppWithAdapter() {
+  const { repoPath } = useRepo();
+  const adapter = useMemo(() => new FetchAdapter(repoPath), [repoPath]);
+
+  return (
+    <ApiAdapterProvider adapter={adapter}>
+      <RouterProvider router={router} />
+    </ApiAdapterProvider>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <RepoProvider>
-        <RouterProvider router={router} />
+        <AppWithAdapter />
       </RepoProvider>
     </ThemeProvider>
   );

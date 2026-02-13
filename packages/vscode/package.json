@@ -1,0 +1,44 @@
+{
+  "name": "spek-vscode",
+  "displayName": "spek — OpenSpec Viewer",
+  "description": "Browse OpenSpec specs and changes directly in VS Code",
+  "version": "0.1.0",
+  "publisher": "spek",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "workspaceContains:openspec/config.yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "spek.open",
+        "title": "Open spek",
+        "category": "spek"
+      },
+      {
+        "command": "spek.search",
+        "title": "Search OpenSpec",
+        "category": "spek"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+    "watch": "npm run build -- --watch",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.24.0",
+    "@vscode/vsce": "^3.0.0"
+  },
+  "dependencies": {
+    "@spek/core": "*",
+    "fuse.js": "^7.0.0"
+  }
+}

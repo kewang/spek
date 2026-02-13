@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Scan OpenSpec directory structure
 The scanner SHALL be a pure function in the `@spek/core` package that reads an OpenSpec directory and returns its complete structure including specs, active changes, and archived changes. It SHALL use Node.js `fs/promises` directly and have no dependency on Express or any HTTP framework.

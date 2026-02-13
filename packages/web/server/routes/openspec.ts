@@ -2,8 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
-import { scanOpenSpec, readSpec, readChange } from "../lib/scanner.js";
-import { resyncTimestamps } from "../lib/git-cache.js";
+import { scanOpenSpec, readSpec, readChange, resyncTimestamps } from "@spek/core";
 
 export const openspecRouter = Router();
 

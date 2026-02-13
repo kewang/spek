@@ -43,7 +43,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      {children}
+      <ThemeControlContext.Provider value={{ setTheme }}>
+        {children}
+      </ThemeControlContext.Provider>
     </ThemeContext.Provider>
   );
 }
@@ -51,5 +53,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
+  return ctx;
+}
+
+// Webview 專用：允許外部設定 theme
+const ThemeControlContext = createContext<{ setTheme: (t: Theme) => void } | null>(null);
+
+export { ThemeControlContext };
+
+export function useThemeControl(): { setTheme: (t: Theme) => void } {
+  const ctx = useContext(ThemeControlContext);
+  if (!ctx) throw new Error("useThemeControl must be used within ThemeProvider");
   return ctx;
 }
