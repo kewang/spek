@@ -6,4 +6,4 @@
 ## 2. Push to GitHub
 
 - [x] 2.1 設定 GitHub remote origin (`https://github.com/kewang/spek`)
-- [ ] 2.2 Push `master` 分支到 remote
+- [x] 2.2 Push `master` 分支到 remote
