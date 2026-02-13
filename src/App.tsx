@@ -1,10 +1,34 @@
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { RepoProvider } from "./contexts/RepoContext";
+import { Layout } from "./components/Layout";
+import { SelectRepo } from "./pages/SelectRepo";
+import { Dashboard } from "./pages/Dashboard";
+import { SpecList } from "./pages/SpecList";
+import { SpecDetail } from "./pages/SpecDetail";
+import { ChangeList } from "./pages/ChangeList";
+import { ChangeDetail } from "./pages/ChangeDetail";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <SelectRepo />,
+  },
+  {
+    element: <Layout />,
+    children: [
+      { path: "/dashboard", element: <Dashboard /> },
+      { path: "/specs", element: <SpecList /> },
+      { path: "/specs/:topic", element: <SpecDetail /> },
+      { path: "/changes", element: <ChangeList /> },
+      { path: "/changes/:slug", element: <ChangeDetail /> },
+    ],
+  },
+]);
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-accent mb-2">spek</h1>
-        <p className="text-text-secondary">OpenSpec Viewer — Phase 1 skeleton</p>
-      </div>
-    </div>
+    <RepoProvider>
+      <RouterProvider router={router} />
+    </RepoProvider>
   );
 }
