@@ -48,14 +48,7 @@ Open http://localhost:5173, enter a path to a repo containing an `openspec/` dir
 
 ### VS Code Extension
 
-```bash
-npm run build -w @spek/core
-npm run build:webview -w @spek/web
-npm run build -w spek-vscode
-cd packages/vscode && npx vsce package --no-dependencies
-```
-
-Install the generated `.vsix` file in VS Code. The extension activates automatically when your workspace contains `openspec/config.yaml`.
+Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=kewang.spek-vscode). The extension activates automatically when your workspace contains `openspec/config.yaml`.
 
 **Commands:**
 - `spek: Open spek` — Open the viewer panel

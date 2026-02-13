@@ -48,14 +48,7 @@ npm run dev
 
 ### VS Code Extension
 
-```bash
-npm run build -w @spek/core
-npm run build:webview -w @spek/web
-npm run build -w spek-vscode
-cd packages/vscode && npx vsce package --no-dependencies
-```
-
-在 VS Code 中安裝產出的 `.vsix` 檔案。當 workspace 包含 `openspec/config.yaml` 時，Extension 會自動啟動。
+從 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=kewang.spek-vscode) 安裝。當 workspace 包含 `openspec/config.yaml` 時，Extension 會自動啟動。
 
 **指令：**
 - `spek: Open spek` — 開啟檢視器面板
