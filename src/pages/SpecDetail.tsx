@@ -39,8 +39,12 @@ export function SpecDetail() {
                   {/* 時間線圓點 */}
                   <div className="absolute -left-4 top-3.5 w-2.5 h-2.5 rounded-full border-2 border-accent bg-bg-primary" />
                   <div className="flex items-center gap-2 mb-0.5">
-                    {entry.date && (
-                      <span className="text-text-muted text-xs font-mono">{entry.date}</span>
+                    {(entry.timestamp || entry.date) && (
+                      <span className="text-text-muted text-xs font-mono" title={entry.timestamp || undefined}>
+                        {entry.timestamp
+                          ? new Date(entry.timestamp).toLocaleString()
+                          : entry.date}
+                      </span>
                     )}
                     <span className={`text-xs px-1.5 py-0.5 rounded ${
                       entry.status === "active"

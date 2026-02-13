@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Spec history data in API response
 The system SHALL include a `history` array in the `GET /api/openspec/specs/:topic` response. Each entry MUST contain the change slug, date (if parseable from slug), timestamp (ISO 8601 from git commit cache, or null if unavailable), description, and status (active or archived).
@@ -17,18 +17,3 @@ The system SHALL include a `history` array in the `GET /api/openspec/specs/:topi
 - **WHEN** a history entry has no git commit timestamp (e.g., uncommitted change or non-git repo)
 - **THEN** the entry's `timestamp` field is null
 - **AND** sorting falls back to the date parsed from the slug
-
-### Requirement: Spec history timeline UI
-The system SHALL display a visual timeline on the SpecDetail page showing all changes that affected the spec. Each timeline entry MUST display the date, change description, and a link to the change detail page.
-
-#### Scenario: Display history timeline
-- **WHEN** the SpecDetail page is rendered for a spec with related changes
-- **THEN** a "History" section is displayed with a vertical timeline showing each change chronologically
-
-#### Scenario: Timeline entry links to change
-- **WHEN** the user clicks on a timeline entry
-- **THEN** the system navigates to the corresponding change detail page
-
-#### Scenario: No history
-- **WHEN** the SpecDetail page is rendered for a spec with no related changes
-- **THEN** the "History" section displays a message indicating no changes have affected this spec

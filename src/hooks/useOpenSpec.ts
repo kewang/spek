@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRepo } from "../contexts/RepoContext";
 
 interface FetchState<T> {
@@ -71,6 +71,7 @@ export function useSpecs(): FetchState<SpecInfo[]> {
 interface SpecHistoryEntry {
   slug: string;
   date: string | null;
+  timestamp: string | null;
   description: string;
   status: "active" | "archived";
 }
@@ -146,6 +147,29 @@ export function useChange(slug: string): FetchState<ChangeDetail> {
       ? `/api/openspec/changes/${encodeURIComponent(slug)}?dir=${encodeURIComponent(repoPath)}`
       : null;
   return useFetch<ChangeDetail>(url);
+}
+
+// --- Resync hook ---
+
+export function useResync(): { resync: () => Promise<void>; loading: boolean } {
+  const { repoPath } = useRepo();
+  const [loading, setLoading] = useState(false);
+
+  const resync = useCallback(async () => {
+    if (!repoPath || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `/api/openspec/resync?dir=${encodeURIComponent(repoPath)}`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [repoPath, loading]);
+
+  return { resync, loading };
 }
 
 // --- Filesystem API hooks ---

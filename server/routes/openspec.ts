@@ -3,6 +3,7 @@ import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
 import { scanOpenSpec, readSpec, readChange } from "../lib/scanner.js";
+import { resyncTimestamps } from "../lib/git-cache.js";
 
 export const openspecRouter = Router();
 
@@ -44,9 +45,9 @@ openspecRouter.get("/specs", (req, res) => {
   res.json(scan.specs);
 });
 
-openspecRouter.get("/specs/:topic", (req, res) => {
+openspecRouter.get("/specs/:topic", async (req, res) => {
   const dir = req.query.dir as string;
-  const result = readSpec(dir, req.params.topic);
+  const result = await readSpec(dir, req.params.topic);
   if (!result) {
     res.status(404).json({ error: "Spec not found" });
     return;
@@ -162,4 +163,10 @@ openspecRouter.get("/search", (req, res) => {
   });
 
   res.json(response);
+});
+
+openspecRouter.post("/resync", async (req, res) => {
+  const dir = req.query.dir as string;
+  await resyncTimestamps(dir);
+  res.json({ ok: true });
 });
