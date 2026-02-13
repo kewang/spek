@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useSpec } from "../hooks/useOpenSpec";
+import { MarkdownRenderer } from "../components/MarkdownRenderer";
 
 export function SpecDetail() {
   const { topic } = useParams<{ topic: string }>();
@@ -18,9 +19,7 @@ export function SpecDetail() {
         <h1 className="text-2xl font-bold mt-2">{data.topic}</h1>
       </div>
 
-      <pre className="bg-bg-secondary border border-border rounded p-4 text-sm text-text-primary whitespace-pre-wrap overflow-x-auto leading-relaxed">
-        {data.content}
-      </pre>
+      <MarkdownRenderer content={data.content} />
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Related Changes</h2>

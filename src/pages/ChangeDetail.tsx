@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useChange } from "../hooks/useOpenSpec";
 import { TabView } from "../components/TabView";
 import { TaskProgress } from "../components/TaskProgress";
+import { MarkdownRenderer } from "../components/MarkdownRenderer";
 
 export function ChangeDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -16,9 +17,7 @@ export function ChangeDetail() {
       id: "proposal",
       label: "Proposal",
       content: data.proposal ? (
-        <pre className="bg-bg-secondary border border-border rounded p-4 text-sm text-text-primary whitespace-pre-wrap overflow-x-auto leading-relaxed">
-          {data.proposal}
-        </pre>
+        <MarkdownRenderer content={data.proposal} />
       ) : (
         <p className="text-text-muted text-sm">No content</p>
       ),
@@ -27,9 +26,7 @@ export function ChangeDetail() {
       id: "design",
       label: "Design",
       content: data.design ? (
-        <pre className="bg-bg-secondary border border-border rounded p-4 text-sm text-text-primary whitespace-pre-wrap overflow-x-auto leading-relaxed">
-          {data.design}
-        </pre>
+        <MarkdownRenderer content={data.design} />
       ) : (
         <p className="text-text-muted text-sm">No content</p>
       ),
@@ -73,9 +70,7 @@ export function ChangeDetail() {
             {data.specs.map((spec) => (
               <div key={spec.topic}>
                 <h3 className="text-sm font-semibold text-accent mb-2">{spec.topic}</h3>
-                <pre className="bg-bg-secondary border border-border rounded p-4 text-sm text-text-primary whitespace-pre-wrap overflow-x-auto leading-relaxed">
-                  {spec.content}
-                </pre>
+                <MarkdownRenderer content={spec.content} />
               </div>
             ))}
           </div>
