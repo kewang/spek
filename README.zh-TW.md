@@ -33,6 +33,38 @@
 - **Spec 歷史追蹤** — 基於 Git 的時間戳記追蹤 spec 修訂紀錄
 - **響應式版面** — 適應不同螢幕尺寸
 
+## 截圖
+
+### Dashboard 總覽
+Specs 數量、Changes 數量、任務完成率一覽。
+
+![Dashboard](screenshots/dashboard.png)
+
+### Specs 瀏覽
+依字母排序的主題列表，支援篩選。
+
+![Specs 列表](screenshots/specs-list.png)
+
+### Spec 詳細內容 — BDD 語法高亮
+BDD 關鍵字上色 — WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUST/SHALL（紅）。
+
+![Spec 詳細](screenshots/spec-detail.png)
+
+### Changes 時間線
+進行中與已封存的 changes 依時間排列。
+
+![Changes 列表](screenshots/changes-list.png)
+
+### Change 詳細內容
+分頁顯示 Proposal、Design、Tasks、Specs。
+
+![Change 詳細](screenshots/change-detail.png)
+
+### 全文搜尋
+`Cmd+K` / `Ctrl+K` 跨 specs 與 changes 搜尋。
+
+![搜尋](screenshots/search.png)
+
 ## 快速開始
 
 ### Web 版

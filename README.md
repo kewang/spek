@@ -33,6 +33,38 @@ Both are **read-only** and **local-only**. No server deployment, no authenticati
 - **Spec History** — Git-based timestamp tracking for spec revisions
 - **Responsive Layout** — Works on various screen sizes
 
+## Screenshots
+
+### Dashboard
+Overview of specs count, changes count, and task completion rates.
+
+![Dashboard](screenshots/dashboard.png)
+
+### Specs Browser
+Alphabetical listing of all spec topics with filter support.
+
+![Specs List](screenshots/specs-list.png)
+
+### Spec Detail with BDD Highlighting
+Visual distinction for BDD keywords — WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red).
+
+![Spec Detail](screenshots/spec-detail.png)
+
+### Changes Timeline
+Active and archived changes listed chronologically.
+
+![Changes List](screenshots/changes-list.png)
+
+### Change Detail
+Tabbed view with Proposal, Design, Tasks, and Specs sections.
+
+![Change Detail](screenshots/change-detail.png)
+
+### Full-text Search
+`Cmd+K` / `Ctrl+K` to search across all specs and changes.
+
+![Search](screenshots/search.png)
+
 ## Quick Start
 
 ### Web Version
