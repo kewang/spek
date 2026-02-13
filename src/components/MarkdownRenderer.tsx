@@ -1,9 +1,11 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 
 interface MarkdownRendererProps {
   content: string;
+  specTopics?: string[];
 }
 
 // BDD 關鍵字樣式對應
@@ -65,7 +67,7 @@ function processChildren(children: ReactNode): ReactNode {
   return children;
 }
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, specTopics }: MarkdownRendererProps) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
@@ -126,6 +128,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
                 <code className={`${className} block`}>
                   {children}
                 </code>
+              );
+            }
+            const text = typeof children === "string" ? children : String(children ?? "");
+            if (specTopics?.includes(text)) {
+              return (
+                <Link
+                  to={`/specs/${text}`}
+                  className="bg-bg-tertiary text-accent hover:text-accent-hover px-1.5 py-0.5 rounded text-sm underline decoration-dotted transition-colors"
+                >
+                  {text}
+                </Link>
               );
             }
             return (

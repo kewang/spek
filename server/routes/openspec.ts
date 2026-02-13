@@ -21,7 +21,7 @@ openspecRouter.get("/overview", (req, res) => {
 
   let totalTasks = 0;
   let completedTasks = 0;
-  for (const change of scan.activeChanges) {
+  for (const change of [...scan.activeChanges, ...scan.archivedChanges]) {
     if (change.taskStats) {
       totalTasks += change.taskStats.total;
       completedTasks += change.taskStats.completed;

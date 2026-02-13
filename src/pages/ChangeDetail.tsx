@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useChange } from "../hooks/useOpenSpec";
+import { useChange, useSpecs } from "../hooks/useOpenSpec";
 import { TabView } from "../components/TabView";
 import { TaskProgress } from "../components/TaskProgress";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
@@ -7,6 +7,8 @@ import { MarkdownRenderer } from "../components/MarkdownRenderer";
 export function ChangeDetail() {
   const { slug } = useParams<{ slug: string }>();
   const { data, loading, error } = useChange(slug ?? "");
+  const { data: specsData } = useSpecs();
+  const specTopics = specsData?.map((s) => s.topic) ?? [];
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
   if (error) return <p className="text-red-400">Error: {error}</p>;
@@ -17,7 +19,7 @@ export function ChangeDetail() {
       id: "proposal",
       label: "Proposal",
       content: data.proposal ? (
-        <MarkdownRenderer content={data.proposal} />
+        <MarkdownRenderer content={data.proposal} specTopics={specTopics} />
       ) : (
         <p className="text-text-muted text-sm">No content</p>
       ),
