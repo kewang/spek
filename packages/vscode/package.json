@@ -3,12 +3,31 @@
   "displayName": "spek — OpenSpec Viewer",
   "description": "Browse OpenSpec specs and changes directly in VS Code",
   "version": "0.1.0",
-  "publisher": "spek",
-  "private": true,
+  "publisher": "kewang",
+  "license": "MIT",
+  "icon": "icon.png",
+  "homepage": "https://github.com/kewang/spek#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kewang/spek.git",
+    "directory": "packages/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/kewang/spek/issues"
+  },
+  "keywords": [
+    "openspec",
+    "spec",
+    "bdd",
+    "documentation",
+    "viewer"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
     "workspaceContains:openspec/config.yaml"
   ],
@@ -28,16 +47,16 @@
     ]
   },
   "scripts": {
+    "vscode:prepublish": "npm run build",
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
     "watch": "npm run build -- --watch",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",
     "esbuild": "^0.24.0",
-    "@vscode/vsce": "^3.0.0"
-  },
-  "dependencies": {
+    "@vscode/vsce": "^3.0.0",
     "@spek/core": "*",
     "fuse.js": "^7.0.0"
   }
