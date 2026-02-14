@@ -2,8 +2,8 @@
 
 ## 0.2.1
 
-- GitHub Actions CI/CD — push `v*` tag 時自動 build 並發佈到 VS Code Marketplace
-- `npm version` 自動同步 root 與 vscode 的版號
+- GitHub Actions CI/CD — auto build and publish to VS Code Marketplace on `v*` tag push
+- `npm version` auto-syncs version between root and vscode package.json
 
 ## 0.2.0
 
