@@ -14,6 +14,8 @@
 
 **spek** 把你本機的 OpenSpec 目錄變成可瀏覽、可搜尋的介面。不用再打開一堆 Markdown 檔案逐一閱讀，spek 提供結構化的瀏覽體驗，包含 BDD 語法高亮、任務進度追蹤和全文搜尋。
 
+**[線上 Demo](https://kewang.github.io/spek/demo.html)** — 直接在瀏覽器體驗，免安裝。
+
 提供兩種使用方式：
 
 - **Web 版** — 本地 Express + React 應用，瀏覽器即可使用

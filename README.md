@@ -14,6 +14,8 @@
 
 **spek** turns your local OpenSpec directory into a navigable, searchable interface. Instead of reading raw Markdown files in a text editor, spek provides structured browsing with BDD syntax highlighting, task progress tracking, and full-text search.
 
+**[Live Demo](https://kewang.github.io/spek/demo.html)** — Try it instantly in your browser, no install needed.
+
 Available in two forms:
 
 - **Web** — Local Express + React app, accessible in any browser

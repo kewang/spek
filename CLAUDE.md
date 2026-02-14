@@ -4,9 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-spek 是一個 OpenSpec 內容檢視器，提供兩種使用方式：
+spek 是一個 OpenSpec 內容檢視器，提供三種使用方式：
 1. **Web 版**：本地唯讀 Web 應用（Express + React SPA），使用者啟動後在 UI 中選擇 repo 路徑瀏覽
 2. **VS Code Extension**：直接在 VS Code 中開啟 Webview Panel 瀏覽當前 workspace 的 OpenSpec 內容
+3. **Demo**：獨立靜態 HTML（`docs/demo.html`），內嵌 spek 自身的 openspec 資料，可部署至 GitHub Pages
 
 ## Tech Stack
 
@@ -30,6 +31,8 @@ packages/
 └── vscode/     # spek-vscode — VS Code Extension
     ├── src/    # extension.ts, panel.ts, handler.ts
     └── webview/ # Vite build output（由 web build:webview 產出）
+scripts/        # Build 工具（build-demo.ts）
+docs/           # 靜態產出（demo.html，GitHub Pages 部署）
 ```
 
 ## Development Commands
@@ -42,6 +45,7 @@ npm run build:core       # Build @spek/core
 npm run build:web        # Build @spek/web（web 版 production build）
 npm run build:webview    # Build webview assets（給 VS Code extension 用）
 npm run build:vscode     # Build VS Code extension
+npm run build:demo       # Build 獨立 demo HTML（docs/demo.html）
 npm run type-check       # TypeScript type check
 ```
 
@@ -67,6 +71,7 @@ cd packages/vscode && npx vsce package --no-dependencies
 前端透過 `ApiAdapter` 介面抽象通訊層：
 - `FetchAdapter` — Web 版，呼叫 Express REST API
 - `MessageAdapter` — VS Code Webview 版，透過 `postMessage` 與 extension host 通訊
+- `StaticAdapter` — Demo 版，從 build time 內嵌的 `window.__DEMO_DATA__` 讀取靜態資料
 - 透過 `ApiAdapterContext` (React Context) 注入
 
 ### API endpoints（Web 版，所有 openspec routes 接受 `dir` query param）
