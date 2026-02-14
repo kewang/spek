@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- GitHub Actions CI/CD — push `v*` tag 時自動 build 並發佈到 VS Code Marketplace
+- `npm version` 自動同步 root 與 vscode 的版號
+
 ## 0.2.0
 
 - Collapsible sidebar with icon-only mode — click toggle button to collapse/expand
