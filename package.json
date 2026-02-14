@@ -15,6 +15,7 @@
     "build:webview": "npm run build:webview -w @spek/web",
     "build:vscode": "npm run build -w spek-vscode",
     "type-check": "npm run type-check -w @spek/web",
+    "build:demo": "npm run build -w @spek/core && tsx scripts/build-demo.ts",
     "version": "node -e \"const p=require('./packages/vscode/package.json');p.version=require('./package.json').version;require('fs').writeFileSync('./packages/vscode/package.json',JSON.stringify(p,null,2)+'\\n')\" && git add packages/vscode/package.json"
   }
 }
