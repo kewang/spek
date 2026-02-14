@@ -154,6 +154,13 @@ npm run type-check       # TypeScript 型別檢查
 
 **系統需求：** Node.js 22+
 
+## 致謝
+
+本專案的靈感來自[龍哥（高見龍）](https://kaochenlong.com)介紹 SDD（Spec Driven Development）的系列文章。因為 [Spectra](https://github.com/kaochenlong/spectra-app) 沒有 Linux 版本，所以催生了 spek。
+
+- [SDD — Spec Driven Development](https://kaochenlong.com/sdd-spec-driven-development)
+- [Spectra with OpenSpec](https://kaochenlong.com/spectra-with-openspec)
+
 ## 授權
 
 MIT

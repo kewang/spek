@@ -154,6 +154,13 @@ npm run type-check       # TypeScript type check
 
 **Requirements:** Node.js 22+
 
+## Acknowledgments
+
+This project was inspired by [龍哥（高見龍）](https://kaochenlong.com)'s articles on SDD (Spec Driven Development). spek was created because [Spectra](https://github.com/kaochenlong/spectra-app) does not have a Linux version.
+
+- [SDD — Spec Driven Development](https://kaochenlong.com/sdd-spec-driven-development)
+- [Spectra with OpenSpec](https://kaochenlong.com/spectra-with-openspec)
+
 ## License
 
 MIT
