@@ -24,12 +24,16 @@ Extension 目錄下 SHALL 有獨立的 `README.md` 作為 Marketplace 頁面內�
 - **WHEN** 執行 `vsce package`
 - **THEN** `packages/vscode/README.md` 被包含在 `.vsix` 中
 
-### Requirement: CHANGELOG
-Extension 目錄下 SHALL 有 `CHANGELOG.md` 記錄版本變更。
+### Requirement: Extension version and changelog
+Extension SHALL 維護 CHANGELOG.md 記錄每個版本的功能異動，且 package.json version 欄位 SHALL 與最新 CHANGELOG entry 一致。
 
 #### Scenario: CHANGELOG content
 - **WHEN** 使用者在 Marketplace 或 VS Code 中檢視 extension 的 changelog
 - **THEN** 顯示按版本分組的變更記錄
+
+#### Scenario: Version bump with new feature
+- **WHEN** 新功能已實作完成
+- **THEN** package.json version 更新且 CHANGELOG.md 包含對應版本區塊描述新功能
 
 ### Requirement: vscodeignore configuration
 `.vscodeignore` SHALL 排除不需要包含在 `.vsix` 中的檔案，減少套件大小。

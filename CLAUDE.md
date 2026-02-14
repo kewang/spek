@@ -104,6 +104,7 @@ GET /api/openspec/search?dir=...&q=...   # 全文搜尋
 - 程式碼用英文撰寫
 - 註解與文件使用繁體中文（台灣用語）
 - OpenSpec 資料結構詳見 `docs/prd.md` 第 3 節
+- **CHANGELOG 同步**：root `CHANGELOG.md` 與 `packages/vscode/CHANGELOG.md` 內容必須保持一致，更新時兩邊同步修改
 
 ## Workflow
 
