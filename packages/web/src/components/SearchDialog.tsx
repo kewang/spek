@@ -1,18 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useRepo } from "../contexts/RepoContext";
-
-interface SearchMatch {
-  text: string;
-  context: string;
-}
-
-interface SearchResult {
-  type: "spec" | "change";
-  name: string;
-  matches: SearchMatch[];
-  score: number;
-}
+import { useApiAdapter } from "../api/ApiAdapterContext";
+import type { SearchResult } from "@spek/core";
 
 interface SearchDialogProps {
   open: boolean;
@@ -20,12 +9,12 @@ interface SearchDialogProps {
 }
 
 function useSearch(query: string) {
-  const { repoPath } = useRepo();
+  const adapter = useApiAdapter();
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!query.trim() || !repoPath) {
+    if (!query.trim()) {
       setResults([]);
       setLoading(false);
       return;
@@ -33,13 +22,8 @@ function useSearch(query: string) {
 
     setLoading(true);
     const timer = setTimeout(() => {
-      fetch(
-        `/api/openspec/search?dir=${encodeURIComponent(repoPath)}&q=${encodeURIComponent(query.trim())}`
-      )
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
+      adapter
+        .search(query.trim())
         .then((data) => {
           setResults(data);
           setLoading(false);
@@ -51,7 +35,7 @@ function useSearch(query: string) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [query, repoPath]);
+  }, [query, adapter]);
 
   return { results, loading };
 }
@@ -86,8 +70,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
     (result: SearchResult) => {
       const path =
         result.type === "spec"
-          ? `/specs/${encodeURIComponent(result.name)}`
-          : `/changes/${encodeURIComponent(result.name)}`;
+          ? `/specs/${encodeURIComponent(result.topic ?? result.title)}`
+          : `/changes/${encodeURIComponent(result.slug ?? result.title)}`;
       navigate(path);
       onClose();
     },
@@ -170,7 +154,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
-                    key={`spec-${result.name}`}
+                    key={`spec-${result.title}`}
                     result={result}
                     selected={idx === selectedIndex}
                     onClick={() => navigateToResult(result)}
@@ -189,7 +173,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
-                    key={`change-${result.name}`}
+                    key={`change-${result.title}`}
                     result={result}
                     selected={idx === selectedIndex}
                     onClick={() => navigateToResult(result)}
@@ -213,8 +197,6 @@ function ResultItem({
   selected: boolean;
   onClick: () => void;
 }) {
-  const preview = result.matches[0]?.context ?? "";
-
   return (
     <button
       onClick={onClick}
@@ -222,9 +204,9 @@ function ResultItem({
         selected ? "bg-bg-tertiary" : "hover:bg-bg-tertiary/50"
       }`}
     >
-      <div className="text-sm font-medium text-text-primary">{result.name}</div>
-      {preview && (
-        <div className="text-xs text-text-muted mt-0.5 truncate">{preview}</div>
+      <div className="text-sm font-medium text-text-primary">{result.title}</div>
+      {result.context && (
+        <div className="text-xs text-text-muted mt-0.5 truncate">{result.context}</div>
       )}
     </button>
   );

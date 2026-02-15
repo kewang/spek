@@ -72,6 +72,7 @@ export function Layout() {
         {isMobile && (
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Open navigation menu"
             className="p-2 mr-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors cursor-pointer"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

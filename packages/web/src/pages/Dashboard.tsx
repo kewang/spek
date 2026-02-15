@@ -28,10 +28,10 @@ export function Dashboard() {
 
       {/* 統計卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Specs" value={data.specsCount} />
-        <StatCard label="Active Changes" value={data.changesCount.active} />
-        <StatCard label="Archived Changes" value={data.changesCount.archived} />
-        <StatCard label="Task Completion" value={`${taskPercent}%`} />
+        <StatCard label="Specs" value={data.specsCount} delay={0} />
+        <StatCard label="Active Changes" value={data.changesCount.active} delay={80} />
+        <StatCard label="Archived Changes" value={data.changesCount.archived} delay={160} />
+        <StatCard label="Task Completion" value={`${taskPercent}%`} delay={240} />
       </div>
 
       {/* Active changes */}
@@ -102,10 +102,13 @@ export function Dashboard() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value, delay = 0 }: { label: string; value: string | number; delay?: number }) {
   return (
-    <div className="bg-bg-secondary border border-border rounded p-4">
-      <div className="text-2xl font-bold text-accent">{value}</div>
+    <div
+      className="bg-bg-secondary border border-border rounded p-4 animate-fade-in-up"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <div className="text-4xl font-bold text-accent">{value}</div>
       <div className="text-text-secondary text-sm">{label}</div>
     </div>
   );

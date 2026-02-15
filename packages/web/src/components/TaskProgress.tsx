@@ -14,7 +14,7 @@ export function TaskProgress({ completed, total }: TaskProgressProps) {
     <div className="flex items-center gap-3">
       <div className="flex-1 h-2 bg-bg-tertiary rounded-full overflow-hidden">
         <div
-          className="h-full bg-accent rounded-full transition-all"
+          className={`h-full rounded-full transition-all ${completed === total ? "bg-green-500" : "bg-accent"}`}
           style={{ width: `${percent}%` }}
         />
       </div>
