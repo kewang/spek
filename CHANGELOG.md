@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Standalone demo page — self-contained HTML with embedded openspec data for GitHub Pages
+- UI design polish — tab order, animations, search highlights, accessibility improvements
+- Fix demo search — use ApiAdapter instead of direct fetch
+- Plus Jakarta Sans web font for improved typography
+- Add acknowledgments section to README
+
 ## 0.2.1
 
 - GitHub Actions CI/CD — auto build and publish to VS Code Marketplace on `v*` tag push
