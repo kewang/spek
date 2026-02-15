@@ -153,11 +153,17 @@ openspecRouter.get("/search", (req, res) => {
         });
       }).flat() || [];
 
+    const name = r.item.name;
+    const title = r.item.type === "change"
+      ? name.replace(/^\d{4}-\d{2}-\d{2}-/, "").replace(/-/g, " ")
+      : name;
+
     return {
       type: r.item.type,
-      name: r.item.name,
-      score: r.score,
-      matches,
+      title,
+      topic: r.item.type === "spec" ? name : undefined,
+      slug: r.item.type === "change" ? name : undefined,
+      context: matches[0] || "",
     };
   });
 

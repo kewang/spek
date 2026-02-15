@@ -3,6 +3,7 @@ import type { ParsedTasks, TaskStats } from "./tasks.js";
 export interface SpecInfo {
   topic: string;
   path: string;
+  historyCount: number;
 }
 
 export interface HistoryEntry {

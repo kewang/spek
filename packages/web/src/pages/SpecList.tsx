@@ -39,7 +39,14 @@ export function SpecList() {
               to={`/specs/${spec.topic}`}
               className="block px-4 py-3 bg-bg-secondary border border-border rounded hover:border-accent transition-colors"
             >
-              <span className="text-text-primary font-medium">{spec.topic}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-text-primary font-medium">{spec.topic}</span>
+                {spec.historyCount > 0 && (
+                  <span className="text-text-muted text-xs">
+                    {spec.historyCount} {spec.historyCount === 1 ? "change" : "changes"}
+                  </span>
+                )}
+              </div>
             </Link>
           ))
         )}

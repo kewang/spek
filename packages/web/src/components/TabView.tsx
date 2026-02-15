@@ -32,7 +32,9 @@ export function TabView({ tabs }: TabViewProps) {
           </button>
         ))}
       </div>
-      <div>{activeTab?.content}</div>
+      <div key={activeId} className="animate-fade-in">
+        {activeTab?.content}
+      </div>
     </div>
   );
 }

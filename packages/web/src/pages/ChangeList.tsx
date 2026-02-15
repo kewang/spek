@@ -33,7 +33,7 @@ export function ChangeList() {
               <Link
                 key={c.slug}
                 to={`/changes/${c.slug}`}
-                className="block bg-bg-secondary border border-border rounded p-4 hover:border-accent transition-colors"
+                className="block bg-bg-secondary border border-border border-l-4 border-l-accent rounded p-4 hover:border-accent transition-colors"
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-text-primary font-medium">{c.description}</span>

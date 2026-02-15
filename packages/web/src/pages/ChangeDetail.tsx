@@ -34,36 +34,6 @@ export function ChangeDetail() {
       ),
     },
     {
-      id: "tasks",
-      label: "Tasks",
-      content: data.tasks ? (
-        <div className="space-y-4">
-          <TaskProgress completed={data.tasks.completed} total={data.tasks.total} />
-          <div className="space-y-4">
-            {data.tasks.sections.map((section) => (
-              <div key={section.title}>
-                <h3 className="text-sm font-semibold text-text-secondary mb-2">{section.title}</h3>
-                <div className="space-y-1">
-                  {section.tasks.map((task, i) => (
-                    <div key={i} className="flex items-start gap-2 text-sm">
-                      <span className={task.completed ? "text-green-400" : "text-text-muted"}>
-                        {task.completed ? "[x]" : "[ ]"}
-                      </span>
-                      <span className={task.completed ? "text-text-secondary line-through" : "text-text-primary"}>
-                        {task.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <p className="text-text-muted text-sm">No content</p>
-      ),
-    },
-    {
       id: "specs",
       label: "Specs",
       content:
@@ -80,12 +50,49 @@ export function ChangeDetail() {
           <p className="text-text-muted text-sm">No delta specs</p>
         ),
     },
+    {
+      id: "tasks",
+      label: "Tasks",
+      content: data.tasks ? (
+        <div className="space-y-4">
+          <TaskProgress completed={data.tasks.completed} total={data.tasks.total} />
+          <div className="space-y-4">
+            {data.tasks.sections.map((section) => (
+              <div key={section.title}>
+                <h3 className="text-sm font-semibold text-text-secondary mb-2">{section.title}</h3>
+                <div className="space-y-1">
+                  {section.tasks.map((task, i) => (
+                    <div key={i} className={`flex items-start gap-2 text-sm ${task.completed ? "opacity-60" : ""}`}>
+                      {task.completed ? (
+                        <svg className="w-4 h-4 mt-0.5 shrink-0 text-green-400" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.2" />
+                          <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4 mt-0.5 shrink-0 text-text-muted" viewBox="0 0 16 16" fill="none">
+                          <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                        </svg>
+                      )}
+                      <span className={task.completed ? "text-text-secondary line-through" : "text-text-primary"}>
+                        {task.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="text-text-muted text-sm">No content</p>
+      ),
+    },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/changes" className="text-text-muted text-sm hover:text-accent transition-colors">
+        <Link to="/changes" className="text-text-muted text-base font-medium hover:text-accent transition-colors">
           &larr; Back to Changes
         </Link>
         <h1 className="text-2xl font-bold mt-2">{slug}</h1>

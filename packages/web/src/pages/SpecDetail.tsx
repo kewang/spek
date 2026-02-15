@@ -13,7 +13,7 @@ export function SpecDetail() {
   return (
     <div className="space-y-6">
       <div>
-        <Link to="/specs" className="text-text-muted text-sm hover:text-accent transition-colors">
+        <Link to="/specs" className="text-text-muted text-base font-medium hover:text-accent transition-colors">
           &larr; Back to Specs
         </Link>
         <h1 className="text-2xl font-bold mt-2">{data.topic}</h1>

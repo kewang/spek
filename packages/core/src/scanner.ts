@@ -62,7 +62,7 @@ export function scanOpenSpec(repoDir: string): ScanResult {
 
   const specs: SpecInfo[] = safeReadDir(specsDir)
     .filter((name) => fs.statSync(path.join(specsDir, name)).isDirectory())
-    .map((topic) => ({ topic, path: path.join(specsDir, topic, "spec.md") }))
+    .map((topic) => ({ topic, path: path.join(specsDir, topic, "spec.md"), historyCount: 0 }))
     .filter((s) => fs.existsSync(s.path))
     .sort((a, b) => a.topic.localeCompare(b.topic));
 
@@ -76,6 +76,17 @@ export function scanOpenSpec(repoDir: string): ScanResult {
     .filter((name) => fs.statSync(path.join(archiveDir, name)).isDirectory())
     .map((slug) => scanChangeDir(path.join(archiveDir, slug), slug, "archived"))
     .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  // 計算每個 spec 被多少 changes 引用
+  const allChangeDirs = [
+    ...safeReadDir(changesDir).filter((n) => n !== "archive").map((n) => path.join(changesDir, n)),
+    ...safeReadDir(archiveDir).map((n) => path.join(archiveDir, n)),
+  ];
+  for (const spec of specs) {
+    spec.historyCount = allChangeDirs.filter((dir) =>
+      fs.existsSync(path.join(dir, "specs", spec.topic, "spec.md"))
+    ).length;
+  }
 
   return { specs, activeChanges, archivedChanges };
 }

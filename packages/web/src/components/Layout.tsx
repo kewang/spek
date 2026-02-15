@@ -132,7 +132,7 @@ export function Layout() {
       <Sidebar open={sidebarOpen} isMobile={isMobile} collapsed={collapsed} onClose={() => setSidebarOpen(false)} onToggle={toggleCollapsed} />
 
       {/* Main content */}
-      <main className={`pt-14 p-6 transition-all duration-200 ${isMobile ? "" : collapsed ? "ml-14" : "ml-60"}`}>
+      <main className={`pt-18 p-6 transition-all duration-200 ${isMobile ? "" : collapsed ? "ml-14" : "ml-60"}`}>
         <Outlet />
       </main>
 

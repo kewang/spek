@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApiAdapter } from "../api/ApiAdapterContext";
 import type { SearchResult } from "@spek/core";
@@ -6,6 +6,33 @@ import type { SearchResult } from "@spek/core";
 interface SearchDialogProps {
   open: boolean;
   onClose: () => void;
+}
+
+type TypeFilter = "all" | "spec" | "change";
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!text || !query.trim()) return <>{text ?? ""}</>;
+
+  const escaped = escapeRegex(query.trim());
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.trim().toLowerCase() ? (
+          <mark key={i} className="bg-accent/20 text-accent rounded px-0.5">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
 }
 
 function useSearch(query: string) {
@@ -43,6 +70,7 @@ function useSearch(query: string) {
 export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { results, loading } = useSearch(query);
@@ -50,13 +78,20 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   // 按類型分組
   const specResults = results.filter((r) => r.type === "spec");
   const changeResults = results.filter((r) => r.type === "change");
-  const flatResults = [...specResults, ...changeResults];
+
+  const filteredSpecResults = typeFilter === "change" ? [] : specResults;
+  const filteredChangeResults = typeFilter === "spec" ? [] : changeResults;
+  const flatResults = useMemo(
+    () => [...filteredSpecResults, ...filteredChangeResults],
+    [filteredSpecResults, filteredChangeResults]
+  );
 
   // 開啟時 focus 輸入框並重設狀態
   useEffect(() => {
     if (open) {
       setQuery("");
       setSelectedIndex(0);
+      setTypeFilter("all");
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
@@ -64,7 +99,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   // 選取索引隨結果變動重設
   useEffect(() => {
     setSelectedIndex(0);
-  }, [results]);
+  }, [results, typeFilter]);
 
   const navigateToResult = useCallback(
     (result: SearchResult) => {
@@ -103,6 +138,12 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
   let globalIndex = 0;
 
+  const filterButtons: { label: string; value: TypeFilter }[] = [
+    { label: "All", value: "all" },
+    { label: "Specs", value: "spec" },
+    { label: "Changes", value: "change" },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
       {/* Backdrop */}
@@ -129,6 +170,25 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           </kbd>
         </div>
 
+        {/* 類型 filter */}
+        {query.trim() && !loading && results.length > 0 && (
+          <div className="flex gap-1 px-4 pt-2">
+            {filterButtons.map((btn) => (
+              <button
+                key={btn.value}
+                onClick={() => setTypeFilter(btn.value)}
+                className={`px-2.5 py-0.5 text-xs rounded-full transition-colors cursor-pointer ${
+                  typeFilter === btn.value
+                    ? "bg-accent/20 text-accent"
+                    : "bg-bg-tertiary text-text-muted hover:text-text-secondary"
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* 結果區域 */}
         <div className="max-h-80 overflow-y-auto">
           {!query.trim() && (
@@ -142,20 +202,24 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
           )}
 
           {query.trim() && !loading && flatResults.length === 0 && (
-            <p className="text-text-muted text-sm p-4 text-center">No results found</p>
+            <div className="text-center p-4">
+              <p className="text-text-muted text-sm">No results found</p>
+              <p className="text-text-muted text-xs mt-1">Try different keywords or check the spelling</p>
+            </div>
           )}
 
-          {!loading && specResults.length > 0 && (
+          {!loading && filteredSpecResults.length > 0 && (
             <div>
               <div className="px-4 pt-3 pb-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                 Specs
               </div>
-              {specResults.map((result) => {
+              {filteredSpecResults.map((result) => {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
                     key={`spec-${result.title}`}
                     result={result}
+                    query={query}
                     selected={idx === selectedIndex}
                     onClick={() => navigateToResult(result)}
                   />
@@ -164,17 +228,18 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
             </div>
           )}
 
-          {!loading && changeResults.length > 0 && (
+          {!loading && filteredChangeResults.length > 0 && (
             <div>
               <div className="px-4 pt-3 pb-1 text-xs font-semibold text-text-muted uppercase tracking-wider">
                 Changes
               </div>
-              {changeResults.map((result) => {
+              {filteredChangeResults.map((result) => {
                 const idx = globalIndex++;
                 return (
                   <ResultItem
                     key={`change-${result.title}`}
                     result={result}
+                    query={query}
                     selected={idx === selectedIndex}
                     onClick={() => navigateToResult(result)}
                   />
@@ -190,10 +255,12 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
 
 function ResultItem({
   result,
+  query,
   selected,
   onClick,
 }: {
   result: SearchResult;
+  query: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -204,9 +271,13 @@ function ResultItem({
         selected ? "bg-bg-tertiary" : "hover:bg-bg-tertiary/50"
       }`}
     >
-      <div className="text-sm font-medium text-text-primary">{result.title}</div>
+      <div className="text-sm font-medium text-text-primary">
+        <HighlightText text={result.title} query={query} />
+      </div>
       {result.context && (
-        <div className="text-xs text-text-muted mt-0.5 truncate">{result.context}</div>
+        <div className="text-xs text-text-muted mt-0.5 truncate">
+          <HighlightText text={result.context} query={query} />
+        </div>
       )}
     </button>
   );
