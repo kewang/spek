@@ -33,6 +33,11 @@ packages/
     └── webview/ # Vite build output（由 web build:webview 產出）
 scripts/        # Build 工具（build-demo.ts）
 docs/           # 靜態產出（demo.html，GitHub Pages 部署）
+.agents/
+└── skills/     # Claude Code skills（原始檔）
+    └── frontend-design/  # 前端設計指引 skill
+.claude/
+└── skills/     # Symlinks → .agents/skills/（Claude Code 自動偵測）
 ```
 
 ## Development Commands
