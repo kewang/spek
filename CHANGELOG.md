@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Interactive spec-change graph view — D3 force-directed graph showing relationships between specs and changes
+- Spec nodes (amber circles) scaled by history count, change nodes (colored rects) by spec count
+- Graph interactions: drag, hover highlight, click navigation, zoom/pan with fit-to-viewport
+- New `/graph` route with sidebar navigation link, working across Web, VS Code, and demo
+
 ## 0.4.0
 
 - Spec diff viewer — compare current spec content against any historical change version with unified diff view
