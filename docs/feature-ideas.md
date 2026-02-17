@@ -2,16 +2,18 @@
 
 > 產出日期：2026-02-17
 > 基於 v0.3.1 現況分析
+> 最後更新：2026-02-17（v0.4.0）
 
 ---
 
 ## 高價值功能
 
-### 1. Spec Diff 比較檢視
+### 1. ~~Spec Diff 比較檢視~~ ✅ 已完成（v0.4.0）
 透過 spec history timeline 已有 git 版本追蹤，可以進一步顯示兩個版本之間的差異——哪些段落被新增、修改、刪除。對於理解 spec 演進非常有用。
 
 - 技術方向：git show 取得歷史版本，前端用 diff library 渲染
 - 可讓 spek 從「檢視器」升級為「spec 演進追蹤工具」
+- **已實作**：`SpecDiffViewer.tsx` — 可在 spec 詳情頁比較不同 change 版本間的差異
 
 ### 2. Mermaid 圖表支援
 在 markdown 中渲染 mermaid 圖表（架構圖、流程圖、序列圖）。OpenSpec 的 design doc 很適合搭配圖表。
@@ -94,7 +96,7 @@ Web 版目前一次只看一個 repo，可支援「最近開啟的 repos」快�
 |------|------|------|------|
 | Mermaid 圖表 | 低 | 中 | 優先做 |
 | 書籤功能 | 低 | 中 | 優先做 |
-| Spec Diff | 中高 | 高 | 最有深度的升級 |
+| ~~Spec Diff~~ | ~~中高~~ | ~~高~~ | ✅ 已完成（v0.4.0） |
 | 鍵盤快捷鍵 | 低 | 低中 | 提升 power user 體驗 |
 | Skeleton Loading | 低 | 低中 | P3 已規劃 |
 | TOC 導覽 | 中 | 中 | P3 已規劃 |
