@@ -27,6 +27,9 @@ export class SpekPanel {
       },
     );
 
+    // Tab icon
+    this.panel.iconPath = vscode.Uri.joinPath(context.extensionUri, "webview", "favicon.svg");
+
     this.handler = new MessageHandler(workspacePath);
 
     // 設定 Webview HTML
