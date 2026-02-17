@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Add custom tab icon (spek logo) to VS Code webview panel for better visual identification
+
 ## 0.3.0
 
 - Standalone demo page — self-contained HTML with embedded openspec data for GitHub Pages
