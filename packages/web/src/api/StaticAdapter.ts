@@ -2,6 +2,7 @@ import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   ChangesData,
   ChangeDetail,
   SearchResult,
@@ -16,6 +17,7 @@ export interface DemoData {
   specDetails: Record<string, SpecDetail>;
   changes: ChangesData;
   changeDetails: Record<string, ChangeDetail>;
+  specVersions: Record<string, Record<string, string>>;
 }
 
 export class StaticAdapter implements ApiAdapter {
@@ -40,6 +42,13 @@ export class StaticAdapter implements ApiAdapter {
     const spec = this.data.specDetails[topic];
     if (!spec) return Promise.reject(new Error(`Spec not found: ${topic}`));
     return Promise.resolve(spec);
+  }
+
+  getSpecAtChange(topic: string, slug: string): Promise<SpecVersionContent> {
+    const versions = this.data.specVersions?.[topic];
+    const content = versions?.[slug];
+    if (content === undefined) return Promise.reject(new Error(`Spec version not found: ${topic}@${slug}`));
+    return Promise.resolve({ content });
   }
 
   getChanges(): Promise<ChangesData> {

@@ -3,6 +3,7 @@ export {
   scanOpenSpec,
   readSpec,
   readChange,
+  readSpecAtChange,
   findRelatedChanges,
   parseSlug,
 } from "./scanner.js";
@@ -29,4 +30,5 @@ export type {
   BrowseEntry,
   BrowseData,
   DetectData,
+  SpecVersionContent,
 } from "./types.js";

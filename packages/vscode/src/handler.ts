@@ -6,6 +6,7 @@ import {
   scanOpenSpec,
   readSpec,
   readChange,
+  readSpecAtChange,
   resyncTimestamps,
 } from "@spek/core";
 
@@ -20,6 +21,8 @@ export class MessageHandler {
         return this.getSpecs();
       case "getSpec":
         return this.getSpec(params?.topic as string);
+      case "getSpecAtChange":
+        return this.getSpecAtChange(params?.topic as string, params?.slug as string);
       case "getChanges":
         return this.getChanges();
       case "getChange":
@@ -65,6 +68,12 @@ export class MessageHandler {
   private async getSpec(topic: string) {
     const result = await readSpec(this.workspacePath, topic);
     if (!result) throw new Error("Spec not found");
+    return result;
+  }
+
+  private getSpecAtChange(topic: string, slug: string) {
+    const result = readSpecAtChange(this.workspacePath, topic, slug);
+    if (!result) throw new Error("Spec version not found");
     return result;
   }
 

@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanOpenSpec, readSpec, readChange } from "../packages/core/dist/index.js";
+import { scanOpenSpec, readSpec, readChange, readSpecAtChange } from "../packages/core/dist/index.js";
 import type {
   OverviewData,
   SpecInfo,
@@ -69,7 +69,21 @@ async function main() {
     archived: scan.archivedChanges,
   };
 
-  const demoData = { overview, specs, specDetails, changes, changeDetails };
+  // 收集 spec 歷史版本內容（供 diff 檢視）
+  const specVersions: Record<string, Record<string, string>> = {};
+  for (const spec of scan.specs) {
+    const detail = specDetails[spec.topic];
+    if (!detail?.history?.length) continue;
+    for (const entry of detail.history) {
+      const version = readSpecAtChange(ROOT, spec.topic, entry.slug);
+      if (version) {
+        if (!specVersions[spec.topic]) specVersions[spec.topic] = {};
+        specVersions[spec.topic][entry.slug] = version.content;
+      }
+    }
+  }
+
+  const demoData = { overview, specs, specDetails, changes, changeDetails, specVersions };
   const demoDataJson = JSON.stringify(demoData);
 
   console.log(

@@ -169,6 +169,27 @@ export function readChange(repoDir: string, slug: string): ChangeDetail | null {
   return { slug, proposal, design, tasks, specs, metadata };
 }
 
+export function readSpecAtChange(
+  repoDir: string,
+  topic: string,
+  slug: string,
+): { content: string } | null {
+  const base = openspecDir(repoDir);
+  const changesDir = path.join(base, "changes");
+
+  // 先檢查 active changes
+  let specPath = path.join(changesDir, slug, "specs", topic, "spec.md");
+  let content = readFileOrNull(specPath);
+  if (content !== null) return { content };
+
+  // 再檢查 archive
+  specPath = path.join(changesDir, "archive", slug, "specs", topic, "spec.md");
+  content = readFileOrNull(specPath);
+  if (content !== null) return { content };
+
+  return null;
+}
+
 export function findRelatedChanges(repoDir: string, topic: string): string[] {
   const base = openspecDir(repoDir);
   const changesDir = path.join(base, "changes");

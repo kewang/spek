@@ -2,6 +2,7 @@ import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   ChangesData,
   ChangeDetail,
   SearchResult,
@@ -13,6 +14,7 @@ export interface ApiAdapter {
   getOverview(): Promise<OverviewData>;
   getSpecs(): Promise<SpecInfo[]>;
   getSpec(topic: string): Promise<SpecDetail>;
+  getSpecAtChange(topic: string, slug: string): Promise<SpecVersionContent>;
   getChanges(): Promise<ChangesData>;
   getChange(slug: string): Promise<ChangeDetail>;
   search(query: string): Promise<SearchResult[]>;

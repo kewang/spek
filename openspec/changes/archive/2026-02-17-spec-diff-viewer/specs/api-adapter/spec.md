@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: ApiAdapter interface
 The frontend SHALL define an `ApiAdapter` interface that abstracts all API communication, allowing different implementations for web and VS Code environments. The interface SHALL include a `getSpecAtChange(topic: string, slug: string): Promise<{ content: string }>` method for fetching spec content at a specific change version.
@@ -40,21 +40,6 @@ The VS Code version SHALL use a `MessageAdapter` that communicates with the exte
 #### Scenario: Message adapter getSpecAtChange
 - **WHEN** `MessageAdapter.getSpecAtChange("user-auth", "2026-01-15-add-oauth")` is called
 - **THEN** it sends `{ type: 'request', id: '<unique>', method: 'getSpecAtChange', params: { topic: 'user-auth', slug: '2026-01-15-add-oauth' } }` via `postMessage`
-
-### Requirement: Adapter injection via React Context
-The adapter SHALL be provided to the React component tree via a Context provider, allowing hooks to use the appropriate adapter without knowing the environment.
-
-#### Scenario: Web app initialization
-- **WHEN** the web app mounts
-- **THEN** it wraps the component tree with an `ApiAdapterProvider` using `FetchAdapter`
-
-#### Scenario: Webview app initialization
-- **WHEN** the React app mounts inside a VS Code Webview
-- **THEN** it wraps the component tree with an `ApiAdapterProvider` using `MessageAdapter`
-
-#### Scenario: Hook usage
-- **WHEN** a hook like `useOverview()` needs to fetch data
-- **THEN** it obtains the adapter from `useApiAdapter()` context and calls `adapter.getOverview()`
 
 ### Requirement: StaticAdapter for demo
 The demo version SHALL use a `StaticAdapter` that reads all data from a pre-embedded JSON object (`window.__DEMO_DATA__`) and implements the `ApiAdapter` interface. The `DemoData` structure SHALL include a `specVersions` field mapping topic to slug to content.

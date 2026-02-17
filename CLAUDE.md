@@ -69,6 +69,7 @@ cd packages/vscode && npx vsce package --no-dependencies
 - `scanOpenSpec(basePath)` — 掃描 OpenSpec 目錄結構
 - `readSpec(basePath, topic)` — 讀取單一 spec（含歷史）
 - `readChange(basePath, slug)` — 讀取單一 change
+- `readSpecAtChange(basePath, topic, slug)` — 讀取特定 change 中的 spec 歷史版本
 - `parseTasks(content)` — 解析 tasks.md checkbox
 - 共用型別：`OverviewData`, `SpecInfo`, `ChangeInfo`, `ChangeDetail` 等
 
@@ -86,6 +87,7 @@ GET /api/fs/detect?path=...              # 偵測 openspec/ 存在
 GET /api/openspec/overview?dir=...       # 總覽統計
 GET /api/openspec/specs?dir=...          # Spec 列表
 GET /api/openspec/specs/:topic?dir=...   # 單一 spec 內容
+GET /api/openspec/specs/:topic/at/:slug?dir=...  # Spec 歷史版本內容（diff 用）
 GET /api/openspec/changes?dir=...        # Changes 列表
 GET /api/openspec/changes/:slug?dir=...  # 單一 change 內容
 GET /api/openspec/search?dir=...&q=...   # 全文搜尋

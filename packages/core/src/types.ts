@@ -84,4 +84,8 @@ export interface DetectData {
   schema?: string;
 }
 
+export interface SpecVersionContent {
+  content: string;
+}
+
 export type { TaskItem, TaskSection, TaskStats, ParsedTasks } from "./tasks.js";

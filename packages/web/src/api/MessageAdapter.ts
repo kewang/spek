@@ -2,6 +2,7 @@ import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   ChangesData,
   ChangeDetail,
   SearchResult,
@@ -80,6 +81,10 @@ export class MessageAdapter implements ApiAdapter {
 
   getSpec(topic: string): Promise<SpecDetail> {
     return this.request("getSpec", { topic });
+  }
+
+  getSpecAtChange(topic: string, slug: string): Promise<SpecVersionContent> {
+    return this.request("getSpecAtChange", { topic, slug });
   }
 
   getChanges(): Promise<ChangesData> {

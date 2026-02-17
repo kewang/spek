@@ -2,6 +2,7 @@ import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   ChangesData,
   ChangeDetail,
   SearchResult,
@@ -33,6 +34,10 @@ export class FetchAdapter implements ApiAdapter {
 
   getSpec(topic: string): Promise<SpecDetail> {
     return fetchJson(`/api/openspec/specs/${encodeURIComponent(topic)}?${this.q()}`);
+  }
+
+  getSpecAtChange(topic: string, slug: string): Promise<SpecVersionContent> {
+    return fetchJson(`/api/openspec/specs/${encodeURIComponent(topic)}/at/${encodeURIComponent(slug)}?${this.q()}`);
   }
 
   getChanges(): Promise<ChangesData> {

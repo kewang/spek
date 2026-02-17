@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
-import { scanOpenSpec, readSpec, readChange, resyncTimestamps } from "@spek/core";
+import { scanOpenSpec, readSpec, readChange, readSpecAtChange, resyncTimestamps } from "@spek/core";
 
 export const openspecRouter = Router();
 
@@ -49,6 +49,16 @@ openspecRouter.get("/specs/:topic", async (req, res) => {
   const result = await readSpec(dir, req.params.topic);
   if (!result) {
     res.status(404).json({ error: "Spec not found" });
+    return;
+  }
+  res.json(result);
+});
+
+openspecRouter.get("/specs/:topic/at/:slug", (req, res) => {
+  const dir = req.query.dir as string;
+  const result = readSpecAtChange(dir, req.params.topic, req.params.slug);
+  if (!result) {
+    res.status(404).json({ error: "Spec version not found" });
     return;
   }
   res.json(result);

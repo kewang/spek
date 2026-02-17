@@ -5,6 +5,7 @@ import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   HistoryEntry as SpecHistoryEntry,
   ChangeInfo,
   ChangesData,
@@ -22,6 +23,7 @@ export type {
   OverviewData,
   SpecInfo,
   SpecDetail,
+  SpecVersionContent,
   ChangeInfo,
   ChangesData,
   ChangeDetail,
@@ -103,6 +105,15 @@ export function useSpec(topic: string): FetchState<SpecDetail> {
   return useAsyncData(
     repoPath && topic ? () => adapter.getSpec(topic) : null,
     [repoPath, topic],
+  );
+}
+
+export function useSpecAtChange(topic: string, slug: string): FetchState<SpecVersionContent> {
+  const { repoPath } = useRepo();
+  const adapter = useApiAdapter();
+  return useAsyncData(
+    repoPath && topic && slug ? () => adapter.getSpecAtChange(topic, slug) : null,
+    [repoPath, topic, slug],
   );
 }
 
