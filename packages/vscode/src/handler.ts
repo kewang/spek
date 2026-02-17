@@ -8,6 +8,7 @@ import {
   readChange,
   readSpecAtChange,
   resyncTimestamps,
+  buildGraphData,
 } from "@spek/core";
 
 export class MessageHandler {
@@ -35,6 +36,8 @@ export class MessageHandler {
         return this.detect(params?.path as string);
       case "resync":
         return this.resync();
+      case "getGraphData":
+        return this.getGraphData();
       default:
         throw new Error(`Unknown method: ${method}`);
     }
@@ -200,5 +203,9 @@ export class MessageHandler {
   private async resync() {
     await resyncTimestamps(this.workspacePath);
     return { ok: true };
+  }
+
+  private getGraphData() {
+    return buildGraphData(this.workspacePath);
   }
 }

@@ -8,6 +8,7 @@ import type {
   SearchResult,
   BrowseData,
   DetectData,
+  GraphData,
 } from "@spek/core";
 
 export interface ApiAdapter {
@@ -21,4 +22,5 @@ export interface ApiAdapter {
   browse(path: string): Promise<BrowseData>;
   detect(path: string): Promise<DetectData>;
   resync(): Promise<void>;
+  getGraphData(): Promise<GraphData>;
 }

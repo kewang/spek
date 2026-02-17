@@ -16,6 +16,7 @@ import type {
   BrowseEntry,
   BrowseData,
   DetectData,
+  GraphData,
 } from "@spek/core";
 
 // Re-export types for existing consumers
@@ -153,6 +154,17 @@ export function useResync(): { resync: () => Promise<void>; loading: boolean } {
   }, [repoPath, loading, adapter]);
 
   return { resync, loading };
+}
+
+// --- Graph data hook ---
+
+export function useGraphData(): FetchState<GraphData> {
+  const { repoPath } = useRepo();
+  const adapter = useApiAdapter();
+  return useAsyncData(
+    repoPath ? () => adapter.getGraphData() : null,
+    [repoPath],
+  );
 }
 
 // --- Filesystem API hooks ---

@@ -10,6 +10,7 @@ import { SpecList } from "./pages/SpecList";
 import { SpecDetail } from "./pages/SpecDetail";
 import { ChangeList } from "./pages/ChangeList";
 import { ChangeDetail } from "./pages/ChangeDetail";
+import { GraphView } from "./pages/GraphView";
 
 const router = createHashRouter([
   {
@@ -21,6 +22,7 @@ const router = createHashRouter([
       { path: "/specs/:topic", element: <SpecDetail /> },
       { path: "/changes", element: <ChangeList /> },
       { path: "/changes/:slug", element: <ChangeDetail /> },
+      { path: "/graph", element: <GraphView /> },
     ],
   },
 ]);

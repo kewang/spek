@@ -2,7 +2,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanOpenSpec, readSpec, readChange, readSpecAtChange } from "../packages/core/dist/index.js";
+import { scanOpenSpec, readSpec, readChange, readSpecAtChange, buildGraphData } from "../packages/core/dist/index.js";
 import type {
   OverviewData,
   SpecInfo,
@@ -83,7 +83,10 @@ async function main() {
     }
   }
 
-  const demoData = { overview, specs, specDetails, changes, changeDetails, specVersions };
+  // 建立 graph 資料
+  const graphData = buildGraphData(ROOT);
+
+  const demoData = { overview, specs, specDetails, changes, changeDetails, specVersions, graphData };
   const demoDataJson = JSON.stringify(demoData);
 
   console.log(

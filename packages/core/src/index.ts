@@ -5,6 +5,7 @@ export {
   readChange,
   readSpecAtChange,
   findRelatedChanges,
+  buildGraphData,
   parseSlug,
 } from "./scanner.js";
 export {
@@ -31,4 +32,7 @@ export type {
   BrowseData,
   DetectData,
   SpecVersionContent,
+  GraphNode,
+  GraphEdge,
+  GraphData,
 } from "./types.js";

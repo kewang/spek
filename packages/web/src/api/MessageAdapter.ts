@@ -8,6 +8,7 @@ import type {
   SearchResult,
   BrowseData,
   DetectData,
+  GraphData,
 } from "@spek/core";
 import type { ApiAdapter } from "./types.js";
 
@@ -109,5 +110,9 @@ export class MessageAdapter implements ApiAdapter {
 
   resync(): Promise<void> {
     return this.request("resync");
+  }
+
+  getGraphData(): Promise<GraphData> {
+    return this.request("getGraphData");
   }
 }

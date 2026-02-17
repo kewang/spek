@@ -9,6 +9,9 @@ import type {
   HistoryEntry,
   ScanResult,
   TaskStats,
+  GraphData,
+  GraphNode,
+  GraphEdge,
 } from "./types.js";
 
 function openspecDir(repoDir: string): string {
@@ -188,6 +191,89 @@ export function readSpecAtChange(
   if (content !== null) return { content };
 
   return null;
+}
+
+export function buildGraphData(repoDir: string): GraphData {
+  const base = openspecDir(repoDir);
+  const specsDir = path.join(base, "specs");
+  const changesDir = path.join(base, "changes");
+  const archiveDir = path.join(changesDir, "archive");
+
+  // 收集所有 spec topics
+  const specTopics = safeReadDir(specsDir)
+    .filter((name) => fs.statSync(path.join(specsDir, name)).isDirectory())
+    .filter((topic) => fs.existsSync(path.join(specsDir, topic, "spec.md")));
+
+  // 收集所有 change dirs（active + archived）
+  const changeDirs: { slug: string; dirPath: string; status: "active" | "archived" }[] = [];
+  for (const slug of safeReadDir(changesDir)) {
+    if (slug === "archive") continue;
+    const dirPath = path.join(changesDir, slug);
+    if (fs.statSync(dirPath).isDirectory()) {
+      changeDirs.push({ slug, dirPath, status: "active" });
+    }
+  }
+  for (const slug of safeReadDir(archiveDir)) {
+    const dirPath = path.join(archiveDir, slug);
+    if (fs.statSync(dirPath).isDirectory()) {
+      changeDirs.push({ slug, dirPath, status: "archived" });
+    }
+  }
+
+  // 建立邊：掃描每個 change 的 specs/ 子目錄
+  const edges: GraphEdge[] = [];
+  const changeSpecCounts = new Map<string, number>();
+  const specHistoryCounts = new Map<string, number>();
+
+  for (const { slug, dirPath, status: _status } of changeDirs) {
+    const changeSpecsDir = path.join(dirPath, "specs");
+    if (!fs.existsSync(changeSpecsDir)) continue;
+
+    let specCount = 0;
+    for (const topic of safeReadDir(changeSpecsDir)) {
+      if (fs.existsSync(path.join(changeSpecsDir, topic, "spec.md"))) {
+        edges.push({
+          source: `change:${slug}`,
+          target: `spec:${topic}`,
+        });
+        specCount++;
+        specHistoryCounts.set(topic, (specHistoryCounts.get(topic) || 0) + 1);
+      }
+    }
+    if (specCount > 0) {
+      changeSpecCounts.set(slug, specCount);
+    }
+  }
+
+  // 建立節點
+  const nodes: GraphNode[] = [];
+
+  // Spec 節點
+  for (const topic of specTopics) {
+    nodes.push({
+      id: `spec:${topic}`,
+      type: "spec",
+      label: topic,
+      historyCount: specHistoryCounts.get(topic) || 0,
+    });
+  }
+
+  // Change 節點（只包含有 specs 的 changes）
+  for (const { slug, status } of changeDirs) {
+    const specCount = changeSpecCounts.get(slug);
+    if (!specCount) continue;
+    const { date, description } = parseSlug(slug);
+    nodes.push({
+      id: `change:${slug}`,
+      type: "change",
+      label: description,
+      date,
+      status,
+      specCount,
+    });
+  }
+
+  return { nodes, edges };
 }
 
 export function findRelatedChanges(repoDir: string, topic: string): string[] {

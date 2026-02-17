@@ -88,4 +88,24 @@ export interface SpecVersionContent {
   content: string;
 }
 
+export interface GraphNode {
+  id: string;
+  type: "spec" | "change";
+  label: string;
+  date?: string | null;
+  status?: "active" | "archived";
+  historyCount?: number;
+  specCount?: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
 export type { TaskItem, TaskSection, TaskStats, ParsedTasks } from "./tasks.js";

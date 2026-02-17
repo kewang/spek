@@ -8,6 +8,7 @@ import type {
   SearchResult,
   BrowseData,
   DetectData,
+  GraphData,
 } from "@spek/core";
 import type { ApiAdapter } from "./types.js";
 
@@ -18,6 +19,7 @@ export interface DemoData {
   changes: ChangesData;
   changeDetails: Record<string, ChangeDetail>;
   specVersions: Record<string, Record<string, string>>;
+  graphData: GraphData;
 }
 
 export class StaticAdapter implements ApiAdapter {
@@ -104,5 +106,9 @@ export class StaticAdapter implements ApiAdapter {
 
   async resync(): Promise<void> {
     // no-op
+  }
+
+  getGraphData(): Promise<GraphData> {
+    return Promise.resolve(this.data.graphData);
   }
 }

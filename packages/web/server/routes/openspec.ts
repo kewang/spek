@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
-import { scanOpenSpec, readSpec, readChange, readSpecAtChange, resyncTimestamps } from "@spek/core";
+import { scanOpenSpec, readSpec, readChange, readSpecAtChange, resyncTimestamps, buildGraphData } from "@spek/core";
 
 export const openspecRouter = Router();
 
@@ -178,6 +178,12 @@ openspecRouter.get("/search", (req, res) => {
   });
 
   res.json(response);
+});
+
+openspecRouter.get("/graph", (req, res) => {
+  const dir = req.query.dir as string;
+  const graphData = buildGraphData(dir);
+  res.json(graphData);
 });
 
 openspecRouter.post("/resync", async (req, res) => {

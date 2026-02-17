@@ -8,6 +8,7 @@ import type {
   SearchResult,
   BrowseData,
   DetectData,
+  GraphData,
 } from "@spek/core";
 import type { ApiAdapter } from "./types.js";
 
@@ -63,5 +64,9 @@ export class FetchAdapter implements ApiAdapter {
   async resync(): Promise<void> {
     const res = await fetch(`/api/openspec/resync?${this.q()}`, { method: "POST" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  getGraphData(): Promise<GraphData> {
+    return fetchJson(`/api/openspec/graph?${this.q()}`);
   }
 }

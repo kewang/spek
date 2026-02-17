@@ -70,8 +70,9 @@ cd packages/vscode && npx vsce package --no-dependencies
 - `readSpec(basePath, topic)` — 讀取單一 spec（含歷史）
 - `readChange(basePath, slug)` — 讀取單一 change
 - `readSpecAtChange(basePath, topic, slug)` — 讀取特定 change 中的 spec 歷史版本
+- `buildGraphData(basePath)` — 建立 spec-change 關聯圖資料
 - `parseTasks(content)` — 解析 tasks.md checkbox
-- 共用型別：`OverviewData`, `SpecInfo`, `ChangeInfo`, `ChangeDetail` 等
+- 共用型別：`OverviewData`, `SpecInfo`, `ChangeInfo`, `ChangeDetail`, `GraphData` 等
 
 ### API Adapter Pattern
 前端透過 `ApiAdapter` 介面抽象通訊層：
@@ -90,6 +91,7 @@ GET /api/openspec/specs/:topic?dir=...   # 單一 spec 內容
 GET /api/openspec/specs/:topic/at/:slug?dir=...  # Spec 歷史版本內容（diff 用）
 GET /api/openspec/changes?dir=...        # Changes 列表
 GET /api/openspec/changes/:slug?dir=...  # 單一 change 內容
+GET /api/openspec/graph?dir=...          # Spec-Change 關聯圖資料
 GET /api/openspec/search?dir=...&q=...   # 全文搜尋
 ```
 
@@ -99,7 +101,7 @@ GET /api/openspec/search?dir=...&q=...   # 全文搜尋
 - Webview Panel 載入 IIFE-bundled React app
 - extension host 直接呼叫 `@spek/core` 處理 API requests
 
-**Frontend routes**: `/` (SelectRepo, web only) → `/dashboard` → `/specs` → `/specs/:topic` → `/changes` → `/changes/:slug`
+**Frontend routes**: `/` (SelectRepo, web only) → `/dashboard` → `/specs` → `/specs/:topic` → `/changes` → `/changes/:slug` → `/graph`
 
 ## Key Design Decisions
 
