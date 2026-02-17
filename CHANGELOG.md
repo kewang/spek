@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+- Spec diff viewer — compare current spec content against any historical change version with unified diff view
+- Compare button on spec history timeline entries for quick diff access
+- New API endpoint and core function for reading spec content at specific change versions
+- Full support across Web, VS Code extension, and demo environments
+
 ## 0.3.1
 
 - Add custom tab icon (spek logo) to VS Code webview panel for better visual identification
