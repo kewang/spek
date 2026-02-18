@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- Fix VS Code live-reload not detecting directory moves (e.g., archive operations)
+
 ## 0.6.0
 
 - Live reload — spek viewer automatically refreshes when openspec files change on disk
