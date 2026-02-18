@@ -11,6 +11,10 @@ The Webview SHALL load the spek React application from the extension's bundled a
 - **WHEN** the Webview HTML references JS or CSS files
 - **THEN** all asset paths SHALL use `webview.asWebviewUri()` to convert local file paths to Webview-safe URIs
 
+#### Scenario: File change notification forwarding
+- **WHEN** a file in the `openspec/` directory changes
+- **THEN** the Webview Panel SHALL forward the `{ type: "fileChanged" }` message to the React application so it can refresh its data
+
 ### Requirement: Content Security Policy
 The Webview SHALL enforce a Content Security Policy that allows the React application to function while preventing unauthorized content.
 

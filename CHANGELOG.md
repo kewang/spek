@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+- Live reload — spek viewer automatically refreshes when openspec files change on disk
+- Web: Server-Sent Events (SSE) with chokidar file watching
+- VS Code: FileSystemWatcher with postMessage notification
+- Debounced refresh (500ms server + 300ms client) preserves existing data without loading flash
+
 ## 0.5.0
 
 - Interactive spec-change graph view — D3 force-directed graph showing relationships between specs and changes

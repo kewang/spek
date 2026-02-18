@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRepo } from "../contexts/RepoContext";
 import { useApiAdapter } from "../api/ApiAdapterContext";
+import { useRefreshKey } from "../contexts/RefreshContext";
 import type {
   OverviewData,
   SpecInfo,
@@ -47,35 +48,62 @@ function useAsyncData<T>(
   fetcher: (() => Promise<T>) | null,
   deps: unknown[],
 ): FetchState<T> {
+  const refreshKey = useRefreshKey();
   const [state, setState] = useState<FetchState<T>>({
     data: null,
     loading: !!fetcher,
     error: null,
   });
+  const isRefresh = useRef(false);
+  const prevRefreshKey = useRef(refreshKey);
 
   useEffect(() => {
+    // 判斷是否為 refreshKey 觸發的 re-fetch
+    const refreshTriggered = prevRefreshKey.current !== refreshKey;
+    prevRefreshKey.current = refreshKey;
+
     if (!fetcher) {
       setState({ data: null, loading: false, error: null });
       return;
     }
 
     let cancelled = false;
-    setState({ data: null, loading: true, error: null });
 
-    fetcher()
-      .then((data) => {
-        if (!cancelled) setState({ data, loading: false, error: null });
-      })
-      .catch((err) => {
-        if (!cancelled)
-          setState({ data: null, loading: false, error: err.message });
-      });
+    const doFetch = () => {
+      // refreshKey 觸發時保留既有 data，不顯示 loading flash
+      if (!refreshTriggered) {
+        setState({ data: null, loading: true, error: null });
+      }
 
+      fetcher()
+        .then((data) => {
+          if (!cancelled) setState({ data, loading: false, error: null });
+        })
+        .catch((err) => {
+          if (!cancelled)
+            setState((prev) => ({
+              data: refreshTriggered ? prev.data : null,
+              loading: false,
+              error: err.message,
+            }));
+        });
+    };
+
+    // refreshKey 觸發時加 debounce 300ms
+    if (refreshTriggered) {
+      const timer = setTimeout(doFetch, 300);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }
+
+    doFetch();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, refreshKey]);
 
   return state;
 }

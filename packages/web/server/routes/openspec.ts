@@ -2,7 +2,66 @@ import { Router, Request, Response, NextFunction } from "express";
 import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
+import chokidar from "chokidar";
 import { scanOpenSpec, readSpec, readChange, readSpecAtChange, resyncTimestamps, buildGraphData } from "@spek/core";
+
+// --- File watcher 共享管理 ---
+
+interface WatcherEntry {
+  watcher: chokidar.FSWatcher;
+  clients: Set<Response>;
+  debounceTimer: ReturnType<typeof setTimeout> | null;
+}
+
+const watchers = new Map<string, WatcherEntry>();
+
+function getOrCreateWatcher(dir: string): WatcherEntry {
+  const existing = watchers.get(dir);
+  if (existing) return existing;
+
+  const watchPath = path.join(dir, "openspec");
+  const watcher = chokidar.watch(watchPath, {
+    ignored: (filePath: string) => {
+      // 只監聽 .md 和 .yaml 檔案（以及目錄）
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+        return !filePath.endsWith(".md") && !filePath.endsWith(".yaml");
+      }
+      return false;
+    },
+    ignoreInitial: true,
+    persistent: true,
+  });
+
+  const entry: WatcherEntry = { watcher, clients: new Set(), debounceTimer: null };
+
+  const notifyClients = () => {
+    if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
+    entry.debounceTimer = setTimeout(() => {
+      entry.debounceTimer = null;
+      for (const client of entry.clients) {
+        client.write(`data: ${JSON.stringify({ type: "changed" })}\n\n`);
+      }
+    }, 500);
+  };
+
+  watcher.on("add", notifyClients);
+  watcher.on("change", notifyClients);
+  watcher.on("unlink", notifyClients);
+
+  watchers.set(dir, entry);
+  return entry;
+}
+
+function removeClient(dir: string, client: Response) {
+  const entry = watchers.get(dir);
+  if (!entry) return;
+  entry.clients.delete(client);
+  if (entry.clients.size === 0) {
+    if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
+    entry.watcher.close();
+    watchers.delete(dir);
+  }
+}
 
 export const openspecRouter = Router();
 
@@ -184,6 +243,28 @@ openspecRouter.get("/graph", (req, res) => {
   const dir = req.query.dir as string;
   const graphData = buildGraphData(dir);
   res.json(graphData);
+});
+
+// --- SSE file watching endpoint ---
+
+openspecRouter.get("/watch", (req, res) => {
+  const dir = req.query.dir as string;
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  });
+
+  // 送一個初始 comment 確認連線
+  res.write(": connected\n\n");
+
+  const entry = getOrCreateWatcher(dir);
+  entry.clients.add(res);
+
+  req.on("close", () => {
+    removeClient(dir, res);
+  });
 });
 
 openspecRouter.post("/resync", async (req, res) => {

@@ -5,6 +5,7 @@ import {
 } from "react-router-dom";
 import { RepoProvider, useRepo } from "./contexts/RepoContext";
 import { ThemeProvider, useThemeControl } from "./contexts/ThemeContext";
+import { RefreshProvider } from "./contexts/RefreshContext";
 import { ApiAdapterProvider } from "./api/ApiAdapterContext";
 import { MessageAdapter } from "./api/MessageAdapter";
 import { Layout } from "./components/Layout";
@@ -79,9 +80,11 @@ function WebviewAppInner() {
   }
 
   return (
-    <ApiAdapterProvider adapter={adapter}>
-      <RouterProvider router={router} />
-    </ApiAdapterProvider>
+    <RefreshProvider>
+      <ApiAdapterProvider adapter={adapter}>
+        <RouterProvider router={router} />
+      </ApiAdapterProvider>
+    </RefreshProvider>
   );
 }
 

@@ -2,12 +2,14 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { useRepo } from "../contexts/RepoContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 import { Sidebar } from "./Sidebar";
 import { SearchDialog } from "./SearchDialog";
 
 export function Layout() {
   const { repoPath } = useRepo();
   const { theme, toggleTheme } = useTheme();
+  useFileWatcher();
   const navigate = useNavigate();
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);

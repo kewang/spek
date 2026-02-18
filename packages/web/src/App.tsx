@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { RepoProvider, useRepo } from "./contexts/RepoContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { RefreshProvider } from "./contexts/RefreshContext";
 import { ApiAdapterProvider } from "./api/ApiAdapterContext";
 import { FetchAdapter } from "./api/FetchAdapter";
 import { Layout } from "./components/Layout";
@@ -36,9 +37,11 @@ function AppWithAdapter() {
   const adapter = useMemo(() => new FetchAdapter(repoPath), [repoPath]);
 
   return (
-    <ApiAdapterProvider adapter={adapter}>
-      <RouterProvider router={router} />
-    </ApiAdapterProvider>
+    <RefreshProvider>
+      <ApiAdapterProvider adapter={adapter}>
+        <RouterProvider router={router} />
+      </ApiAdapterProvider>
+    </RefreshProvider>
   );
 }
 

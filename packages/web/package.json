@@ -14,6 +14,7 @@
   "dependencies": {
     "@spek/core": "*",
     "@types/diff": "^7.0.2",
+    "chokidar": "^5.0.0",
     "cors": "^2.8.5",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",

@@ -69,7 +69,7 @@ export class SpekPanel {
       this.disposables,
     );
 
-    // 監聽 theme 變更
+    // 監聯 theme 變更
     vscode.window.onDidChangeActiveColorTheme(
       (theme) => {
         this.panel.webview.postMessage({
@@ -80,6 +80,22 @@ export class SpekPanel {
       null,
       this.disposables,
     );
+
+    // 監聽 openspec 檔案變更，通知 webview 刷新
+    const fileWatcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(workspacePath, "openspec/**/*.{md,yaml}"),
+    );
+    let fileChangeTimer: ReturnType<typeof setTimeout> | undefined;
+    const notifyFileChange = () => {
+      if (fileChangeTimer) clearTimeout(fileChangeTimer);
+      fileChangeTimer = setTimeout(() => {
+        this.panel.webview.postMessage({ type: "fileChanged" });
+      }, 500);
+    };
+    fileWatcher.onDidCreate(notifyFileChange, null, this.disposables);
+    fileWatcher.onDidChange(notifyFileChange, null, this.disposables);
+    fileWatcher.onDidDelete(notifyFileChange, null, this.disposables);
+    this.disposables.push(fileWatcher);
 
     // Panel 關閉時清理
     this.panel.onDidDispose(
