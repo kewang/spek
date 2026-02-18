@@ -83,7 +83,7 @@ export class SpekPanel {
 
     // 監聽 openspec 檔案變更，通知 webview 刷新
     const fileWatcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(workspacePath, "openspec/**/*.{md,yaml}"),
+      new vscode.RelativePattern(workspacePath, "openspec/**"),
     );
     let fileChangeTimer: ReturnType<typeof setTimeout> | undefined;
     const notifyFileChange = () => {
