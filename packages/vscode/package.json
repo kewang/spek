@@ -2,7 +2,7 @@
   "name": "spek-vscode",
   "displayName": "spek — OpenSpec Viewer",
   "description": "Browse OpenSpec specs and changes directly in VS Code",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "publisher": "kewang",
   "license": "MIT",
   "icon": "icon.png",
