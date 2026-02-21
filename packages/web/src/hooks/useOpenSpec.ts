@@ -84,7 +84,7 @@ function useAsyncData<T>(
             setState((prev) => ({
               data: refreshTriggered ? prev.data : null,
               loading: false,
-              error: err.message,
+              error: refreshTriggered && prev.data ? null : err.message,
             }));
         });
     };

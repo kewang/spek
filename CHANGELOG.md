@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.4
+
+- Fix change detail showing "Change not found" error during file watcher refresh (e.g., after archiving a change)
+- Improve API error messages — show descriptive server errors instead of generic "HTTP 404"
+
 ## 0.6.3
 
 - Add git timestamp to changes — sort by precise commit time instead of date-only slug, display relative time (e.g., "3 hours ago") in Dashboard and Changes list

@@ -76,3 +76,14 @@ The `useAsyncData` hook SHALL support automatic re-fetch triggered by `refreshKe
 #### Scenario: Existing data preserved during re-fetch
 - **WHEN** a re-fetch is triggered by `refreshKey` change
 - **THEN** the existing `data` SHALL remain visible (no loading flash) until the new data arrives
+
+#### Scenario: Refresh failure with existing data
+- **WHEN** a re-fetch triggered by `refreshKey` change fails with an error
+- **AND** the hook already has existing data from a previous successful fetch
+- **THEN** the existing `data` SHALL be preserved
+- **AND** the `error` state SHALL NOT be set (remains null)
+
+#### Scenario: Refresh failure without existing data
+- **WHEN** a re-fetch triggered by `refreshKey` change fails with an error
+- **AND** the hook has no existing data (data is null)
+- **THEN** the `error` state SHALL be set to the error message
