@@ -89,16 +89,18 @@ export function ChangeDetail() {
     },
   ];
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <Link to="/changes" className="text-text-muted text-base font-medium hover:text-accent transition-colors">
-          &larr; Back to Changes
-        </Link>
-        <h1 className="text-2xl font-bold mt-2">{slug}</h1>
-      </div>
+  const headerEl = (
+    <div className="pt-2 pb-3">
+      <Link to="/changes" className="text-text-muted text-base font-medium hover:text-accent transition-colors">
+        &larr; Back to Changes
+      </Link>
+      <h1 className="text-2xl font-bold mt-2">{slug}</h1>
+    </div>
+  );
 
-      <TabView tabs={tabs} />
+  return (
+    <div>
+      <TabView tabs={tabs} header={headerEl} sticky />
     </div>
   );
 }

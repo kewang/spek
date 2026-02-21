@@ -8,16 +8,19 @@ interface Tab {
 
 interface TabViewProps {
   tabs: Tab[];
+  header?: React.ReactNode;
+  sticky?: boolean;
 }
 
-export function TabView({ tabs }: TabViewProps) {
+export function TabView({ tabs, header, sticky }: TabViewProps) {
   const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
 
   const activeTab = tabs.find((t) => t.id === activeId);
 
-  return (
-    <div>
-      <div className="flex border-b border-border mb-4">
+  const tabBar = (
+    <>
+      {header}
+      <div className="flex border-b border-border">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -32,7 +35,19 @@ export function TabView({ tabs }: TabViewProps) {
           </button>
         ))}
       </div>
-      <div key={activeId} className="animate-fade-in">
+    </>
+  );
+
+  return (
+    <div>
+      {sticky ? (
+        <div className="sticky top-14 z-[5] bg-bg-primary -mx-6 px-6 pb-px">
+          {tabBar}
+        </div>
+      ) : (
+        <div className="mb-4">{tabBar}</div>
+      )}
+      <div key={activeId} className={`animate-fade-in ${sticky ? "mt-4" : ""}`}>
         {activeTab?.content}
       </div>
     </div>

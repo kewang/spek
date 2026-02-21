@@ -16,7 +16,7 @@ The system SHALL display changes grouped into active and archived sections. Acti
 - **THEN** system displays an empty state message
 
 ### Requirement: Change detail with tab navigation
-The system SHALL display change details using a tabbed interface with tabs in OpenSpec workflow order: Proposal, Design, Specs (delta specs), and Tasks. Tab content SHALL transition with a fade-in animation when switching.
+The system SHALL display change details using a tabbed interface with tabs in OpenSpec workflow order: Proposal, Design, Specs (delta specs), and Tasks. Tab content SHALL transition with a fade-in animation when switching. The change title (including back navigation link) and tab navigation bar SHALL be sticky-positioned below the main header, remaining visible when the user scrolls through long content.
 
 #### Scenario: View proposal tab
 - **WHEN** user views a change and clicks the Proposal tab
@@ -41,6 +41,15 @@ The system SHALL display change details using a tabbed interface with tabs in Op
 #### Scenario: Missing artifact
 - **WHEN** a tab's corresponding artifact file does not exist
 - **THEN** the tab shows a "No content" placeholder
+
+#### Scenario: Sticky header on scroll
+- **WHEN** user scrolls down through long change content
+- **THEN** the change title (with back link) and tab navigation bar SHALL remain fixed below the main application header
+- **AND** the sticky area SHALL have an opaque background that covers scrolling content beneath it
+
+#### Scenario: Sticky does not overlap main header
+- **WHEN** the sticky area is active
+- **THEN** it SHALL be positioned directly below the main header (top offset equal to header height) with a z-index lower than the main header and sidebar
 
 ### Requirement: Task progress display in change detail
 The Tasks tab SHALL display a progress bar and statistics (completed/total) derived from the change's task data.
