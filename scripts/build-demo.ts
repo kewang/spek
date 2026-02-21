@@ -22,7 +22,7 @@ async function main() {
   // 1. 收集 openspec 資料
   console.log("Collecting openspec data...");
 
-  const scan = scanOpenSpec(ROOT);
+  const scan = await scanOpenSpec(ROOT);
 
   const overview: OverviewData = {
     specsCount: scan.specs.length,

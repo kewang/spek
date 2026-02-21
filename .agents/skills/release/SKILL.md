@@ -46,7 +46,22 @@ Automate the spek release process — update CHANGELOGs, bump version, create ta
    git commit -m "Update CHANGELOG for v<version>"
    ```
 
-5. **Run npm version**
+5. **Rebuild demo page**
+
+   Rebuild `docs/demo.html` so it reflects the latest code and openspec content:
+
+   ```bash
+   npm run build:demo
+   ```
+
+   Stage the updated demo file:
+
+   ```bash
+   git add docs/demo.html
+   git commit -m "Rebuild demo for v<version>"
+   ```
+
+6. **Run npm version**
 
    ```bash
    npm version <type-or-version> --no-git-tag-version
@@ -65,7 +80,7 @@ Automate the spek release process — update CHANGELOGs, bump version, create ta
    - Create git commit with version
    - Create `v<version>` git tag
 
-6. **Push to trigger CI/CD**
+7. **Push to trigger CI/CD**
 
    Ask the user for confirmation before pushing:
    > "Ready to push v<version> to origin? This will trigger the CI/CD pipeline to publish to VS Code Marketplace."
@@ -74,7 +89,7 @@ Automate the spek release process — update CHANGELOGs, bump version, create ta
    git push --follow-tags
    ```
 
-7. **Show summary**
+8. **Show summary**
 
    Display:
    - New version number
