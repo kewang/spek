@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.2
+
+- Sticky change detail header — change title and tab navigation stay fixed below the header when scrolling through long content
+
 ## 0.6.1
 
 - Fix VS Code live-reload not detecting directory moves (e.g., archive operations)
