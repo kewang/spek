@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.3
+
+- Add git timestamp to changes — sort by precise commit time instead of date-only slug, display relative time (e.g., "3 hours ago") in Dashboard and Changes list
+- Fix detect fallback — repos with openspec/ directory but no config.yaml are now correctly detected
+
 ## 0.6.2
 
 - Sticky change detail header — change title and tab navigation stay fixed below the header when scrolling through long content
