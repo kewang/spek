@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useChanges } from "../hooks/useOpenSpec";
 import { TaskProgress } from "../components/TaskProgress";
+import { formatRelativeTime } from "../utils/formatRelativeTime";
 
 export function ChangeList() {
   const { data, loading, error } = useChanges();
@@ -37,7 +38,11 @@ export function ChangeList() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-text-primary font-medium">{c.description}</span>
-                  {c.date && <span className="text-text-muted text-xs">{c.date}</span>}
+                  {(c.timestamp || c.date) && (
+                    <span className="text-text-muted text-xs" title={c.timestamp || undefined}>
+                      {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
+                    </span>
+                  )}
                 </div>
                 {c.taskStats && (
                   <TaskProgress completed={c.taskStats.completed} total={c.taskStats.total} />
@@ -61,7 +66,11 @@ export function ChangeList() {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-text-primary">{c.description}</span>
-                  {c.date && <span className="text-text-muted text-xs">{c.date}</span>}
+                  {(c.timestamp || c.date) && (
+                    <span className="text-text-muted text-xs" title={c.timestamp || undefined}>
+                      {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}

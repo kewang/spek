@@ -74,9 +74,9 @@ openspecRouter.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-openspecRouter.get("/overview", (req, res) => {
+openspecRouter.get("/overview", async (req, res) => {
   const dir = req.query.dir as string;
-  const scan = scanOpenSpec(dir);
+  const scan = await scanOpenSpec(dir);
 
   let totalTasks = 0;
   let completedTasks = 0;
@@ -97,9 +97,9 @@ openspecRouter.get("/overview", (req, res) => {
   });
 });
 
-openspecRouter.get("/specs", (req, res) => {
+openspecRouter.get("/specs", async (req, res) => {
   const dir = req.query.dir as string;
-  const scan = scanOpenSpec(dir);
+  const scan = await scanOpenSpec(dir);
   res.json(scan.specs);
 });
 
@@ -123,9 +123,9 @@ openspecRouter.get("/specs/:topic/at/:slug", (req, res) => {
   res.json(result);
 });
 
-openspecRouter.get("/changes", (req, res) => {
+openspecRouter.get("/changes", async (req, res) => {
   const dir = req.query.dir as string;
-  const scan = scanOpenSpec(dir);
+  const scan = await scanOpenSpec(dir);
   res.json({
     active: scan.activeChanges,
     archived: scan.archivedChanges,

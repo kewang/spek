@@ -43,8 +43,8 @@ export class MessageHandler {
     }
   }
 
-  private getOverview() {
-    const scan = scanOpenSpec(this.workspacePath);
+  private async getOverview() {
+    const scan = await scanOpenSpec(this.workspacePath);
     let totalTasks = 0;
     let completedTasks = 0;
     for (const change of [...scan.activeChanges, ...scan.archivedChanges]) {
@@ -63,8 +63,8 @@ export class MessageHandler {
     };
   }
 
-  private getSpecs() {
-    const scan = scanOpenSpec(this.workspacePath);
+  private async getSpecs() {
+    const scan = await scanOpenSpec(this.workspacePath);
     return scan.specs;
   }
 
@@ -80,8 +80,8 @@ export class MessageHandler {
     return result;
   }
 
-  private getChanges() {
-    const scan = scanOpenSpec(this.workspacePath);
+  private async getChanges() {
+    const scan = await scanOpenSpec(this.workspacePath);
     return {
       active: scan.activeChanges,
       archived: scan.archivedChanges,
@@ -191,13 +191,23 @@ export class MessageHandler {
   private detect(dirPath: string) {
     if (!dirPath) throw new Error("path is required");
     const resolved = path.resolve(dirPath);
-    const configPath = path.join(resolved, "openspec", "config.yaml");
-    if (!fs.existsSync(configPath)) {
-      return { hasOpenSpec: false };
+    const openspecDir = path.join(resolved, "openspec");
+    const configPath = path.join(openspecDir, "config.yaml");
+
+    if (fs.existsSync(configPath)) {
+      const content = fs.readFileSync(configPath, "utf-8");
+      const schemaMatch = content.match(/^schema:\s*(.+)$/m);
+      return { hasOpenSpec: true, schema: schemaMatch ? schemaMatch[1].trim() : "unknown" };
     }
-    const content = fs.readFileSync(configPath, "utf-8");
-    const schemaMatch = content.match(/^schema:\s*(.+)$/m);
-    return { hasOpenSpec: true, schema: schemaMatch ? schemaMatch[1].trim() : "unknown" };
+
+    // Fallback: 檢查 openspec/specs/ 或 openspec/changes/ 是否存在
+    const hasSpecs = fs.existsSync(path.join(openspecDir, "specs"));
+    const hasChanges = fs.existsSync(path.join(openspecDir, "changes"));
+    if (hasSpecs || hasChanges) {
+      return { hasOpenSpec: true, schema: "unknown" };
+    }
+
+    return { hasOpenSpec: false };
   }
 
   private async resync() {

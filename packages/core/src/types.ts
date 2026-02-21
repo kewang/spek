@@ -24,6 +24,7 @@ export interface SpecDetail {
 export interface ChangeInfo {
   slug: string;
   date: string | null;
+  timestamp: string | null;
   description: string;
   status: "active" | "archived";
   hasProposal: boolean;

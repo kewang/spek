@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Scan OpenSpec directory structure
 The scanner SHALL be an async function in the `@spek/core` package that reads an OpenSpec directory and returns its complete structure including specs, active changes, and archived changes. Each `ChangeInfo` SHALL include a `timestamp` field (ISO 8601 string or null) obtained from the git timestamp cache. Changes SHALL be sorted by timestamp descending (most recent first), falling back to slug date when timestamp is unavailable. It SHALL use Node.js `fs` directly and have no dependency on Express or any HTTP framework.
@@ -20,28 +20,3 @@ The scanner SHALL be an async function in the `@spek/core` package that reads an
 - **WHEN** the repo is not a git repository or changes have no git history
 - **THEN** changes SHALL be sorted by slug date descending as fallback
 - **AND** all `timestamp` fields SHALL be null
-
-### Requirement: Parse change artifacts
-The scanner SHALL read individual change directories and extract available artifacts.
-
-#### Scenario: Change with all artifacts
-- **WHEN** scanner reads a change directory containing proposal.md, design.md, tasks.md, and specs/
-- **THEN** it returns the raw Markdown content for each artifact and a list of delta spec files
-
-#### Scenario: Change with partial artifacts
-- **WHEN** scanner reads a change directory containing only proposal.md
-- **THEN** it returns proposal content and null for missing artifacts
-
-### Requirement: Read spec content
-The scanner SHALL read spec files and return their Markdown content.
-
-#### Scenario: Read existing spec
-- **WHEN** scanner reads `openspec/specs/{topic}/spec.md`
-- **THEN** it returns the raw Markdown content of the spec file
-
-### Requirement: Detect related changes for a spec
-The scanner SHALL identify which changes contain delta specs for a given spec topic.
-
-#### Scenario: Spec with related changes
-- **WHEN** scanner checks for changes related to spec topic "simulation-engine"
-- **THEN** it returns all change slugs that have a `specs/simulation-engine/spec.md` delta file

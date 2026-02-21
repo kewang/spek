@@ -54,10 +54,10 @@ function scanChangeDir(
     taskStats = { total: parsed.total, completed: parsed.completed };
   }
 
-  return { slug, date, description, status, hasProposal, hasDesign, hasTasks, hasSpecs, taskStats };
+  return { slug, date, timestamp: null, description, status, hasProposal, hasDesign, hasTasks, hasSpecs, taskStats };
 }
 
-export function scanOpenSpec(repoDir: string): ScanResult {
+export async function scanOpenSpec(repoDir: string): Promise<ScanResult> {
   const base = openspecDir(repoDir);
   const specsDir = path.join(base, "specs");
   const changesDir = path.join(base, "changes");
@@ -69,16 +69,33 @@ export function scanOpenSpec(repoDir: string): ScanResult {
     .filter((s) => fs.existsSync(s.path))
     .sort((a, b) => a.topic.localeCompare(b.topic));
 
+  // 取得 git timestamps
+  const timestamps = await getTimestamps(repoDir);
+
+  const sortByTimestamp = (a: ChangeInfo, b: ChangeInfo) => {
+    const ta = a.timestamp || a.date || "";
+    const tb = b.timestamp || b.date || "";
+    return tb.localeCompare(ta);
+  };
+
   const activeChanges: ChangeInfo[] = safeReadDir(changesDir)
     .filter((name) => name !== "archive")
     .filter((name) => fs.statSync(path.join(changesDir, name)).isDirectory())
-    .map((slug) => scanChangeDir(path.join(changesDir, slug), slug, "active"))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    .map((slug) => {
+      const info = scanChangeDir(path.join(changesDir, slug), slug, "active");
+      info.timestamp = timestamps.get(slug) || null;
+      return info;
+    })
+    .sort(sortByTimestamp);
 
   const archivedChanges: ChangeInfo[] = safeReadDir(archiveDir)
     .filter((name) => fs.statSync(path.join(archiveDir, name)).isDirectory())
-    .map((slug) => scanChangeDir(path.join(archiveDir, slug), slug, "archived"))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    .map((slug) => {
+      const info = scanChangeDir(path.join(archiveDir, slug), slug, "archived");
+      info.timestamp = timestamps.get(slug) || null;
+      return info;
+    })
+    .sort(sortByTimestamp);
 
   // 計算每個 spec 被多少 changes 引用
   const allChangeDirs = [

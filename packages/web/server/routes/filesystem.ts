@@ -44,16 +44,24 @@ filesystemRouter.get("/detect", (req, res) => {
   }
 
   const resolved = path.resolve(dirPath);
-  const configPath = path.join(resolved, "openspec", "config.yaml");
+  const openspecDir = path.join(resolved, "openspec");
+  const configPath = path.join(openspecDir, "config.yaml");
 
-  if (!fs.existsSync(configPath)) {
-    res.json({ hasOpenSpec: false });
+  if (fs.existsSync(configPath)) {
+    const content = fs.readFileSync(configPath, "utf-8");
+    const schemaMatch = content.match(/^schema:\s*(.+)$/m);
+    const schema = schemaMatch ? schemaMatch[1].trim() : "unknown";
+    res.json({ hasOpenSpec: true, schema });
     return;
   }
 
-  const content = fs.readFileSync(configPath, "utf-8");
-  const schemaMatch = content.match(/^schema:\s*(.+)$/m);
-  const schema = schemaMatch ? schemaMatch[1].trim() : "unknown";
+  // Fallback: 檢查 openspec/specs/ 或 openspec/changes/ 是否存在
+  const hasSpecs = fs.existsSync(path.join(openspecDir, "specs"));
+  const hasChanges = fs.existsSync(path.join(openspecDir, "changes"));
+  if (hasSpecs || hasChanges) {
+    res.json({ hasOpenSpec: true, schema: "unknown" });
+    return;
+  }
 
-  res.json({ hasOpenSpec: true, schema });
+  res.json({ hasOpenSpec: false });
 });
