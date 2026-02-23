@@ -29,7 +29,8 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:openspec/config.yaml"
+    "workspaceContains:openspec/config.yaml",
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {

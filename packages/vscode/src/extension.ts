@@ -83,16 +83,21 @@ function getWorkspacePath(): string | undefined {
 }
 
 function hasOpenSpecDir(workspacePath: string): boolean {
-  const configUri = vscode.Uri.joinPath(
-    vscode.Uri.file(workspacePath),
-    "openspec",
-    "config.yaml",
-  );
   try {
-    // 同步存取不可用，用 vscode.workspace.fs 是 async
-    // 但在 activate 中用 require('fs') 是安全的
     const fs = require("fs");
-    return fs.existsSync(configUri.fsPath);
+    const path = require("path");
+    const openspecDir = path.join(workspacePath, "openspec");
+
+    // 先檢查 config.yaml
+    if (fs.existsSync(path.join(openspecDir, "config.yaml"))) {
+      return true;
+    }
+
+    // Fallback: 檢查 specs/ 或 changes/ 目錄是否存在
+    return (
+      fs.existsSync(path.join(openspecDir, "specs")) ||
+      fs.existsSync(path.join(openspecDir, "changes"))
+    );
   } catch {
     return false;
   }
