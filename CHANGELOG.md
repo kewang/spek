@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.1
+
+- Fix VS Code extension not activating in workspaces without `config.yaml` — sidebar and status bar now appear for any valid OpenSpec repo (with `specs/` or `changes/` directory)
+
 ## 0.7.0
 
 - Add Activity Bar sidebar — browse specs and changes directly from the VS Code sidebar without opening the Command Palette
