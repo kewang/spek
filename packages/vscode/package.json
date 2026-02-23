@@ -43,8 +43,46 @@
         "command": "spek.search",
         "title": "Search OpenSpec",
         "category": "spek"
+      },
+      {
+        "command": "spek.openDashboard",
+        "title": "Open Dashboard",
+        "category": "spek",
+        "icon": "$(link-external)"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "spek-sidebar",
+          "title": "spek",
+          "icon": "media/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "spek-sidebar": [
+        {
+          "id": "spek.specsView",
+          "name": "Specs",
+          "when": "spek.hasOpenSpec"
+        },
+        {
+          "id": "spek.changesView",
+          "name": "Changes",
+          "when": "spek.hasOpenSpec"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "spek.openDashboard",
+          "when": "view == spek.specsView",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

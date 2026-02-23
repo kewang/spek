@@ -127,6 +127,11 @@ export class SpekPanel {
     this.panel.webview.postMessage(message);
   }
 
+  navigateTo(routePath: string) {
+    this.panel.reveal();
+    this.panel.webview.postMessage({ type: "navigate", path: routePath });
+  }
+
   private getCurrentTheme(): "dark" | "light" {
     return vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Light
       ? "light"

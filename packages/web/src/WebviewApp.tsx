@@ -65,6 +65,10 @@ function WebviewAppInner() {
           new KeyboardEvent("keydown", { key: "k", metaKey: true }),
         );
       }
+
+      if (msg.type === "navigate" && msg.path) {
+        router.navigate(msg.path);
+      }
     };
 
     window.addEventListener("message", handler);
