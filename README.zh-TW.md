@@ -34,6 +34,7 @@
 - **深色 / 淺色主題** — 可切換，預設深色主題
 - **Spec 歷史追蹤** — 基於 Git 的時間戳記追蹤 spec 修訂紀錄
 - **響應式版面** — 適應不同螢幕尺寸
+- **VS Code 側邊欄** — Activity Bar icon + TreeView，直接從側邊欄瀏覽 specs 與 changes
 
 ## 截圖
 
@@ -84,9 +85,12 @@ npm run dev
 
 從 [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=kewang.spek-vscode) 安裝。當 workspace 包含 `openspec/config.yaml` 時，Extension 會自動啟動。
 
+啟動後，點擊 Activity Bar 上的 **spek icon** 即可從側邊欄瀏覽 specs 與 changes。點擊任一項目會開啟完整的檢視器面板。
+
 **指令：**
 - `spek: Open spek` — 開啟檢視器面板
 - `spek: Search OpenSpec` — 開啟搜尋對話框
+- `spek: Open Dashboard` — 從側邊欄開啟 Dashboard
 
 ## OpenSpec 目錄結構
 

@@ -34,6 +34,7 @@ Both are **read-only** and **local-only**. No server deployment, no authenticati
 - **Dark / Light Theme** — Toggle between themes; dark by default
 - **Spec History** — Git-based timestamp tracking for spec revisions
 - **Responsive Layout** — Works on various screen sizes
+- **VS Code Sidebar** — Activity Bar icon with TreeView for browsing specs and changes directly from the sidebar
 
 ## Screenshots
 
@@ -84,9 +85,12 @@ Open http://localhost:5173, enter a path to a repo containing an `openspec/` dir
 
 Install from the [Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=kewang.spek-vscode). The extension activates automatically when your workspace contains `openspec/config.yaml`.
 
+Once activated, click the **spek icon** in the Activity Bar to browse specs and changes from the sidebar. Click any item to open the full viewer panel.
+
 **Commands:**
 - `spek: Open spek` — Open the viewer panel
 - `spek: Search OpenSpec` — Open search dialog
+- `spek: Open Dashboard` — Open the dashboard from sidebar
 
 ## OpenSpec Directory Structure
 

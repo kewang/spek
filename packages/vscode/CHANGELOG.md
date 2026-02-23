@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0
+
+- Add Activity Bar sidebar — browse specs and changes directly from the VS Code sidebar without opening the Command Palette
+- TreeView with two sections: Specs (alphabetical) and Changes (grouped by active/archived)
+- Click any item to open the spek webview panel and navigate to that spec or change
+- Auto-refresh TreeView when openspec files change on disk
+
 ## 0.6.4
 
 - Fix change detail showing "Change not found" error during file watcher refresh (e.g., after archiving a change)
