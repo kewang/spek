@@ -28,4 +28,4 @@
 
 - [x] 5.1 執行 `npm run type-check` 確認無型別錯誤
 - [x] 5.2 執行 `npm run build:vscode` 確認 extension 可正常 build
-- [ ] 5.3 手動測試：打開含 openspec/ 的 workspace，確認 sidebar icon 出現、TreeView 顯示正確、點擊可導航
+- [x] 5.3 手動測試：打開含 openspec/ 的 workspace，確認 sidebar icon 出現、TreeView 顯示正確、點擊可導航
