@@ -70,6 +70,11 @@ npm run type-check       # TypeScript type check
 npm test                 # core + ui + web tests
 ```
 
+**A core change needs `npm run build:core` before web tests mean anything.** `@spekjs/core`'s package
+entry is `dist/`, so the web package imports the *built* copy, not `src/`. Editing core and running
+`npm test` will happily exercise the previous build and pass — this reads as "my change is fine" when
+the web side never saw it. Build core first, then run the web tests.
+
 **Package VS Code**: `npm run build -w @spekjs/core && npm run build:webview -w @spekjs/web && npm run build -w spek-vscode`, then `cd packages/vscode && npx vsce package --no-dependencies`
 **Package IntelliJ**: `npm run build -w @spekjs/core && npm run build:intellij`, then `cd packages/intellij && ./gradlew buildPlugin` (output: `build/distributions/spek-intellij-*.zip`)
 
@@ -208,7 +213,19 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 - **Security**: Express only reads `.md` / `.yaml` files under `openspec/`; no arbitrary file access
 - **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), ADDED/MODIFIED (orange/blue badge)
 - **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
-- **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`
+- **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
+  **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
+  — the `- ` marker's CommonMark content offset), and the Tasks tab renders that text as Markdown. The
+  folding rule is "whatever a standard CommonMark+GFM renderer shows for the same source", pinned by a
+  test that compares against the reference renderer over every `tasks.md` in the repo — don't replace it
+  with a friendlier heuristic (dedenting by the *smallest* indent instead diverges on 6-space
+  continuations, promoting lazy prose into bullet lists no other viewer shows). Two rules carry it:
+  the 2-char dedent (only observable on a blank line + ≥6-space indent, i.e. an indented code block —
+  the single case any test can distinguish it by) and the blank-line boundary (after a blank line a line
+  must be indented ≥2 to stay in the item, else standalone prose gets swallowed into the task).
+  `CHECKBOX_RE` stays **anchored at column 0**: an indented checkbox belongs to its parent's text and is
+  deliberately *not* counted, so relaxing the anchor would move every progress bar and CI badge. First
+  lines keep trailing whitespace when folded, or two-space hard breaks silently become soft ones
 - **Webview CSP**: IIFE + nonce script + unsafe-inline styles (Tailwind needs it)
 - **Host flags**: VS Code sets `window.__vscodeApi` (`acquireVsCodeApi` called once, stored globally), IntelliJ
   `window.__spekIntellij`, Demo `window.__DEMO_DATA__`. `useFileWatcher` picks its refresh channel from these flags, so
