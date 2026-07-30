@@ -5,6 +5,7 @@ import type { ChangeArtifact } from "@spekjs/core";
 import { useChange, useSpecs } from "../hooks/useOpenSpec";
 import { TabView } from "../components/TabView";
 import { TaskProgress } from "../components/TaskProgress";
+import { TaskText } from "../components/TaskText";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { SpecsTabContent } from "../components/SpecsTabContent";
 import { SpecToc } from "../components/SpecToc";
@@ -63,9 +64,13 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[]) {
                       <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
                     </svg>
                   )}
-                  <span className={task.completed ? "text-text-secondary line-through" : "text-text-primary"}>
-                    {task.text}
-                  </span>
+                  {/* A div, not a span: task text is Markdown and may contain block content
+                      (lists, code). As a flex item its display is blockified either way, so the
+                      single-line appearance is unchanged. min-w-0 lets a code block scroll inside
+                      the row instead of widening it. */}
+                  <div className={`min-w-0 ${task.completed ? "text-text-secondary line-through" : "text-text-primary"}`}>
+                    <TaskText text={task.text} />
+                  </div>
                 </div>
               ))}
             </div>
