@@ -54,6 +54,17 @@ class TaskParserTest {
     }
 
     @Test
+    fun `an indented code block keeps its exact content`() {
+        // The one case that distinguishes the dedent from doing nothing: 6 spaces - 2 leaves 4, so the
+        // line is an indented code block whose content starts flush. Without the dedent it would carry
+        // two spurious leading spaces inside the code.
+        assertEquals(
+            listOf("Task\n\n    six space content"),
+            textOf("- [ ] Task\n\n      six space content"),
+        )
+    }
+
+    @Test
     fun `trailing blank lines are dropped`() {
         assertEquals(listOf("Task one\n- a"), textOf("- [ ] Task one\n  - a\n\n\n"))
     }

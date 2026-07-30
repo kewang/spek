@@ -41,6 +41,15 @@ test("parseTasks: indented prose after a blank line continues the task", () => {
   assert.deepEqual(textOf("- [ ] Task one\n\n  Belongs to item."), ["Task one\n\nBelongs to item."]);
 });
 
+test("parseTasks: an indented code block keeps its exact content", () => {
+  // The one case that distinguishes the dedent from doing nothing: 6 spaces - 2 leaves 4, so the
+  // line is an indented code block whose content starts flush. Without the dedent it would carry two
+  // spurious leading spaces inside the code.
+  assert.deepEqual(textOf("- [ ] Task\n\n      six space content"), [
+    "Task\n\n    six space content",
+  ]);
+});
+
 test("parseTasks: trailing blank lines are dropped", () => {
   assert.deepEqual(textOf("- [ ] Task one\n  - a\n\n\n"), ["Task one\n- a"]);
 });
