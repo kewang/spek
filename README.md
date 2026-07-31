@@ -379,6 +379,7 @@ Thanks to everyone who has contributed to spek:
   - TOC and `#hash` navigation that lands the target heading below the sticky header instead of behind it
   - Opening a change no longer consults the OpenSpec CLI once per change — the authoritative artifact order is cached per schema, since every change sharing a schema gets the same answer back
   - Bullets and numbers stay inline with their item's first line in lists whose items are separated by blank lines, instead of being pushed onto a line of their own
+  - Task text in the Tasks tab renders as Markdown, and a task's continuation lines — sub-bullets, paragraphs, code blocks — are kept instead of being discarded by the parser before they reach any surface
 
 - [@david-lutz](https://github.com/david-lutz) (David Lutz)
   - Deduplication of active changes shared across git worktrees, in both the Changes list and the dependency graph — the surviving copy is elected from git divergence rather than file timestamps, which a fresh checkout rewrites
