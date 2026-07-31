@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0
+
+**Highlight: the Tasks tab shows what your `tasks.md` actually says.** Two independent defects had made it the least faithful view in the app — one discarded content before it ever reached the UI, the other displayed what survived as literal source. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) for reporting and contributing both.
+
+- **A task's continuation lines are no longer discarded.** Sub-bullets, explanatory paragraphs and code blocks written underneath a `- [ ]` item were dropped by the parser itself, so they were missing from the data rather than merely hidden by styling — no amount of scrolling, resizing or switching surface would reveal them. In this repo's own openspec that was 90 of 1137 tasks, each showing only its first line. They now display as the source describes
+- **Task text renders as Markdown.** The Tasks tab was the one artifact view whose text never reached a Markdown parser, so `**bold**` appeared as four asterisks and `` `code` `` as backticks around the word. Inline formatting, links, nested lists and code blocks now render as they do on every other tab. Links open in a new tab, matching the rest of the viewer
+- **A bullet at column 0 after a checkbox stays outside that task.** A plain `- Note: …` line following a `- [ ]` item is a separate bullet in Markdown, and is now shown as one instead of being absorbed into the task above it as a nested list. The same applies to a heading, blockquote, code fence, numbered item or `---` — indent any of them and it still belongs to the task, exactly as Markdown reads it
+- **Progress counts, section grouping and the CI task badge are unchanged.** Only checkboxes at column 0 are counted, as before; an indented `- [ ]` belongs to its parent task's text and is not a task of its own. This was verified across every `tasks.md` in this repo — no progress bar or badge value moves
+
 ## 1.9.2
 
 - **Spec diffs stay readable on lines too wide to fit.** The red and green tints marking removed and added lines stopped at the first screenful, so scrolling right — exactly what you do to read a long line — left the changed text sitting on plain background, with nothing to say whether it was an addition or a removal. The tints now span the full scrollable width. Thanks to [@Katsz](https://github.com/Katsz) (Alex) for reporting and contributing this
