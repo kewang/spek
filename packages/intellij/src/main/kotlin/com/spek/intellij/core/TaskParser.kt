@@ -27,6 +27,32 @@ object TaskParser {
         return n
     }
 
+    // A column-0 line that opens a new block, which ends the preceding item rather than continuing
+    // it. CommonMark's lazy continuation only runs on for *paragraph* text: any line that starts a
+    // block interrupts the paragraph, so a standard renderer puts it outside the list. See the
+    // TypeScript original for what is deliberately left out (HTML blocks, fence tracking, setext).
+    //
+    // `\z` where the TypeScript side writes `$`: on an already-split line JS's `$` means the absolute
+    // end of the string, which is Kotlin's `\z` — Kotlin's own `$` would also match before a trailing
+    // `\r`. Likewise `[ \t]` rather than `\s`, whose membership differs between the two engines.
+    // The two patterns must stay literally translatable.
+    private val BLOCK_OPENER_RE = Regex(
+        "^(?:" +
+            listOf(
+                """#{1,6}(?:[ \t]|\z)""", // ATX heading ("## " is handled earlier by SECTION_RE)
+                """>""", // blockquote
+                """[-+*](?:[ \t]|\z)""", // bullet list item ("- [x] " handled earlier by CHECKBOX_RE)
+                // Any ordered marker, not just "1.": inside a bullet list a "2." opens a list of
+                // a different type, which ends the item. Checked against the reference renderer.
+                """\d{1,9}[.)](?:[ \t]|\z)""",
+                """`{3,}|~{3,}""", // fenced code block
+                """(?:[-*_][ \t]*){3,}\z""", // thematic break
+            ).joinToString("|") { "(?:$it)" } +
+            ")",
+    )
+
+    private fun opensBlock(line: String): Boolean = BLOCK_OPENER_RE.containsMatchIn(line)
+
     private class Pending(val first: String, val completed: Boolean) {
         val rest = mutableListOf<String>()
     }
@@ -98,6 +124,14 @@ object TaskParser {
             // must reach the content offset to stay inside the item — otherwise a standard renderer
             // puts it in its own paragraph outside the list, so it is not part of this task.
             if (sawBlank && leadingWhitespace(line) < CONTENT_OFFSET) {
+                flush()
+                sawBlank = false
+                continue
+            }
+
+            // Lazy continuation applies to paragraph text only: a column-0 line that opens a new
+            // block ends the item instead of joining it.
+            if (leadingWhitespace(line) == 0 && opensBlock(line)) {
                 flush()
                 sawBlank = false
                 continue

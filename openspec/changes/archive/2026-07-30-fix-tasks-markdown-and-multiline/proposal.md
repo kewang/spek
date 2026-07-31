@@ -9,8 +9,9 @@ continuation lines never enter the data model at all — 159 such lines exist in
 ## What Changes
 
 - `parseTasks` attaches a task's continuation lines to that task instead of dropping them. They are
-  folded into the existing `text` field, newline-joined, with their common leading indentation
-  stripped so the folded text is valid Markdown.
+  folded into the existing `text` field, newline-joined, each dedented by up to 2 leading whitespace
+  characters — the `- ` marker's CommonMark content offset — so the folded text is valid Markdown.
+  (Dedenting by the *smallest* indent found was considered and rejected; see `design.md`.)
 - The Tasks tab renders each task's `text` as Markdown, so inline formatting (`**bold**`,
   `` `code` ``, links) displays instead of raw source.
 - IntelliJ's Kotlin `TaskParser` is kept aligned with the same folding rules.

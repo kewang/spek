@@ -25,7 +25,7 @@
 - [x] 2.4 Cover the invariants that must not move: a single-line task's `text` is byte-identical to
       today's trimmed output and contains no newline; indented `- [ ]` checkboxes do not increment
       `total`; existing section grouping and `{ total, completed }` results are unchanged
-  - 17 cases, all passing. Full core suite stays at 170 passing / 0 failing.
+  - 17 cases, all passing. Full core suite stays at 185 passing / 0 failing.
 
 ## 3. Render task text as Markdown
 
@@ -78,15 +78,15 @@
       today — asserting the same cases as 2.1–2.4 so the two implementations cannot drift silently
 - [x] 5.3 Run `./gradlew test` and confirm the reported test count actually includes the new class;
       Gradle runs instrumented output, so a stale build can pass while running old bytecode
-  - `TEST-com.spek.intellij.core.TaskParserTest.xml` reports `tests=17 failures=0`, freshly timestamped.
+  - `TEST-com.spek.intellij.core.TaskParserTest.xml` reports `tests=18 failures=0`, freshly timestamped.
     `compileKotlin` printed UP-TO-DATE, but the folding assertions cannot pass against the old parser,
-    so the new bytecode demonstrably ran. Whole module: 103 tests, 0 failures.
+    so the new bytecode demonstrably ran. Whole module: 104 tests, 0 failures.
 
 ## 6. Verify
 
 - [x] 6.1 `npm run type-check` and `npm test` clean. Note that `npm run build` and `build:webview` use
       `cp` / `rm -rf` and fail under Windows shells — run `tsc` plus a manual copy if a build is needed
-  - type-check passes; tests 170 + 24 + 60, 0 failures. `npm run build -w @spekjs/core` did work here
+  - type-check passes; tests 185 + 24 + 60, 0 failures. `npm run build -w @spekjs/core` did work here
     (Git Bash provides `rm`); web consumers resolve `@spekjs/core` from `dist/`, so core must be rebuilt
     before web tests exercise a parser change — otherwise they silently test the published build.
 - [x] 6.2 Check the Tasks tab in the running web app against a change with multi-line tasks and one with
@@ -104,3 +104,21 @@
     terminating, boundary comparison flipped, first line trimmed when folded, trailing blanks kept,
     single-line trim dropped, tab excluded from dedent, checkbox regex allowing indentation, blank lines
     not recorded. LSP diagnostics clean on every touched file.
+
+## 7. Block-opener boundary (applied by the maintainer on merge)
+
+- [x] 7.1 Lazy continuation was folding column-0 block-openers into the preceding task, so a plain
+      `- Note: …` bullet became a nested list and a `---` turned the task into a setext heading —
+      the opposite of the rendering-equivalence property this change is built on
+  - `BLOCK_OPENER_RE` in both parsers: a column-0 bullet / ordered marker / ATX heading / blockquote
+    / code fence / thematic break ends the item. An indented one still belongs to the task
+  - Every entry was checked against the reference renderer rather than read off the CommonMark spec.
+    `2.` is included because remark ends the item on it, though the "only a list starting at 1
+    interrupts a paragraph" rule reads like it should not; `===` is excluded because it is absorbed
+    as paragraph text, not a block start
+  - Counting is untouched by construction: none of these lines is a column-0 checkbox, so they end a
+    task without starting one
+- [x] 7.2 Twelve cases added on each side, plus the two known divergences documented in the spec
+  - core 197 passing, `TaskParserTest` 30, IntelliJ module 116, web 60, ui 24, type-check clean
+  - Re-ran the PR's own reference-comparison harness over the block-opener cases: 13/15 match. The
+    two that do not are the documented setext and fenced-checkbox divergences, both pre-existing

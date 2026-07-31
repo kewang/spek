@@ -112,3 +112,68 @@ test("parseTasks: empty input yields no tasks", () => {
 test("parseTasks: CRLF input is handled", () => {
   assert.deepEqual(textOf("- [ ] Parent\r\n  - a\r\n"), ["Parent\n- a"]);
 });
+
+// Lazy continuation is a paragraph-only rule. A column-0 line that opens a block interrupts the
+// paragraph, so a standard renderer shows it outside the list — folding it in would make the Tasks
+// tab the only viewer that nests it. Counting is untouched: none of these lines is a column-0
+// checkbox, so they end a task without starting one.
+
+test("parseTasks: a column-0 bullet ends the task instead of nesting inside it", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n- plain note"), ["Task one"]);
+});
+
+test("parseTasks: an indented bullet still belongs to the task", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n  - plain note"), ["Task one\n- plain note"]);
+});
+
+test("parseTasks: a thematic break ends the task rather than making it a setext heading", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n---"), ["Task one"]);
+});
+
+test("parseTasks: a setext underline stays in the task", () => {
+  // Not a block start — the reference absorbs it as paragraph text. Keeping it renders the task as
+  // a heading, which is wrong, but dropping it would delete content, which is the worse of the two.
+  assert.deepEqual(textOf("- [ ] Task one\n==="), ["Task one\n==="]);
+});
+
+test("parseTasks: a blockquote ends the task", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n> quoted"), ["Task one"]);
+});
+
+test("parseTasks: an ATX heading ends the task", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n### Heading"), ["Task one"]);
+});
+
+test("parseTasks: a code fence ends the task", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n```\nfenced\n```"), ["Task one"]);
+});
+
+test("parseTasks: an ordered list ends the task", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n1. first"), ["Task one"]);
+});
+
+test("parseTasks: an ordered list not starting at 1 also ends the task", () => {
+  // The "only a list starting at 1 interrupts a paragraph" rule is about running text. Inside a
+  // bullet list this opens a list of a different type, and the reference ends the item on it.
+  assert.deepEqual(textOf("- [ ] Task one\n2. second"), ["Task one"]);
+});
+
+test("parseTasks: a bare # without a space is not a heading", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n#hashtag"), ["Task one\n#hashtag"]);
+});
+
+test("parseTasks: emphasis at column 0 is not a bullet", () => {
+  assert.deepEqual(textOf("- [ ] Task one\n*emphasis* continues"), [
+    "Task one\n*emphasis* continues",
+  ]);
+});
+
+test("parseTasks: a block opener between tasks leaves the counts alone", () => {
+  const parsed = parseTasks("- [x] one\n- plain note\n- [ ] two\n");
+  assert.equal(parsed.total, 2);
+  assert.equal(parsed.completed, 1);
+  assert.deepEqual(
+    parsed.sections[0].tasks.map((t) => t.text),
+    ["one", "two"]
+  );
+});

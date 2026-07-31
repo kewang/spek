@@ -136,4 +136,78 @@ class TaskParserTest {
     fun `CRLF input is handled`() {
         assertEquals(listOf("Parent\n- a"), textOf("- [ ] Parent\r\n  - a\r\n"))
     }
+
+    // Lazy continuation is a paragraph-only rule. A column-0 line that opens a block interrupts the
+    // paragraph, so a standard renderer shows it outside the list. Counting is untouched: none of
+    // these lines is a column-0 checkbox, so they end a task without starting one.
+
+    @Test
+    fun `a column-0 bullet ends the task instead of nesting inside it`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n- plain note"))
+    }
+
+    @Test
+    fun `an indented bullet still belongs to the task`() {
+        assertEquals(listOf("Task one\n- plain note"), textOf("- [ ] Task one\n  - plain note"))
+    }
+
+    @Test
+    fun `a thematic break ends the task rather than making it a setext heading`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n---"))
+    }
+
+    @Test
+    fun `a setext underline stays in the task`() {
+        // Not a block start — the reference absorbs it as paragraph text. Keeping it renders the
+        // task as a heading, which is wrong, but dropping it would delete content.
+        assertEquals(listOf("Task one\n==="), textOf("- [ ] Task one\n==="))
+    }
+
+    @Test
+    fun `a blockquote ends the task`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n> quoted"))
+    }
+
+    @Test
+    fun `an ATX heading ends the task`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n### Heading"))
+    }
+
+    @Test
+    fun `a code fence ends the task`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n```\nfenced\n```"))
+    }
+
+    @Test
+    fun `an ordered list ends the task`() {
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n1. first"))
+    }
+
+    @Test
+    fun `an ordered list not starting at 1 also ends the task`() {
+        // The "only a list starting at 1 interrupts a paragraph" rule is about running text. Inside
+        // a bullet list this opens a list of a different type, and the reference ends the item.
+        assertEquals(listOf("Task one"), textOf("- [ ] Task one\n2. second"))
+    }
+
+    @Test
+    fun `a bare number sign without a space is not a heading`() {
+        assertEquals(listOf("Task one\n#hashtag"), textOf("- [ ] Task one\n#hashtag"))
+    }
+
+    @Test
+    fun `emphasis at column 0 is not a bullet`() {
+        assertEquals(
+            listOf("Task one\n*emphasis* continues"),
+            textOf("- [ ] Task one\n*emphasis* continues"),
+        )
+    }
+
+    @Test
+    fun `a block opener between tasks leaves the counts alone`() {
+        val parsed = TaskParser.parse("- [x] one\n- plain note\n- [ ] two\n")
+        assertEquals(2, parsed.total)
+        assertEquals(1, parsed.completed)
+        assertEquals(listOf("one", "two"), parsed.sections[0].tasks.map { it.text })
+    }
 }

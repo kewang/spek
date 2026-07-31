@@ -222,7 +222,14 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   continuations, promoting lazy prose into bullet lists no other viewer shows). Two rules carry it:
   the 2-char dedent (only observable on a blank line + ≥6-space indent, i.e. an indented code block —
   the single case any test can distinguish it by) and the blank-line boundary (after a blank line a line
-  must be indented ≥2 to stay in the item, else standalone prose gets swallowed into the task).
+  must be indented ≥2 to stay in the item, else standalone prose gets swallowed into the task) plus
+  `BLOCK_OPENER_RE` (lazy continuation is paragraph-only, so a **column-0** bullet / ordered marker /
+  ATX heading / blockquote / code fence / thematic break ends the task — indented, the same line still
+  belongs to it). Entries in that regex were each checked against the reference renderer, **not read
+  off the CommonMark spec**: `2.` ends an item even though "only a list starting at 1 interrupts a
+  paragraph" reads otherwise, and `===` does *not*, being absorbed as paragraph text. Two divergences
+  are knowingly kept (documented in the spec): a folded `===` renders as a heading, and a column-0
+  checkbox inside a fenced block still counts — fixing the latter would move `total`.
   `CHECKBOX_RE` stays **anchored at column 0**: an indented checkbox belongs to its parent's text and is
   deliberately *not* counted, so relaxing the anchor would move every progress bar and CI badge. First
   lines keep trailing whitespace when folded, or two-space hard breaks silently become soft ones

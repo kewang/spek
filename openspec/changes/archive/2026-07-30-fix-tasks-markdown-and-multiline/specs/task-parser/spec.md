@@ -9,8 +9,14 @@ that the resulting `text` is valid Markdown whose rendering matches how a standa
 renderer displays the same source in place.
 
 A line is a continuation of the preceding task when it is neither a column-0 checkbox nor a `##`
-section heading, subject to the blank-line boundary rule. Trailing blank lines SHALL be dropped from
-the end of a task's text.
+section heading, subject to the blank-line boundary and block-opener rules. Trailing blank lines SHALL
+be dropped from the end of a task's text.
+
+Two constructs are known not to satisfy the rendering-equivalence property above, both because a
+folded task is rendered standalone while the reference renders it in context. A setext underline
+(`===`) is absorbed as paragraph text by the reference but turns the folded task into a heading; and a
+column-0 checkbox inside a fenced code block is counted as a task, which the reference does not do.
+Both are retained deliberately — the alternatives are deleting content and moving `total` respectively.
 
 #### Scenario: Sub-bullets indented by two spaces
 - **WHEN** parser receives `- [ ] Parent` followed by `  - first` and `  - second`
@@ -54,6 +60,27 @@ because a standard renderer places such a line in its own paragraph outside the 
 #### Scenario: Indented prose after a blank line continues the task
 - **WHEN** parser receives `- [ ] Task one`, a blank line, then a line indented 2 spaces
 - **THEN** that line is part of the task's `text`
+
+### Requirement: Block openers end a task
+
+The task parser SHALL end the preceding task at a column-0 line that opens a new block — a bullet
+(`-`/`+`/`*`), an ordered marker (`1.`, `2)`, …), an ATX heading, a blockquote, a code fence, or a
+thematic break — rather than folding that line into the task. Lazy continuation applies to paragraph
+text only, and a standard renderer places such a line outside the list. The same line indented to at
+least the content offset SHALL remain part of the task. Because none of these lines is a column-0
+checkbox, this rule ends tasks without starting any, leaving `total` and `completed` unchanged.
+
+#### Scenario: Column-0 bullet after a task
+- **WHEN** parser receives `- [ ] Task one` followed by `- plain note`
+- **THEN** `- plain note` is not part of the task's `text`, and `total` is 1
+
+#### Scenario: Indented bullet after a task
+- **WHEN** parser receives `- [ ] Task one` followed by `  - plain note`
+- **THEN** the note is part of the task's `text` and renders as a nested list
+
+#### Scenario: Thematic break after a task
+- **WHEN** parser receives `- [ ] Task one` followed by `---`
+- **THEN** the task's `text` is `Task one`, rather than becoming a setext heading
 
 ### Requirement: Preserve intentional line breaks
 
