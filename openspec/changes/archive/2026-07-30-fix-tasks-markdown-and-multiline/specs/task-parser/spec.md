@@ -1,42 +1,4 @@
-## Purpose
-
-Parse tasks.md checkboxes and section groupings into the completion statistics every delivery surface reports.
-
-## Requirements
-### Requirement: Parse task checkboxes
-The task parser SHALL be a pure function in the `@spekjs/core` package that reads a tasks.md content string and extracts checkbox items with their completion status. It SHALL have no dependency on Express or any HTTP framework.
-
-#### Scenario: Parse file with mixed checkboxes
-- **WHEN** parser receives a string containing `- [x] Done task` and `- [ ] Pending task`
-- **THEN** it returns each task with `text` and `completed` (boolean) fields
-
-### Requirement: Group tasks by section
-The task parser SHALL group tasks under their `##` heading sections.
-
-#### Scenario: Tasks under multiple sections
-- **WHEN** parser receives a string with `## Phase 1` followed by tasks and `## Phase 2` followed by tasks
-- **THEN** it returns sections array, each with `title` and `tasks` array
-
-#### Scenario: Tasks without section headings
-- **WHEN** parser receives a string where tasks appear before any `##` heading
-- **THEN** those tasks are grouped under a default section with empty title
-
-### Requirement: Calculate task statistics
-The task parser SHALL compute aggregate statistics from parsed tasks. Only checkboxes at column 0 SHALL
-count toward `total` and `completed`; an indented checkbox is part of its parent task's text and SHALL
-NOT be counted as a separate task.
-
-#### Scenario: Calculate completion stats
-- **WHEN** parser processes a string with 10 total checkboxes where 7 are checked
-- **THEN** it returns `{ total: 10, completed: 7 }` along with the sections breakdown
-
-#### Scenario: Empty tasks file
-- **WHEN** parser processes an empty string or one with no checkboxes
-- **THEN** it returns `{ total: 0, completed: 0, sections: [] }`
-
-#### Scenario: Indented checkboxes are not counted
-- **WHEN** parser processes a column-0 checkbox followed by two checkboxes indented 2 spaces
-- **THEN** `total` is 1, and the indented checkboxes appear within that task's `text`
+## ADDED Requirements
 
 ### Requirement: Preserve task continuation lines
 
@@ -133,3 +95,23 @@ downgraded to a soft break.
 #### Scenario: Soft line break stays soft
 - **WHEN** parser receives a checkbox line with no trailing whitespace followed by a continuation line
 - **THEN** the two lines render as a single wrapped line, not as a hard break
+
+## MODIFIED Requirements
+
+### Requirement: Calculate task statistics
+
+The task parser SHALL compute aggregate statistics from parsed tasks. Only checkboxes at column 0 SHALL
+count toward `total` and `completed`; an indented checkbox is part of its parent task's text and SHALL
+NOT be counted as a separate task.
+
+#### Scenario: Calculate completion stats
+- **WHEN** parser processes a string with 10 total checkboxes where 7 are checked
+- **THEN** it returns `{ total: 10, completed: 7 }` along with the sections breakdown
+
+#### Scenario: Empty tasks file
+- **WHEN** parser processes an empty string or one with no checkboxes
+- **THEN** it returns `{ total: 0, completed: 0, sections: [] }`
+
+#### Scenario: Indented checkboxes are not counted
+- **WHEN** parser processes a column-0 checkbox followed by two checkboxes indented 2 spaces
+- **THEN** `total` is 1, and the indented checkboxes appear within that task's `text`

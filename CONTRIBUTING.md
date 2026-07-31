@@ -122,6 +122,17 @@ Maintainers review for **correctness** and whether the change does what it claim
 PR against undocumented internal conventions — if a convention matters, it belongs in this file, so
 tell us if you hit one that isn't written down.
 
+**If a PR grows, we may ask you to split it.** One logical change per PR reviews and lands faster —
+if a branch ends up carrying several unrelated things, we'll ask for the pieces to go out
+separately (this has happened before, and the smaller pieces merged sooner). Flagging the split
+yourself — "happy to peel out X if you'd rather review a thinner PR" — is always welcome.
+
+**Small fixes may be applied on merge, with credit.** When a reviewed PR only needs a nit or a
+mechanical touch-up, we may merge it and make the fix in a follow-up commit on `master` rather than
+holding the merge for another round-trip. When we do, you're credited — an `@mention` in the README
+or release notes, or a `Co-authored-by:` trailer. Prefer to make the change yourself? Say so on the
+PR and we'll wait for you.
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under the
