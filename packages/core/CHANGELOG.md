@@ -3,6 +3,35 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.4.0
+
+- **`parseTasks` keeps a task's continuation lines instead of discarding them.** The line loop
+  previously kept only lines matching the checkbox or section pattern and dropped everything else, so
+  sub-bullets, explanatory paragraphs and code blocks written underneath a `- [ ]` item never entered
+  the data model at all.
+
+  **Behavior change for consumers: `TaskItem.text` may now contain newlines, where it was previously
+  always single-line.** No type or field change, and additive in effect — but a consumer rendering it
+  as a one-line label may now wrap. The field's contract is "Markdown, possibly multi-line": render
+  it, don't treat it as a plain string label.
+
+  Continuation lines are newline-joined onto the first line and each dedented by up to 2 leading
+  whitespace characters — the `- ` marker's CommonMark content offset — so the folded text renders the
+  way a standard CommonMark+GFM renderer displays the same source in place. A task with no
+  continuation lines is byte-identical to the previous output.
+
+- **A column-0 line that opens a block ends the task.** Lazy continuation applies to paragraph text
+  only, so a bullet, ordered marker, ATX heading, blockquote, code fence or thematic break at column 0
+  terminates the preceding item rather than being folded into it. Indented to the content offset, the
+  same line still belongs to the task. Two divergences from a reference renderer are knowingly kept: a
+  folded setext underline (`===`) renders as a heading, and a column-0 checkbox inside a fenced code
+  block still counts as a task — the alternatives are deleting content and moving `total`.
+
+- **`total`, `completed` and section grouping are unchanged.** `CHECKBOX_RE` remains anchored at
+  column 0, so an indented `- [ ]` belongs to its parent task's text and is not counted. Verified by
+  parsing every `tasks.md` in the spek repository with the old and new parsers: no difference in
+  `total` / `completed`, per-section counts, section titles, or any task's first line.
+
 ## 1.3.0
 
 - **New export: `changeNodeSlug(node)`** — resolves a graph change node back to its change slug,
