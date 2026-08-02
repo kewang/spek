@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import Fuse from "fuse.js";
 import fs from "node:fs";
 import path from "node:path";
-import chokidar from "chokidar";
+import chokidar, { type FSWatcher } from "chokidar";
 import {
   scanOpenSpec,
   scanOpenSpecAggregated,
@@ -22,7 +22,7 @@ import {
 // --- File watcher 共享管理 ---
 
 interface WatcherEntry {
-  watcher: chokidar.FSWatcher;
+  watcher: FSWatcher;
   clients: Set<Response>;
   debounceTimer: ReturnType<typeof setTimeout> | null;
 }

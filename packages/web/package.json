@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "build:webview": "vite build --config vite.webview.config.ts",
     "build:intellij": "vite build --config vite.intellij.config.ts",
-    "type-check": "tsc -p tsconfig.json --noEmit",
+    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "lint": "eslint src server --ext .ts,.tsx",
     "format": "prettier --write src server"
