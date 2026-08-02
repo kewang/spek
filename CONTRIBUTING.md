@@ -92,9 +92,11 @@ reference — several were authored by external contributors.
   and spec deltas in English.
 - **Write comments in English too.** Some existing code still has Traditional Chinese comments — no
   need to translate those wholesale, but write new comments in English.
-- **Preserve existing line endings.** This repo has mixed line endings and no `.gitattributes`.
-  Configure your editor so it does **not** reformat an entire file's line endings when you touch
-  a few lines — a whole-file CRLF↔LF flip produces an unreviewable diff and will be sent back.
+- **Line endings are LF, enforced by `.gitattributes`.** The repo was normalized in `beaebbb`
+  (2026-07-18) and `* text=auto eol=lf` keeps it that way, so no editor configuration is needed for
+  new work. One caveat: a branch forked before that commit still carries the old endings, and
+  touching a file there produces a whole-file CRLF↔LF flip — an unreviewable diff that will be sent
+  back. Rebase onto current `master` instead of committing the flip.
 - Match the style of the surrounding code: its naming, comment density, and idioms.
 
 ## Submitting a pull request
