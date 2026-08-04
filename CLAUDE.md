@@ -16,12 +16,18 @@ spek — an OpenSpec content viewer. Four delivery surfaces plus one CI helper:
 
 The repo is **`spekhq/spek`**; the npm scope is **`@spekjs`** (an org name ≠ npm scope is normal — don't "fix" the mismatch).
 
-## action.yml: zero test coverage — read before touching the build chain
+## action.yml: smoke-tested only — read before touching the build chain
 
-The composite action is the only shipped artifact with **no test coverage** (`npm test` and CI never run it — a
-known trade-off). **Any change to packaging build timing / the build chain must verify the action manually**: add a
-temporary `workflow_dispatch` workflow with `uses: spekhq/spek@master` + `generate-badges: "true"`, assert that
-`html-path` / `badges-path` actually produce files, then remove it.
+CI runs a smoke job (`action-smoke` in `ci.yml`) that invokes the composite action against this repo with
+`generate-badges: "true"` and asserts the `html-path` / `badges-path` outputs point at real, non-empty files. It
+pins `spek-version: ${{ github.sha }}` — the action checks out `spekhq/spek` at that ref and builds from *that*
+copy, so the default `master` would test master's implementation and go green on a PR that breaks the action.
+
+**What it covers**: the action's own build chain produces output. That is the failure that shipped before.
+**What it does not**: any input combination other than the one it runs (`repo-path`, `output-path`, `title`,
+`spek-version` pinned to a tag), the generated HTML's *content*, and behavior on a consumer's repo layout. A
+change to those still needs manual verification — a temporary `workflow_dispatch` workflow with
+`uses: spekhq/spek@master`, asserting the outputs, then removed.
 
 - Precedent: moving `@spekjs/ui`'s build from `prepare` (install-time) to `prepublishOnly` (publish-time) made the
   action's ui build **silently vanish** — it relied on `npm ci` triggering `prepare` to get ui dist. The Marketplace
@@ -66,9 +72,18 @@ npm run build:core       # @spekjs/core
 npm run build:webview    # webview assets (for VS Code)
 npm run build:demo       # standalone demo (docs/demo.html; needs NODE_ENV=production)
 npm run build:intellij   # IntelliJ webview assets
-npm run type-check       # TypeScript type check
+npm run type-check       # type-check core + ui + web + vscode + scripts/ (tests included)
+npm run lint             # ESLint over every package's src, web's server, and scripts/
 npm test                 # core + ui + web tests
 ```
+
+**CI runs exactly these scripts** (`.github/workflows/ci.yml`, on `pull_request` + `push:[master]`), plus
+`./gradlew test` in `packages/intellij` and the action smoke job. A gate that fails in CI reproduces locally
+with the same command — that is deliberate, so don't reimplement a gate inline in the workflow.
+
+`type-check` covers **test files too**. Each of core/ui carries a `tsconfig.test.json` for that, rather than the
+build config dropping its test `exclude`: the build config emits into `dist`, and `files: ["dist"]` publishes it,
+so removing the exclude there would ship compiled tests to registry consumers.
 
 **A core change needs `npm run build:core` before web tests mean anything.** `@spekjs/core`'s package
 entry is `dist/`, so the web package imports the *built* copy, not `src/`. Editing core and running
@@ -267,6 +282,15 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   - **`@spekjs/core`** and **`@spekjs/ui`** each have their own version line and CHANGELOG
     (`packages/core/CHANGELOG.md` / `packages/ui/CHANGELOG.md`), **not written into the three above** (their readers
     are API consumers). Each must be listed in that package's `package.json` `files` (npm doesn't auto-pack a CHANGELOG)
+  - **`@spekjs/*` publishing is automated; the version decision is not.** CI publishes a package when its declared
+    version differs from the registry (`.github/workflows/npm-publish.yml`, on `push:[master]`), authenticating via
+    npm Trusted Publishing (OIDC — no token in repo secrets) and creating a `core-vX.Y.Z` / `ui-vX.Y.Z` tag on
+    success. Never run `npm publish` locally and never hand-create those tags. **The workflow's filename is
+    registered with npm and matched exactly — renaming `npm-publish.yml` leaves a workflow that still runs, still
+    resolves the version difference, and fails only at authentication, with nothing naming the cause.** The bump
+    itself is chosen by the `release` skill from the archived changes' Impact, never from commit prefixes: core
+    1.3.0 (`fix:` that added an export subpath) and 1.4.0 (`fix:`/`test:` that changed `TaskItem.text` semantics)
+    would both have been under-bumped to a patch by a prefix rule
   - **Written at release time, not inside a change.** CHANGELOG entries and version bumps (`package.json` `version`,
     `gradle.properties` `pluginVersion`) belong to the release flow — `/release` for the product line, a separate
     `chore(npm): publish …` commit for the package lines. Do **not** list them in a change's `tasks.md` or do them

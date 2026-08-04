@@ -59,9 +59,9 @@
 
 ## 5. Backfill the package release tags
 
-- [ ] 5.1 Create the twelve annotated tags on the commits listed in the design's backfill table
+- [x] 5.1 Create the twelve annotated tags on the commits listed in the design's backfill table
       (`core-v1.0.0` … `core-v1.4.0`, `ui-v1.0.0` … `ui-v1.2.0`; `2e65a11` carries two).
-- [ ] 5.2 Verify each tagged commit's `packages/<pkg>/package.json` declares the version the tag
+- [x] 5.2 Verify each tagged commit's `packages/<pkg>/package.json` declares the version the tag
       names, and that no existing tag was moved or deleted.
 - [ ] 5.3 Push the tags to origin.
 
@@ -70,52 +70,52 @@
 - [ ] 6.1 Register a trusted publisher for `@spekjs/core` and `@spekjs/ui` on npmjs.com, pointing at
       `spekhq/spek` and the workflow filename `npm-publish.yml`. **Maintainer action outside the
       repository; publishing cannot authenticate until it is done.**
-- [ ] 6.2 Create `.github/workflows/npm-publish.yml` on `push` to `master`, with
+- [x] 6.2 Create `.github/workflows/npm-publish.yml` on `push` to `master`, with
       `id-token: write` + `contents: write` and a concurrency group. Open the file with a comment
       stating that its filename is registered with the npm registry and must not be renamed without
       re-registering.
-- [ ] 6.3 Run the gates in the job before publishing: `npm ci` → `npm run build:core` → `npm test` →
+- [x] 6.3 Run the gates in the job before publishing: `npm ci` → `npm run build:core` → `npm test` →
       `npm run type-check`. Do not chain on `ci.yml` via `workflow_run`.
-- [ ] 6.4 Install npm ≥ 11.5.1 after `setup-node` — the Node pinned by `.nvmrc` bundles npm 10.9.4,
+- [x] 6.4 Install npm ≥ 11.5.1 after `setup-node` — the Node pinned by `.nvmrc` bundles npm 10.9.4,
       which predates trusted publishing.
-- [ ] 6.5 For each package, compare the declared version against the registry and publish only on a
+- [x] 6.5 For each package, compare the declared version against the registry and publish only on a
       difference; an already-published version exits successfully without publishing.
-- [ ] 6.6 On a successful publish, create and push the matching `core-vX.Y.Z` / `ui-vX.Y.Z`
+- [x] 6.6 On a successful publish, create and push the matching `core-vX.Y.Z` / `ui-vX.Y.Z`
       annotated tag. Create no tag when the package was skipped.
-- [ ] 6.7 Keep the workflow flat — no reusable-workflow indirection, which breaks npm's OIDC
+- [x] 6.7 Keep the workflow flat — no reusable-workflow indirection, which breaks npm's OIDC
       filename validation.
 - [ ] 6.8 Verify end to end with a deliberate patch release of one package: the publish succeeds,
       the registry shows a provenance attestation, and the tag lands on the right commit.
 
 ## 7. Extend the release skill to the package line
 
-- [ ] 7.1 Add a step to `.agents/skills/release/SKILL.md` that, for each of `@spekjs/core` and
+- [x] 7.1 Add a step to `.agents/skills/release/SKILL.md` that, for each of `@spekjs/core` and
       `@spekjs/ui`, diffs `packages/<pkg>/src` against that package's last release tag and reports
       whether a release is due.
-- [ ] 7.2 Specify how the increment is decided: from the archived changes' stated impact (a new
+- [x] 7.2 Specify how the increment is decided: from the archived changes' stated impact (a new
       public export, a behavior change observable by a consumer), never from commit prefixes. Cite
       core 1.3.0 and 1.4.0 as the worked examples of why.
-- [ ] 7.3 Specify the outputs of the step — that package's CHANGELOG updated, its version bumped,
+- [x] 7.3 Specify the outputs of the step — that package's CHANGELOG updated, its version bumped,
       and a `chore(npm): publish @spekjs/<pkg>@X.Y.Z` commit written — and that CI publishes from
       there, so the skill no longer runs `npm publish` locally.
-- [ ] 7.4 Add a guardrail covering the case where neither package changed: bump neither, and say so.
+- [x] 7.4 Add a guardrail covering the case where neither package changed: bump neither, and say so.
 
 ## 8. Update the documentation the gates change
 
-- [ ] 8.1 Update `CONTRIBUTING.md` to name the commands that must pass before opening a pull
+- [x] 8.1 Update `CONTRIBUTING.md` to name the commands that must pass before opening a pull
       request, and to state that CI runs them.
-- [ ] 8.2 Update `CLAUDE.md`: `action.yml` is no longer untested (revise the "zero test coverage"
+- [x] 8.2 Update `CLAUDE.md`: `action.yml` is no longer untested (revise the "zero test coverage"
       section to describe the smoke job and what it does not cover), record the npm publish flow and
       the workflow-filename trap, and correct the "Development Commands" list where `type-check` and
       `lint` now mean something different.
-- [ ] 8.3 Update the `README` / `README.zh-TW` development sections if they name the old
+- [x] 8.3 Update the `README` / `README.zh-TW` development sections if they name the old
       `type-check` scope.
 
 ## 9. Verify
 
-- [ ] 9.1 Run `npm run build:core && npm test && npm run type-check && npm run lint && npm run build`
+- [x] 9.1 Run `npm run build:core && npm test && npm run type-check && npm run lint && npm run build`
       locally from a clean `npm ci` and confirm all pass.
-- [ ] 9.2 Run `./gradlew test` in `packages/intellij` and confirm it passes.
+- [x] 9.2 Run `./gradlew test` in `packages/intellij` and confirm it passes.
 - [ ] 9.3 Open a pull request and confirm every job reports, including the smoke job.
 - [ ] 9.4 Confirm a pull request that introduces a type error in a test file is caught — the hole
       this change exists to close.

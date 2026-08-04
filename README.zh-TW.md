@@ -329,7 +329,8 @@ npm run build:ui         # 僅 Build @spekjs/ui
 npm run build:webview    # Build webview 靜態資源（給 VS Code Extension 用）
 npm run build:vscode     # Build VS Code Extension
 npm run build:intellij   # Build IntelliJ webview 靜態資源
-npm run type-check       # TypeScript 型別檢查
+npm run type-check       # 型別檢查所有 package 與 scripts/（含測試檔）
+npm run lint             # ESLint
 ```
 
 **IntelliJ Plugin build：**

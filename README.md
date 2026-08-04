@@ -331,7 +331,8 @@ npm run build:ui         # Build @spekjs/ui only
 npm run build:webview    # Build webview assets for VS Code extension
 npm run build:vscode     # Build VS Code extension
 npm run build:intellij   # Build IntelliJ webview assets
-npm run type-check       # TypeScript type check
+npm run type-check       # Type-check every package + scripts/ (tests included)
+npm run lint             # ESLint
 ```
 
 **IntelliJ Plugin build:**
