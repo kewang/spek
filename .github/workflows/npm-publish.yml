@@ -1,0 +1,156 @@
+# ┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+# │ THIS FILE'S NAME IS CONFIGURATION. DO NOT RENAME IT.                                          │
+# │                                                                                               │
+# │ "npm-publish.yml" is registered as a trusted publisher for @spekjs/core and @spekjs/ui on     │
+# │ npmjs.com, and npm matches it exactly. Renaming this file leaves a workflow that still runs,  │
+# │ still resolves the version difference, and fails only at the authentication step — with       │
+# │ nothing indicating that a rename caused it. Rename only alongside re-registering the trusted  │
+# │ publisher for BOTH packages.                                                                  │
+# │                                                                                               │
+# │ For the same reason the publish steps stay inline: npm's OIDC validation checks the *calling* │
+# │ workflow's name when a reusable workflow is involved, so factoring them out breaks the match. │
+# └──────────────────────────────────────────────────────────────────────────────────────────────┘
+#
+# Publishes @spekjs/core and @spekjs/ui when their declared version differs from the registry.
+# The version bump itself is decided by the release flow, never inferred here — see
+# openspec/specs/npm-package-cicd.
+
+name: Publish npm packages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize: two pushes in quick succession must not race into a double publish.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  # Cheap gate. Nearly every push to master changes no version, and this job is all that runs then.
+  check:
+    name: Check versions against the registry
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.check.outputs.core }}
+      core-version: ${{ steps.check.outputs.core-version }}
+      ui: ${{ steps.check.outputs.ui }}
+      ui-version: ${{ steps.check.outputs.ui-version }}
+      any: ${{ steps.check.outputs.any }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - id: check
+        run: |
+          any=false
+          for pkg in core ui; do
+            local_version=$(node -p "require('./packages/$pkg/package.json').version")
+            published=$(npm view "@spekjs/$pkg" versions --json 2>/dev/null || echo '[]')
+            # Membership of the full version list, rather than `npm view <pkg>@<version>`: that
+            # form signals "not published" through an E404 exit code, which conflates with every
+            # other reason the command can fail (network, auth, registry outage) — and a failure
+            # read as "not published" is a failure read as "publish it". `versions --json` also
+            # yields a bare string rather than an array when a package has exactly one version,
+            # which the check below normalizes.
+            if node -e '
+              const [v, raw] = process.argv.slice(1);
+              let arr = [];
+              try { arr = JSON.parse(raw); } catch {}
+              if (!Array.isArray(arr)) arr = [arr];
+              process.exit(arr.includes(v) ? 0 : 1);
+            ' "$local_version" "$published"; then
+              echo "@spekjs/$pkg@$local_version is already on the registry — skipping"
+              echo "$pkg=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "@spekjs/$pkg@$local_version is not on the registry — will publish"
+              echo "$pkg=true" >> "$GITHUB_OUTPUT"
+              any=true
+            fi
+            echo "$pkg-version=$local_version" >> "$GITHUB_OUTPUT"
+          done
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish
+    needs: check
+    if: needs.check.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # OIDC — trusted publishing. No npm token is stored in this repository.
+      contents: write   # pushing the release tag
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          registry-url: 'https://registry.npmjs.org'
+
+      # .nvmrc pins Node 22, which bundles npm 10 — older than trusted publishing requires. Without
+      # this the job fails at publish with an authentication error that does not name the cause.
+      - name: Ensure npm supports trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - run: npm ci
+
+      # Both, for the same reason as ci.yml: web type-checks against core's and ui's dist/, and
+      # `npm ci` produces neither.
+      - name: Build @spekjs/core and @spekjs/ui
+        run: |
+          npm run build:core
+          npm run build:ui
+
+      # The gates run here rather than chaining on ci.yml via workflow_run: that trigger evaluates
+      # the workflow file from the default branch rather than the triggering commit, and getting its
+      # success coupling subtly wrong publishes on a red build — which cannot be undone, because a
+      # published version cannot be withdrawn.
+      - name: Test
+        run: npm test
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Publish @spekjs/core
+        if: needs.check.outputs.core == 'true'
+        run: npm publish -w @spekjs/core
+
+      - name: Publish @spekjs/ui
+        if: needs.check.outputs.ui == 'true'
+        run: npm publish -w @spekjs/ui
+
+      # Tags are created only after a successful publish, so they record what happened rather than
+      # gating it: a failed publish leaves the registry and the tag namespace both untouched.
+      - name: Tag the published versions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          tagged=()
+          if [ "${{ needs.check.outputs.core }}" = "true" ]; then
+            tagged+=("core-v${{ needs.check.outputs.core-version }}:@spekjs/core@${{ needs.check.outputs.core-version }}")
+          fi
+          if [ "${{ needs.check.outputs.ui }}" = "true" ]; then
+            tagged+=("ui-v${{ needs.check.outputs.ui-version }}:@spekjs/ui@${{ needs.check.outputs.ui-version }}")
+          fi
+
+          for entry in "${tagged[@]}"; do
+            tag="${entry%%:*}"
+            msg="${entry#*:}"
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "tag $tag already exists — leaving it alone"
+              continue
+            fi
+            git tag -a "$tag" -m "$msg"
+            git push origin "$tag"
+            echo "pushed $tag"
+          done

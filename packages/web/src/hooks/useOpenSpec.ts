@@ -14,7 +14,6 @@ import type {
   SpecInfo,
   SpecDetail,
   SpecVersionContent,
-  HistoryEntry as SpecHistoryEntry,
   ChangeInfo,
   ChangesData,
   ChangeDetail,
@@ -62,7 +61,6 @@ function useAsyncData<T>(
     loading: !!fetcher,
     error: null,
   });
-  const isRefresh = useRef(false);
   const prevRefreshKey = useRef(refreshKey);
 
   useEffect(() => {

@@ -1,0 +1,124 @@
+name: CI
+
+# The quality gates. Every other workflow in this repository publishes or deploys and is gated on a
+# tag; this one is the only thing that runs before code reaches master. It invokes the root npm
+# scripts rather than reimplementing any gate inline, so a contributor can reproduce a failure
+# locally with the same command. See openspec/specs/continuous-integration.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+# Only the checkout needs anything.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  node:
+    name: Node gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - run: npm ci
+
+      # Both must precede the type check and every build. core and ui each resolve through their
+      # dist/, not their sources, so web type-checks against packages/{core,ui}/dist/*.d.ts. Neither
+      # is produced by `npm ci`: core builds on `prepare`, which npm skips for a workspace root
+      # install, and ui builds on `prepublishOnly` (a `prepare` hook would run before npm creates the
+      # workspace symlinks, so ui could not resolve core and would take the whole `npm ci` down).
+      #
+      # Omitting the ui build here failed exactly once, on this workflow's first run, with
+      # "TS2307: Cannot find module '@spekjs/ui'" — invisible locally, where a dist from an earlier
+      # build is always lying around. It is the same trap that shipped the composite action broken;
+      # see the "Action build chain" requirement in openspec/specs/github-action.
+      - name: Build @spekjs/core and @spekjs/ui
+        run: |
+          npm run build:core
+          npm run build:ui
+
+      - name: Test
+        run: npm test
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      # build:demo follows NODE_ENV. Without production set, this exercises a React dev build —
+      # a different artifact from the one that ships, which is how v1.8.0 put a dev build on the
+      # live demo page.
+      - name: Build demo
+        run: npm run build:demo
+        env:
+          NODE_ENV: production
+
+  kotlin:
+    name: Kotlin gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      # packages/intellij re-implements core's scanning rules in Kotlin. Nothing links the two
+      # implementations, so this suite is the only thing that observes a divergence.
+      - name: Test
+        working-directory: packages/intellij
+        run: ./gradlew test
+
+  action-smoke:
+    name: Composite action smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # spek-version MUST be the commit under test. The action checks out spekhq/spek at that ref
+      # into .spek-builder and builds from *that* copy — left at its default of "master", this job
+      # would run the pull request's workflow against master's action implementation and report
+      # green on a change that breaks the action, which is the exact failure it exists to catch.
+      - name: Run the action against this repository
+        id: spek
+        uses: ./
+        with:
+          spek-version: ${{ github.sha }}
+          generate-badges: "true"
+
+      # Assert on file contents, not on the outputs having values. A step output is set whether or
+      # not the build produced anything: when @spekjs/ui's build moved off the install-time hook,
+      # the action stopped producing ui's dist and shipped broken for a full day with every output
+      # still populated.
+      - name: Assert the action produced real output
+        run: |
+          HTML='${{ steps.spek.outputs.html-path }}'
+          BADGES='${{ steps.spek.outputs.badges-path }}'
+
+          if [ -z "$HTML" ]; then echo "::error::html-path output is empty"; exit 1; fi
+          if [ ! -s "$HTML" ]; then echo "::error::no file at html-path: $HTML"; exit 1; fi
+          echo "html-path: $HTML ($(wc -c <"$HTML") bytes)"
+
+          if [ -z "$BADGES" ]; then echo "::error::badges-path output is empty"; exit 1; fi
+          if [ ! -d "$BADGES" ]; then echo "::error::no directory at badges-path: $BADGES"; exit 1; fi
+          count=$(find "$BADGES" -name '*.svg' -size +0c | wc -l)
+          if [ "$count" -eq 0 ]; then echo "::error::no non-empty badge in $BADGES"; exit 1; fi
+          echo "badges-path: $BADGES ($count badges)"

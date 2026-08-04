@@ -47,7 +47,8 @@ npm run build:webview  # Build webview assets for the VS Code extension
 npm run build:vscode   # Build the VS Code extension
 npm run build:intellij # Build IntelliJ webview assets
 npm run build:demo     # Build the standalone demo (docs/demo.html)
-npm run type-check     # TypeScript type check
+npm run type-check     # Type-check every package + scripts/ (test files included)
+npm run lint           # ESLint
 npm test               # Run the test suites (core + ui + web)
 ```
 
@@ -105,9 +106,14 @@ reference — several were authored by external contributors.
 2. Make your change. Keep the PR focused — one logical change per PR is easier to review.
 3. **Run the checks locally:**
    ```bash
+   npm run build:core   # first — the type check resolves core through its built dist/
    npm test
    npm run type-check
+   npm run lint
    ```
+   CI runs these same scripts on every pull request, plus `./gradlew test` in `packages/intellij`
+   (JDK 17) if you touched the IntelliJ plugin. Running them locally first just saves you a round
+   trip — nothing here is a gate you can only satisfy on CI.
 4. **Fill out the pull request template** — it prompts for the affected surface, a summary, and a
    short checklist.
 5. Open the PR against `spekhq/spek:master` and link any related issue (`Fixes #123`).

@@ -1,0 +1,23 @@
+{
+  // Type-checks scripts/*.ts, which no other tsconfig in the repository names — they were the only
+  // TypeScript here that nothing checked, and they are what the composite action and the deployed
+  // demo page actually execute.
+  //
+  // These scripts import "../packages/core/dist/index.js" directly, so `npm run build:core` must
+  // have run before this config can resolve them. See openspec/specs/continuous-integration.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["scripts"]
+}

@@ -107,6 +107,7 @@
     "vscode:prepublish": "npm run build",
     "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
     "watch": "npm run build -- --watch",
+    "type-check": "tsc -p tsconfig.json",
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies"
   },
@@ -115,7 +116,9 @@
     "esbuild": "^0.24.0",
     "@vscode/vsce": "^3.0.0",
     "@spekjs/core": "*",
+    "@types/node": "^22.10.0",
     "chokidar": "^5.0.0",
-    "fuse.js": "^7.0.0"
+    "fuse.js": "^7.0.0",
+    "typescript": "^5.7.0"
   }
 }

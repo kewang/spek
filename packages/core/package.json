@@ -50,6 +50,7 @@
     "build": "rm -rf dist && tsc",
     "prepare": "tsc",
     "dev": "tsc --watch",
+    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {

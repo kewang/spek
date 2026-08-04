@@ -75,12 +75,16 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
   const navigate = useNavigate();
   const { results, loading } = useSearch(query);
 
-  // 按類型分組
-  const specResults = results.filter((r) => r.type === "spec");
-  const changeResults = results.filter((r) => r.type === "change");
-
-  const filteredSpecResults = typeFilter === "change" ? [] : specResults;
-  const filteredChangeResults = typeFilter === "spec" ? [] : changeResults;
+  // 按類型分組。兩個清單各自 memo：直接在 render 中算會每次產生新陣列 identity，
+  // 讓下面的 flatResults memo 每次都重算，等於沒有 memo。
+  const filteredSpecResults = useMemo(
+    () => (typeFilter === "change" ? [] : results.filter((r) => r.type === "spec")),
+    [results, typeFilter]
+  );
+  const filteredChangeResults = useMemo(
+    () => (typeFilter === "spec" ? [] : results.filter((r) => r.type === "change")),
+    [results, typeFilter]
+  );
   const flatResults = useMemo(
     () => [...filteredSpecResults, ...filteredChangeResults],
     [filteredSpecResults, filteredChangeResults]
