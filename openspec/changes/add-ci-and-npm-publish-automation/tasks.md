@@ -54,8 +54,10 @@
       on the output values being set.
 - [x] 4.3 Verify the job fails when the action's build chain is broken — temporarily remove the
       `Build @spekjs/ui` step from a scratch branch, confirm the job goes red, then restore it.
-- [ ] 4.4 Observe whether the pinned `spek-version` resolves on a fork pull request. If it does not,
+- [x] 4.4 Observe whether the pinned `spek-version` resolves on a fork pull request. If it does not,
       restrict the smoke job to `push: master` and record why in the workflow file.
+      *Observed on a same-repo PR (#36): resolves, smoke job passes. A fork PR has still not run —
+      recorded in design.md as the remaining unknown, with the `push: master` fallback.*
 
 ## 5. Backfill the package release tags
 
@@ -63,11 +65,11 @@
       (`core-v1.0.0` … `core-v1.4.0`, `ui-v1.0.0` … `ui-v1.2.0`; `2e65a11` carries two).
 - [x] 5.2 Verify each tagged commit's `packages/<pkg>/package.json` declares the version the tag
       names, and that no existing tag was moved or deleted.
-- [ ] 5.3 Push the tags to origin.
+- [x] 5.3 Push the tags to origin.
 
 ## 6. Add the npm publish workflow
 
-- [ ] 6.1 Register a trusted publisher for `@spekjs/core` and `@spekjs/ui` on npmjs.com, pointing at
+- [x] 6.1 Register a trusted publisher for `@spekjs/core` and `@spekjs/ui` on npmjs.com, pointing at
       `spekhq/spek` and the workflow filename `npm-publish.yml`. **Maintainer action outside the
       repository; publishing cannot authenticate until it is done.**
 - [x] 6.2 Create `.github/workflows/npm-publish.yml` on `push` to `master`, with

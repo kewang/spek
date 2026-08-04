@@ -138,11 +138,17 @@ regression this guards against was in the action's own build chain, not in the s
 Assertions are on file contents, not on output values — a step output is set whether or not the
 build produced anything, which is how the ui-`dist` breakage stayed invisible.
 
-*Fork caveat*: for a pull request from a fork, `github.sha` is the merge commit, which exists in the
-base repository as `refs/pull/N/merge` and is fetchable, so the pinned checkout is expected to
-resolve. If it turns out not to, the fallback is to run the smoke job on `push: master` only —
-catching a break after merge instead of before, which is still strictly better than the current
-state. Decide this by observation on the first fork pull request, not by guessing now.
+*Observed*: the pinned checkout resolves on a same-repository pull request — PR #36's smoke job
+passed, checking out `github.sha` (the `refs/pull/N/merge` commit) from `spekhq/spek` without
+special handling.
+
+*Fork caveat, still unobserved*: a fork's pull request produces a merge commit in the **base**
+repository by the same mechanism, so it is expected to resolve identically — but no fork PR has run
+against this workflow yet, and the action hard-codes `repository: spekhq/spek`, so a fork's own
+commits are genuinely absent from what it checks out. If a fork PR fails here, the fallback is to
+run the smoke job on `push: master` only: that catches a break after merge instead of before, which
+is still strictly better than not running the action at all. Decide it on the first fork
+contribution rather than pre-emptively.
 
 ### ESLint only; no Prettier
 
