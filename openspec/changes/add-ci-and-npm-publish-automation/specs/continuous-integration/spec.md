@@ -25,20 +25,34 @@ consumers.
 - **WHEN** any gate — test, type check, lint, or build — fails
 - **THEN** the workflow is marked failed
 
-### Requirement: Core is built before any gate that resolves it
+### Requirement: Every workspace package resolved through its dist is built before the gates
 
-The workflow SHALL build `@spekjs/core` after installing dependencies and before running the type
-check or any build that imports it.
+The workflow SHALL build **both** `@spekjs/core` and `@spekjs/ui` after installing dependencies and
+before running the type check or any build that imports them. It SHALL NOT assume that installing
+dependencies produced either one.
 
-`@spekjs/core`'s package entry is `dist/`, so `@spekjs/web` and `@spekjs/ui` type-check against
-`packages/core/dist/*.d.ts` rather than core's sources. On a fresh checkout with no core build, the
-type check reports errors that have nothing to do with the change under test.
+Both packages' entry points are `dist/`, so `@spekjs/web` type-checks against
+`packages/core/dist/*.d.ts` and `packages/ui/dist/*.d.ts` rather than against their sources. Neither
+`dist` survives a fresh `npm ci`: core's build is on `prepare`, and ui's is deliberately on
+`prepublishOnly`, because a `prepare` hook would run before npm creates the workspace symlinks and
+take the whole install down (see `ui-package`).
+
+The failure is invisible to local runs, where a `dist` from an earlier build is always present, and
+it does not name its cause — it surfaces as `TS2307: Cannot find module '@spekjs/ui'` plus a spray
+of implicit-`any` errors in the files that imported it.
 
 #### Scenario: Fresh runner checkout
 
-- **WHEN** the workflow runs on a runner with no pre-existing `packages/core/dist`
-- **THEN** `@spekjs/core` is built before the type check runs
+- **WHEN** the workflow runs on a runner with no pre-existing `packages/core/dist` or
+  `packages/ui/dist`
+- **THEN** both packages are built before the type check runs
 - **AND** the type check reports only errors attributable to the checked-out code
+
+#### Scenario: A newly added workspace package resolved through dist
+
+- **WHEN** a workspace package that resolves through a built `dist` is added and imported by another
+  package that the gates check
+- **THEN** the workflow builds it before the gates, rather than relying on an install-time hook
 
 ### Requirement: The type check covers every TypeScript source in the repository
 

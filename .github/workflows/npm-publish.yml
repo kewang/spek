@@ -103,8 +103,12 @@ jobs:
 
       - run: npm ci
 
-      - name: Build @spekjs/core
-        run: npm run build:core
+      # Both, for the same reason as ci.yml: web type-checks against core's and ui's dist/, and
+      # `npm ci` produces neither.
+      - name: Build @spekjs/core and @spekjs/ui
+        run: |
+          npm run build:core
+          npm run build:ui
 
       # The gates run here rather than chaining on ci.yml via workflow_run: that trigger evaluates
       # the workflow file from the default branch rather than the triggering commit, and getting its

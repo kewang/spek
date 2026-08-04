@@ -32,11 +32,20 @@ jobs:
 
       - run: npm ci
 
-      # Must precede the type check and every build: @spekjs/core's package entry is dist/, so web
-      # and ui type-check against packages/core/dist/*.d.ts rather than core's sources. On a fresh
-      # checkout with no core build, the type check reports errors unrelated to the change.
-      - name: Build @spekjs/core
-        run: npm run build:core
+      # Both must precede the type check and every build. core and ui each resolve through their
+      # dist/, not their sources, so web type-checks against packages/{core,ui}/dist/*.d.ts. Neither
+      # is produced by `npm ci`: core builds on `prepare`, which npm skips for a workspace root
+      # install, and ui builds on `prepublishOnly` (a `prepare` hook would run before npm creates the
+      # workspace symlinks, so ui could not resolve core and would take the whole `npm ci` down).
+      #
+      # Omitting the ui build here failed exactly once, on this workflow's first run, with
+      # "TS2307: Cannot find module '@spekjs/ui'" — invisible locally, where a dist from an earlier
+      # build is always lying around. It is the same trap that shipped the composite action broken;
+      # see the "Action build chain" requirement in openspec/specs/github-action.
+      - name: Build @spekjs/core and @spekjs/ui
+        run: |
+          npm run build:core
+          npm run build:ui
 
       - name: Test
         run: npm test
