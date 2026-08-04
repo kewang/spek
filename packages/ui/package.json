@@ -42,6 +42,7 @@
     "build:css": "cp src/styles.css dist/styles.css",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
+    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "test": "node --import tsx --test \"src/**/__tests__/*.test.ts\""
   },
   "dependencies": {

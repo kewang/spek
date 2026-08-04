@@ -1,3 +1,5 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { SpekPanel } from "./panel";
 import { SpecsTreeProvider, ChangesTreeProvider } from "./tree-provider";
@@ -80,8 +82,6 @@ function getWorkspacePath(): string | undefined {
 
 function hasOpenSpecDir(workspacePath: string): boolean {
   try {
-    const fs = require("fs");
-    const path = require("path");
     const openspecDir = path.join(workspacePath, "openspec");
 
     // 先檢查 config.yaml

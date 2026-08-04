@@ -266,8 +266,8 @@ test("scanOpenSpecAggregated: main's UNCOMMITTED advance competes in a live cont
 test("pickActiveWinners: a worktree whose divergence check fails does not shadow main", async () => {
   // 注入一個永遠回空集合的 divergence provider，模擬對該 worktree 的 git 指令失敗。
   // fork 持有 foo 但被判為未分歧 → main 保留 foo（不因 git 失敗而錯顯 fork 的繼承副本）。
-  const mainWt: WorktreeInfo = { path: "/repo", branch: "main", head: "aaa", isMain: true, isBare: false, key: "m" };
-  const fork: WorktreeInfo = { path: "/repo-x", branch: "wx", head: "bbb", isMain: false, isBare: false, key: "x" };
+  const mainWt: WorktreeInfo = { path: "/repo", branch: "main", head: "aaa", isMain: true, isBare: false, key: "m", vcs: "git" };
+  const fork: WorktreeInfo = { path: "/repo-x", branch: "wx", head: "bbb", isMain: false, isBare: false, key: "x", vcs: "git" };
   const failing = async () => new Set<string>();
 
   const winners = await pickActiveWinners(

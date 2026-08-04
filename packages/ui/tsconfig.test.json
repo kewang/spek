@@ -1,0 +1,14 @@
+{
+  // Type-checks the test files that tsconfig.json deliberately excludes.
+  //
+  // The exclude in tsconfig.json cannot simply be dropped: that config is also what `npm run build`
+  // uses, it emits into `dist`, and `files: ["dist"]` publishes it — so a test file included there
+  // ends up in the tarball consumers download. This config exists purely to check them, never to
+  // emit. See openspec/specs/continuous-integration.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src"],
+  "exclude": []
+}

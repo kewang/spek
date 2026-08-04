@@ -205,7 +205,6 @@ export class SpekPanel {
       return `<!DOCTYPE html><html><body><h1>spek webview assets not found</h1><p>Run build first.</p></body></html>`;
     }
 
-    const html = fs.readFileSync(indexPath, "utf-8");
     const nonce = getNonce();
     const webview = this.panel.webview;
     const cspSource = webview.cspSource;
