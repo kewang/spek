@@ -118,6 +118,8 @@
 - [x] 9.1 Run `npm run build:core && npm test && npm run type-check && npm run lint && npm run build`
       locally from a clean `npm ci` and confirm all pass.
 - [x] 9.2 Run `./gradlew test` in `packages/intellij` and confirm it passes.
-- [ ] 9.3 Open a pull request and confirm every job reports, including the smoke job.
-- [ ] 9.4 Confirm a pull request that introduces a type error in a test file is caught — the hole
+- [x] 9.3 Open a pull request and confirm every job reports, including the smoke job.
+- [x] 9.4 Confirm a pull request that introduces a type error in a test file is caught — the hole
       this change exists to close.
+      *Verified on throwaway PR #37 (closed unmerged): `Test` passed 267 assertions, `Type check`
+      then failed with the expected `TS2741`.*
