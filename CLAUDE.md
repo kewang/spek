@@ -16,6 +16,22 @@ spek — an OpenSpec content viewer. Four delivery surfaces plus one CI helper:
 
 The repo is **`spekhq/spek`**; the npm scope is **`@spekjs`** (an org name ≠ npm scope is normal — don't "fix" the mismatch).
 
+## Three things whose *names* are configuration — renaming any of them fails silently
+
+Each is referenced by something outside the file that holds it, matched by exact string, with no error when the
+match breaks. Rename only alongside updating the other side.
+
+| Name | Referenced by | What a rename does |
+|---|---|---|
+| `ci.yml`'s job names — `Node gates`, `Kotlin gates`, `Composite action smoke test` | `master`'s branch protection (required status checks) | PRs sit at **pending forever**, waiting on a check that will never report. Reads like CI is down, not like a config error |
+| `npm-publish.yml` (the filename) | npm's trusted publisher registration for both packages | The workflow still runs and still resolves the version difference; it fails only at authentication, naming no cause |
+| `action.yml`'s build chain steps | nothing — it is the *absence* of a reference that bites | Outputs stay populated while the files behind them are empty or missing (see below) |
+
+Branch protection on `master` requires those three checks with `strict: true` (a PR must be up to date before
+merging), does **not** require reviews, and leaves `enforce_admins` off — deliberately, because the `release` skill
+pushes the `npm version` commit straight to `master` and a locally-created commit can never have passed a required
+check. Turning admin enforcement on breaks `/release`.
+
 ## action.yml: smoke-tested only — read before touching the build chain
 
 CI runs a smoke job (`action-smoke` in `ci.yml`) that invokes the composite action against this repo with
@@ -285,10 +301,8 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   - **`@spekjs/*` publishing is automated; the version decision is not.** CI publishes a package when its declared
     version differs from the registry (`.github/workflows/npm-publish.yml`, on `push:[master]`), authenticating via
     npm Trusted Publishing (OIDC — no token in repo secrets) and creating a `core-vX.Y.Z` / `ui-vX.Y.Z` tag on
-    success. Never run `npm publish` locally and never hand-create those tags. **The workflow's filename is
-    registered with npm and matched exactly — renaming `npm-publish.yml` leaves a workflow that still runs, still
-    resolves the version difference, and fails only at authentication, with nothing naming the cause.** The bump
-    itself is chosen by the `release` skill from the archived changes' Impact, never from commit prefixes: core
+    success. Never run `npm publish` locally and never hand-create those tags. Its filename is configuration — see
+    the renaming table at the top of this file. The bump itself is chosen by the `release` skill from the archived changes' Impact, never from commit prefixes: core
     1.3.0 (`fix:` that added an export subpath) and 1.4.0 (`fix:`/`test:` that changed `TaskItem.text` semantics)
     would both have been under-bumped to a patch by a prefix rule
   - **Written at release time, not inside a change.** CHANGELOG entries and version bumps (`package.json` `version`,
