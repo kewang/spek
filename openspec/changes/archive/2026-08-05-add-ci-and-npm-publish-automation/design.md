@@ -244,6 +244,35 @@ serializes runs; the version-diff check makes a second run a quiet skip rather t
 Rollback: each step is a file deletion or a tag that nothing reads. A failed publish leaves the
 registry untouched, since the tag is created only after a successful publish.
 
+## Verified at implementation time
+
+- **The gates run and catch what they exist to catch.** PR #36's first run failed on this workflow's
+  own missing ui build; a throwaway PR (#37, closed unmerged) confirmed the original hole is closed —
+  `Test` passed 267 assertions and `Type check` then failed with the expected `TS2741`.
+- **The smoke job's assertions** were exercised against five shapes (valid output, empty HTML, no
+  badge, missing file, empty output value), and the causal chain confirmed: with `ui/dist` removed,
+  `build-demo.ts` exits 1 and produces nothing.
+- **The publish workflow's skip path ran for real** when #36 merged: both packages were detected as
+  already on the registry, the publish job was skipped, and the run was green. Nothing was published
+  and no tag was created.
+- **`spek-version: ${{ github.sha }}` resolves** on a same-repository pull request.
+
+## Knowingly unverified
+
+**The OIDC authentication step has never executed.** Reaching it requires an actual `npm publish`,
+and neither package's `src/` had changed since its last release — so under this change's own rules
+neither was due for one, and publishing an identical tarball under a new number purely to test the
+pipeline is not a trade worth making against a registry that cannot be un-published.
+
+What *is* verified is everything up to that point: the version comparison against the real registry
+(across four cases), the check job on a real runner, the job-to-job output passing, and the skip
+path. What remains unknown is whether the trusted-publisher registration and the npm upgrade are
+correct.
+
+The cost of finding out late is bounded: a failed publish leaves the registry untouched, and the tag
+is created only after a successful publish, so a first-release failure means re-running the workflow
+rather than cleaning anything up. This is why the verification was dropped rather than forced.
+
 ## Open Questions
 
 - Whether the smoke job's `spek-version: ${{ github.sha }}` resolves for a fork pull request. Decide
