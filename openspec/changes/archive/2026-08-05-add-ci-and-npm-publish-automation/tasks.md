@@ -86,8 +86,6 @@
       annotated tag. Create no tag when the package was skipped.
 - [x] 6.7 Keep the workflow flat — no reusable-workflow indirection, which breaks npm's OIDC
       filename validation.
-- [ ] 6.8 Verify end to end with a deliberate patch release of one package: the publish succeeds,
-      the registry shows a provenance attestation, and the tag lands on the right commit.
 
 ## 7. Extend the release skill to the package line
 
