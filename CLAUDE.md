@@ -264,6 +264,19 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   `CHECKBOX_RE` stays **anchored at column 0**: an indented checkbox belongs to its parent's text and is
   deliberately *not* counted, so relaxing the anchor would move every progress bar and CI badge. First
   lines keep trailing whitespace when folded, or two-space hard breaks silently become soft ones
+- **The parser never lets its runtime decide a boundary** — the rule that was learned twice (issue #33).
+  `parseTasks` and the Kotlin `TaskParser` are one rule written in two languages, and a construct that
+  *reads* the same in both is not the same: Java's regex `$` also matches before a trailing line
+  terminator (and its terminator set covers U+2028 / U+2029 as well as CR), and `isBlank()` /
+  `trim()` disagree over U+00A0, U+FEFF, U+2007, U+202F and U+001C. So both boundaries are now stated,
+  not inherited: **all three CommonMark line endings** (`\n`, `\r\n`, **lone `\r`**) are normalised
+  before the split, and a **blank line is spaces and tabs only** — the same `[ \t]` class the indent
+  rules already use, via `isBlankLine` / `trimSpacesTabs` on both sides. Patterns applied to a
+  split line anchor with `\z` in Kotlin. One divergence is knowingly kept and pinned by a test on both
+  sides: **U+0085** is an ordinary character to JS's `.` and a terminator to Java's, so a line
+  containing it is a task only in TypeScript. Case-mirrored tests **cannot** catch this class — the
+  spelling is the control, not the tests. New cases go in as escape sequences, never literal
+  characters: a raw U+001C or U+0085 gets rewritten on the way into the file and silently guts the test
 - **Webview CSP**: IIFE + nonce script + unsafe-inline styles (Tailwind needs it)
 - **Host flags**: VS Code sets `window.__vscodeApi` (`acquireVsCodeApi` called once, stored globally), IntelliJ
   `window.__spekIntellij`, Demo `window.__DEMO_DATA__`. `useFileWatcher` picks its refresh channel from these flags, so

@@ -26,6 +26,14 @@ export interface ParsedTasks extends TaskStats {
 const CHECKBOX_RE = /^- \[([ xX])\] (.+)$/;
 const SECTION_RE = /^## (.+)$/;
 
+// Every CommonMark line ending: LF, CRLF, and a *lone* CR. Normalising only CRLF left a lone CR
+// sitting inside a line, and from there the two implementations of this parser disagreed about
+// whether such a line held a checkbox at all — Java's `$` matches before a trailing line terminator,
+// JavaScript's does not (issue #33). Both answers were wrong: the reference renderer treats the CR as
+// a line ending and sees a task on each side of it. Normalising all three here means no rule below
+// ever meets a CR, so neither engine's line-terminator table can influence the result.
+const LINE_ENDING_RE = /\r\n?/g;
+
 // Width of the `- ` list marker, i.e. CommonMark's content offset for these items. Continuation
 // lines are dedented by this much so the folded text renders the way a standard renderer shows the
 // original source — no more. Stripping the full indent instead would promote deeply indented lines
@@ -40,6 +48,30 @@ function dedentContinuation(line: string): string {
 
 function leadingWhitespace(line: string): number {
   return /^[ \t]*/.exec(line)![0].length;
+}
+
+// CommonMark's blank line — spaces and tabs only — spelled out rather than delegated to the runtime.
+// `trim() === ""` and Kotlin's `isBlank()` are each a different set: JavaScript strips U+00A0, U+FEFF,
+// U+2007 and U+202F, Kotlin counts U+001C, and CommonMark counts none of them. Since blankness moves
+// the continuation boundary, the two implementations folded different text for the same file. This is
+// the same `[ \t]` class `leadingWhitespace` measures, kept as an explicit loop so the Kotlin mirror
+// can say it identically.
+function isBlankLine(line: string): boolean {
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch !== " " && ch !== "\t") return false;
+  }
+  return true;
+}
+
+// Trim to the same class, for the same reason: `String.prototype.trim` would eat a trailing U+00A0
+// that the reference renderer displays, and Kotlin's `trim()` would leave it.
+function trimSpacesTabs(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && (text[start] === " " || text[start] === "\t")) start++;
+  while (end > start && (text[end - 1] === " " || text[end - 1] === "\t")) end--;
+  return text.slice(start, end);
 }
 
 // A column-0 line that opens a new block, which ends the preceding item rather than continuing it.
@@ -94,7 +126,7 @@ interface PendingTask {
 }
 
 export function parseTasks(content: string): ParsedTasks {
-  const lines = content.replace(/\r\n/g, "\n").split("\n");
+  const lines = content.replace(LINE_ENDING_RE, "\n").split("\n");
   const sections: TaskSection[] = [];
   let currentSection: TaskSection = { title: "", tasks: [] };
   let total = 0;
@@ -109,13 +141,13 @@ export function parseTasks(content: string): ParsedTasks {
   function flush(): void {
     if (!pending) return;
     const { first, rest } = pending;
-    while (rest.length > 0 && rest[rest.length - 1].trim() === "") rest.pop();
+    while (rest.length > 0 && isBlankLine(rest[rest.length - 1])) rest.pop();
     // With continuation lines the first line is kept verbatim: two trailing spaces are a hard line
     // break, and trimming them would quietly downgrade it to a soft one.
     const text =
       rest.length > 0
-        ? [first, ...rest.map((l) => (l.trim() === "" ? "" : dedentContinuation(l)))].join("\n")
-        : first.trim();
+        ? [first, ...rest.map((l) => (isBlankLine(l) ? "" : dedentContinuation(l)))].join("\n")
+        : trimSpacesTabs(first);
     currentSection.tasks.push({ text, completed: pending.completed });
     total++;
     if (pending.completed) completed++;
@@ -129,7 +161,7 @@ export function parseTasks(content: string): ParsedTasks {
       if (currentSection.tasks.length > 0) {
         sections.push(currentSection);
       }
-      currentSection = { title: sectionMatch[1].trim(), tasks: [] };
+      currentSection = { title: trimSpacesTabs(sectionMatch[1]), tasks: [] };
       sawBlank = false;
       continue;
     }
@@ -148,7 +180,7 @@ export function parseTasks(content: string): ParsedTasks {
 
     if (!pending) continue;
 
-    if (line.trim() === "") {
+    if (isBlankLine(line)) {
       sawBlank = true;
       pending.rest.push(line);
       continue;
