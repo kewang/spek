@@ -9,3 +9,8 @@ packages/vscode/dist/
 packages/vscode/webview/
 *.vsix
 .idea/
+
+# Scratch corpus written by scripts/generate-task-parser-corpus.ts. Generated fixtures are
+# throwaway input for a differential run; adjudicated findings are committed to
+# test-fixtures/task-parser/ as authored fixtures instead.
+.task-parser-scratch/

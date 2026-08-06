@@ -1,0 +1,43 @@
+{
+  "name": "next-line-char-in-section-heading",
+  "note": "Accepted divergence, surface 2 of 2, and the more subtle one: the counts agree and only the section title moves. SECTION_RE has the same anchored (.+) as CHECKBOX_RE, so Kotlin does not recognise the heading at all and the task lands under the default empty title. This is exactly why fixtures compare the whole parse result rather than total and completed alone. U+2028 and U+2029 were checked at the same time and do not diverge, so these two surfaces are the complete set.",
+  "input": "## S\u0085T\n- [ ] x\n",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "S\u0085T",
+        "tasks": [
+          {
+            "text": "x",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  },
+  "divergences": {
+    "kotlin": {
+      "reason": "SECTION_RE's (.+) cannot span U+0085 to reach the absolute end anchor, so the heading line matches nothing and is skipped; the following task is grouped under the default empty section title.",
+      "expected": {
+        "total": 1,
+        "completed": 0,
+        "sections": [
+          {
+            "title": "",
+            "tasks": [
+              {
+                "text": "x",
+                "completed": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "meta": {
+    "spec": "openspec/specs/task-parser/spec.md"
+  }
+}

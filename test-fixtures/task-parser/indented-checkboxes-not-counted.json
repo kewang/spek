@@ -1,0 +1,20 @@
+{
+  "name": "indented-checkboxes-not-counted",
+  "note": "CHECKBOX_RE is anchored at column 0. An indented checkbox is part of its parent's text and is deliberately not a task of its own -- relaxing the anchor would move every progress bar and CI badge.",
+  "input": "- [ ] Parent\n  - [ ] sub one\n  - [x] sub two",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n- [ ] sub one\n- [x] sub two",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

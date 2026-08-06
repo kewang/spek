@@ -1,0 +1,27 @@
+{
+  "name": "lone-cr-separates-lines",
+  "note": "CommonMark counts a lone carriage return as a line ending, so this is two tasks and not one unparseable line. Before issue #33 the two implementations disagreed here: Java's regex $ also matches before a trailing line terminator and JavaScript's does not, so one side saw a checkbox and the other did not. Both were wrong; normalising all three line endings before the split is what fixed it.",
+  "input": "- [x] a\r- [ ] b",
+  "expected": {
+    "total": 2,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "a",
+            "completed": true
+          },
+          {
+            "text": "b",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  },
+  "meta": {
+    "issue": "https://github.com/spekhq/spek/issues/33"
+  }
+}

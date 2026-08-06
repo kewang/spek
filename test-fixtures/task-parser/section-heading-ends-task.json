@@ -1,0 +1,29 @@
+{
+  "name": "section-heading-ends-task",
+  "note": "A '##' heading flushes the pending task and starts a new section, so continuation cannot run across a section boundary.",
+  "input": "- [ ] one\n  - a\n## Next\n- [ ] two",
+  "expected": {
+    "total": 2,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "one\n- a",
+            "completed": false
+          }
+        ]
+      },
+      {
+        "title": "Next",
+        "tasks": [
+          {
+            "text": "two",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "code-fence-ends-task",
+  "note": "A code fence opens a block and ends the item. Fence contents are deliberately not tracked, so a column-0 checkbox inside a fenced block would still count -- see the task-parser spec.",
+  "input": "- [ ] Task one\n```\nfenced\n```",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

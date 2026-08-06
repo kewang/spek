@@ -1,0 +1,8 @@
+{
+  "name": "input-wrong-type",
+  "note": "A number where a string belongs.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": 3, \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "input must be a string"
+}

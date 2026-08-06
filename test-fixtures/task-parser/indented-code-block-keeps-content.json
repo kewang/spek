@@ -1,0 +1,20 @@
+{
+  "name": "indented-code-block-keeps-content",
+  "note": "The one case that distinguishes the 2-character dedent from doing nothing: 6 spaces minus 2 leaves 4, so the line is an indented code block whose content starts flush. Without the dedent it would carry two spurious leading spaces inside the code.",
+  "input": "- [ ] Task\n\n      six space content",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task\n\n    six space content",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -100,6 +100,30 @@ reference — several were authored by external contributors.
   back. Rebase onto current `master` instead of committing the flip.
 - Match the style of the surrounding code: its naming, comment density, and idioms.
 
+## Adding a task-parser test case
+
+The tasks.md parser exists twice — `parseTasks` in `@spekjs/core` and `TaskParser.kt` in the IntelliJ
+plugin — as two implementations of one rule. They are verified by a **shared fixture corpus** in
+[`test-fixtures/task-parser/`](test-fixtures/task-parser/README.md) that both test suites read in
+full, so a new case belongs there rather than in either suite:
+
+1. **Add one JSON file.** `<name>.json`, with `name` matching the filename, a `note` saying why the
+   case exists, the `input`, and the whole `expected` result. There is no index to update, and both
+   languages assert it on the next run.
+2. **Write every awkward character as an escape** — `\r`, `\u0085`, `\u00a0`, `\u001c`. Never
+   literally. Line-ending normalization, a Windows checkout, and editors that trim on save all rewrite
+   those, and the case still *looks* present afterwards. Both loaders check this at the byte level and
+   will fail the run.
+3. **Author the expected values; don't paste in a run's output.** In both divergences found so far
+   *each* implementation was wrong in one direction, so capturing either would have blessed the bug.
+   Reason out the fields your case is about; the structural remainder may be filled from a run.
+
+A test stays hand-written only when a fixture cannot express it — an equivalence between two inputs,
+or a property of whatever the result turns out to be. The same directory has an `invalid/` corpus for
+the loaders' own rejection rules, on the same principle: one file per case, both languages assert it.
+The corpus README covers the rest, including how to record a deliberate difference between the two
+implementations and how to run the generator that hunts for undiscovered ones.
+
 ## Submitting a pull request
 
 1. **Fork** the repo and create a branch from `master`.

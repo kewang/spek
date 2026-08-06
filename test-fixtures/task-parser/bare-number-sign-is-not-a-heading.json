@@ -1,0 +1,20 @@
+{
+  "name": "bare-number-sign-is-not-a-heading",
+  "note": "An ATX heading needs a space after its marker, so a bare '#hashtag' is ordinary paragraph text and stays in the task.",
+  "input": "- [ ] Task one\n#hashtag",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\n#hashtag",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

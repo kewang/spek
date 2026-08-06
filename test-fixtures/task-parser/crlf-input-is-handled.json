@@ -1,0 +1,20 @@
+{
+  "name": "crlf-input-is-handled",
+  "note": "Ordinary CRLF content parses identically to the same content with line feeds; no carriage return reaches the folding rules.",
+  "input": "- [ ] Parent\r\n  - a\r\n",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n- a",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

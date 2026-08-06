@@ -1,0 +1,8 @@
+{
+  "name": "bytes-raw-carriage-return",
+  "note": "A raw CR inside a string literal -- the character that started all of this in issue #33.",
+  "fileName": "case.json",
+  "document": "{\"input\":\"a\rb\"}",
+  "stage": "bytes",
+  "expectedMessage": "written as a"
+}

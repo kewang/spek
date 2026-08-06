@@ -1,0 +1,24 @@
+{
+  "name": "single-line-task-text-is-trimmed",
+  "note": "A single-line task's text is the trimmed checkbox content. Pairs with the hand-written property test that no such text contains a newline -- a fixture pins one string, it cannot state that no output may ever contain something.",
+  "input": "- [ ] Just this  \n- [x] And this",
+  "expected": {
+    "total": 2,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Just this",
+            "completed": false
+          },
+          {
+            "text": "And this",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "soft-break-stays-soft",
+  "note": "With no trailing whitespace the two lines render as one wrapped line. Paired with the hard-break cases: the difference between them is exactly the trailing spaces.",
+  "input": "- [ ] First line\n  second line",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "First line\nsecond line",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

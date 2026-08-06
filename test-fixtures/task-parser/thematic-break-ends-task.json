@@ -1,0 +1,20 @@
+{
+  "name": "thematic-break-ends-task",
+  "note": "A thematic break opens a block and ends the item, rather than being folded in where it would turn the task into a setext heading.",
+  "input": "- [ ] Task one\n---",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

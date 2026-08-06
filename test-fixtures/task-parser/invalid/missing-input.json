@@ -1,0 +1,8 @@
+{
+  "name": "missing-input",
+  "note": "Without an input there is nothing to parse.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "fixture is missing \"input\""
+}

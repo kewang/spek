@@ -1,0 +1,8 @@
+{
+  "name": "all-implementations-overridden",
+  "note": "Overriding every implementation asserts nothing in common -- that is two single-language tests sharing a filename.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"divergences\": {\"kotlin\": {\"reason\": \"r\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}, \"typescript\": {\"reason\": \"r\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}}}",
+  "stage": "parse",
+  "expectedMessage": "no shared expectation is asserted"
+}

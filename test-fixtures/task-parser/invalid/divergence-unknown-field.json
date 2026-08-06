@@ -1,0 +1,8 @@
+{
+  "name": "divergence-unknown-field",
+  "note": "A divergence entry carries a reason and an expectation, nothing else.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"divergences\": {\"kotlin\": {\"reason\": \"r\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"why\": \"x\"}}}",
+  "stage": "parse",
+  "expectedMessage": "has unknown field \"why\""
+}

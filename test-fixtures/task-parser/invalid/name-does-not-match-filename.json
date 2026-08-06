@@ -1,0 +1,8 @@
+{
+  "name": "name-does-not-match-filename",
+  "note": "name and filename would otherwise drift apart with nothing tying them.",
+  "fileName": "other.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "does not match the filename"
+}

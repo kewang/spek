@@ -1,0 +1,33 @@
+{
+  "name": "baseline-sections-and-counts",
+  "note": "Ordinary tasks.md: two sections, a folded sub-bullet, mixed completion. The case the harness itself is proven against, so a wiring mistake shows up here rather than in something exotic.",
+  "input": "## Phase 1\n- [x] one\n  - note\n- [ ] two\n## Phase 2\n- [x] three\n",
+  "expected": {
+    "total": 3,
+    "completed": 2,
+    "sections": [
+      {
+        "title": "Phase 1",
+        "tasks": [
+          {
+            "text": "one\n- note",
+            "completed": true
+          },
+          {
+            "text": "two",
+            "completed": false
+          }
+        ]
+      },
+      {
+        "title": "Phase 2",
+        "tasks": [
+          {
+            "text": "three",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  }
+}

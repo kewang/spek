@@ -1,0 +1,20 @@
+{
+  "name": "indented-prose-after-blank-continues-task",
+  "note": "The other side of the blank-line boundary: indented to the content offset, the line stays inside the item and the blank line is preserved in the folded text.",
+  "input": "- [ ] Task one\n\n  Belongs to item.",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\n\nBelongs to item.",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "setext-underline-stays-in-task",
+  "note": "Knowingly divergent from the reference renderer, which absorbs '===' as paragraph text. Keeping it renders the folded task as a heading, which is wrong; dropping it would delete content, which is worse. Documented in the task-parser spec.",
+  "input": "- [ ] Task one\n===",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\n===",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

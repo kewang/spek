@@ -1,0 +1,8 @@
+{
+  "name": "meta-array",
+  "note": "meta is a free-form object, not a list.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"meta\": []}",
+  "stage": "parse",
+  "expectedMessage": "meta must be an object"
+}

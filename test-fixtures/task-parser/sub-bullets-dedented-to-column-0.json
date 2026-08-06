@@ -1,0 +1,20 @@
+{
+  "name": "sub-bullets-dedented-to-column-0",
+  "note": "Continuation lines are dedented by the 2-character content offset of the '- ' marker, so the folded text renders as the nested bullet list a standard renderer shows for the original source.",
+  "input": "- [ ] Parent\n  - a\n  - b",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n- a\n- b",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

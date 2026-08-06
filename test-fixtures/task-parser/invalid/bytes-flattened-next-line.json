@@ -1,0 +1,8 @@
+{
+  "name": "bytes-flattened-next-line",
+  "note": "A fixture whose U+0085 escape was flattened into a literal character. JSON.parse rejects the file and kotlinx-serialization accepts it, so only the byte check makes the two loaders agree on corpus membership.",
+  "fileName": "case.json",
+  "document": "{\"input\":\"a\u0085b\"}",
+  "stage": "bytes",
+  "expectedMessage": "written as a"
+}

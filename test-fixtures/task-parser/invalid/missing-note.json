@@ -1,0 +1,8 @@
+{
+  "name": "missing-note",
+  "note": "The note is what a future reader has instead of the deleted test's comment.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "fixture is missing \"note\""
+}

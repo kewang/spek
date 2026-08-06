@@ -1,0 +1,8 @@
+{
+  "name": "divergence-empty-reason",
+  "note": "Same rule, blank rather than absent.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"divergences\": {\"kotlin\": {\"reason\": \"  \", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}}}",
+  "stage": "parse",
+  "expectedMessage": "reason must not be empty"
+}

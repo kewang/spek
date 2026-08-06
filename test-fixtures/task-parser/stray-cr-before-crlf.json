@@ -1,0 +1,24 @@
+{
+  "name": "stray-cr-before-crlf",
+  "note": "'\\r\\r\\n' normalises to two line endings. The leftover carriage return used to make Java's regex see a checkbox where JavaScript's saw none (issue #33); no CR may survive into a line.",
+  "input": "- [x] a\r\r\n- [x] b",
+  "expected": {
+    "total": 2,
+    "completed": 2,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "a",
+            "completed": true
+          },
+          {
+            "text": "b",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "missing-name",
+  "note": "Every required field is required on both sides.",
+  "fileName": "case.json",
+  "document": "{\"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "fixture is missing \"name\""
+}

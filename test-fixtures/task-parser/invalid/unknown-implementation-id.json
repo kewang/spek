@@ -1,0 +1,8 @@
+{
+  "name": "unknown-implementation-id",
+  "note": "The load-bearing one. Under a permissive loader a typo'd \"Kotlin\" leaves the divergence unrecorded while the run still reports success.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"divergences\": {\"Kotlin\": {\"reason\": \"r\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}}}",
+  "stage": "parse",
+  "expectedMessage": "has unknown field \"Kotlin\""
+}

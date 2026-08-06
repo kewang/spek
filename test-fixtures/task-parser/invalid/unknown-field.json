@@ -1,0 +1,8 @@
+{
+  "name": "unknown-field",
+  "note": "A field the format does not define is a typo or a newer format; either way it must not be ignored.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"expcted\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "has unknown field \"expcted\""
+}

@@ -1,0 +1,20 @@
+{
+  "name": "spaces-and-tabs-line-is-blank",
+  "note": "The positive case for the same rule: a line of spaces and tabs IS blank, so the unindented prose after it starts a new paragraph outside the list.",
+  "input": "- [ ] Task\n \t \nprose",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

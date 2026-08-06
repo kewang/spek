@@ -1,0 +1,24 @@
+{
+  "name": "final-line-ending-in-cr",
+  "note": "A file whose last line ends with a lone carriage return still counts that line's checkbox, and the CR does not reach the task's text.",
+  "input": "- [x] a\n- [ ] b\r",
+  "expected": {
+    "total": 2,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "a",
+            "completed": true
+          },
+          {
+            "text": "b",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

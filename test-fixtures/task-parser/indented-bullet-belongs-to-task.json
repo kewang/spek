@@ -1,0 +1,20 @@
+{
+  "name": "indented-bullet-belongs-to-task",
+  "note": "The same line indented to the content offset is genuinely inside the item -- that is how sub-bullets work.",
+  "input": "- [ ] Task one\n  - plain note",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\n- plain note",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

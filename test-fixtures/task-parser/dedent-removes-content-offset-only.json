@@ -1,0 +1,20 @@
+{
+  "name": "dedent-removes-content-offset-only",
+  "note": "6 spaces minus 2 leaves 4, which standard Markdown renders as lazy paragraph continuation with a literal '-'. Stripping the whole indent would promote it to a bullet list no other viewer shows.",
+  "input": "- [ ] Parent\n      - a",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n    - a",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "ordered-list-ends-task",
+  "note": "An ordered marker at column 0 opens a list of a different type and ends the item.",
+  "input": "- [ ] Task one\n1. first",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

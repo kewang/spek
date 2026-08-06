@@ -2,246 +2,30 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseTasks } from "./tasks.js";
 
-// A task's text is Markdown, and the folding rules exist so it renders the way a standard
-// CommonMark+GFM renderer shows the same source in place. These tests pin the folded strings;
-// TaskText.test.ts in @spekjs/web pins the rendering equivalence those strings are chosen for.
+// Almost everything this parser does is pinned by the shared fixture corpus in
+// `test-fixtures/task-parser/`, which `tasks.corpus.test.ts` and the IntelliJ plugin's
+// `TaskParserCorpusTest.kt` both read in full. One fixture, both languages, no step anyone has to
+// remember — that is the mechanism now, not two suites mirrored by hand. **New cases go there.**
+//
+// What stays here is what a fixture cannot express. A fixture pins one input to one result, so it
+// cannot state an equivalence between two inputs, and it cannot state a property that has to hold of
+// whatever the result turns out to be. Both remaining tests are mirrored in TaskParserTest.kt for the
+// same reason they always were, and both are as exposed to the runtime-divergence problem as any
+// hand-mirrored test — keep them few.
 
-function textOf(content: string): string[] {
-  return parseTasks(content).sections.flatMap((s) => s.tasks.map((t) => t.text));
-}
-
-test("parseTasks: sub-bullets indented two spaces are dedented to column 0", () => {
-  assert.deepEqual(textOf("- [ ] Parent\n  - a\n  - b"), ["Parent\n- a\n- b"]);
-});
-
-test("parseTasks: removes exactly the content offset, not the whole indent", () => {
-  // 6 spaces - 2 leaves 4, which standard Markdown renders as lazy paragraph continuation
-  // with a literal "-". Stripping all 6 would promote it to a bullet list no other viewer shows.
-  assert.deepEqual(textOf("- [ ] Parent\n      - a"), ["Parent\n    - a"]);
-});
-
-test("parseTasks: relative nesting between continuation lines is preserved", () => {
-  assert.deepEqual(textOf("- [ ] Parent\n  - a\n    - b"), ["Parent\n- a\n  - b"]);
-});
-
-test("parseTasks: lazy continuation at column 0 belongs to the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\nprose line"), ["Task one\nprose line"]);
-});
-
-test("parseTasks: a tab counts as one whitespace character when dedenting", () => {
-  assert.deepEqual(textOf("- [ ] Parent\n\t- a"), ["Parent\n- a"]);
-});
-
-test("parseTasks: unindented prose after a blank line ends the task", () => {
-  // A standard renderer puts this prose in its own paragraph outside the list.
-  assert.deepEqual(textOf("- [ ] Task one\n\nStandalone prose."), ["Task one"]);
-});
-
-test("parseTasks: indented prose after a blank line continues the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n\n  Belongs to item."), ["Task one\n\nBelongs to item."]);
-});
-
-test("parseTasks: an indented code block keeps its exact content", () => {
-  // The one case that distinguishes the dedent from doing nothing: 6 spaces - 2 leaves 4, so the
-  // line is an indented code block whose content starts flush. Without the dedent it would carry two
-  // spurious leading spaces inside the code.
-  assert.deepEqual(textOf("- [ ] Task\n\n      six space content"), [
-    "Task\n\n    six space content",
-  ]);
-});
-
-test("parseTasks: trailing blank lines are dropped", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n  - a\n\n\n"), ["Task one\n- a"]);
-});
-
-test("parseTasks: a two-space hard line break survives folding", () => {
-  assert.deepEqual(textOf("- [ ] First line  \n  second line"), ["First line  \nsecond line"]);
-});
-
-test("parseTasks: a backslash hard line break survives folding", () => {
-  assert.deepEqual(textOf("- [ ] First line\\\n  second line"), ["First line\\\nsecond line"]);
-});
-
-test("parseTasks: a soft break stays soft", () => {
-  assert.deepEqual(textOf("- [ ] First line\n  second line"), ["First line\nsecond line"]);
-});
-
-test("parseTasks: single-line tasks are unchanged and contain no newline", () => {
+test("parseTasks: a single-line task's text contains no newline", () => {
+  // A property, not a value: whatever the folding rules produce, a task with no continuation lines
+  // must not gain one. The values themselves are pinned by the single-line-task-text-is-trimmed
+  // fixture.
   const tasks = parseTasks("- [ ] Just this  \n- [x] And this").sections[0].tasks;
-  assert.deepEqual(
-    tasks.map((t) => t.text),
-    ["Just this", "And this"]
-  );
   for (const t of tasks) assert.ok(!t.text.includes("\n"));
 });
 
-test("parseTasks: indented checkboxes are not counted as separate tasks", () => {
-  const parsed = parseTasks("- [ ] Parent\n  - [ ] sub one\n  - [x] sub two");
-  assert.equal(parsed.total, 1);
-  assert.equal(parsed.completed, 0);
-  assert.deepEqual(
-    parsed.sections[0].tasks.map((t) => t.text),
-    ["Parent\n- [ ] sub one\n- [x] sub two"]
-  );
-});
-
-test("parseTasks: statistics and section grouping are unchanged", () => {
-  const parsed = parseTasks(
-    "## Phase 1\n- [x] one\n  - note\n- [ ] two\n## Phase 2\n- [x] three\n"
-  );
-  assert.equal(parsed.total, 3);
-  assert.equal(parsed.completed, 2);
-  assert.deepEqual(
-    parsed.sections.map((s) => s.title),
-    ["Phase 1", "Phase 2"]
-  );
-  assert.deepEqual(
-    parsed.sections[0].tasks.map((t) => t.text),
-    ["one\n- note", "two"]
-  );
-});
-
-test("parseTasks: a section heading ends the preceding task", () => {
-  assert.deepEqual(textOf("- [ ] one\n  - a\n## Next\n- [ ] two"), ["one\n- a", "two"]);
-});
-
-test("parseTasks: empty input yields no tasks", () => {
-  assert.deepEqual(parseTasks(""), { total: 0, completed: 0, sections: [] });
-});
-
-test("parseTasks: CRLF input is handled", () => {
-  assert.deepEqual(textOf("- [ ] Parent\r\n  - a\r\n"), ["Parent\n- a"]);
-});
-
-// Lazy continuation is a paragraph-only rule. A column-0 line that opens a block interrupts the
-// paragraph, so a standard renderer shows it outside the list — folding it in would make the Tasks
-// tab the only viewer that nests it. Counting is untouched: none of these lines is a column-0
-// checkbox, so they end a task without starting one.
-
-test("parseTasks: a column-0 bullet ends the task instead of nesting inside it", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n- plain note"), ["Task one"]);
-});
-
-test("parseTasks: an indented bullet still belongs to the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n  - plain note"), ["Task one\n- plain note"]);
-});
-
-test("parseTasks: a thematic break ends the task rather than making it a setext heading", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n---"), ["Task one"]);
-});
-
-test("parseTasks: a setext underline stays in the task", () => {
-  // Not a block start — the reference absorbs it as paragraph text. Keeping it renders the task as
-  // a heading, which is wrong, but dropping it would delete content, which is the worse of the two.
-  assert.deepEqual(textOf("- [ ] Task one\n==="), ["Task one\n==="]);
-});
-
-test("parseTasks: a blockquote ends the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n> quoted"), ["Task one"]);
-});
-
-test("parseTasks: an ATX heading ends the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n### Heading"), ["Task one"]);
-});
-
-test("parseTasks: a code fence ends the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n```\nfenced\n```"), ["Task one"]);
-});
-
-test("parseTasks: an ordered list ends the task", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n1. first"), ["Task one"]);
-});
-
-test("parseTasks: an ordered list not starting at 1 also ends the task", () => {
-  // The "only a list starting at 1 interrupts a paragraph" rule is about running text. Inside a
-  // bullet list this opens a list of a different type, and the reference ends the item on it.
-  assert.deepEqual(textOf("- [ ] Task one\n2. second"), ["Task one"]);
-});
-
-test("parseTasks: a bare # without a space is not a heading", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n#hashtag"), ["Task one\n#hashtag"]);
-});
-
-test("parseTasks: emphasis at column 0 is not a bullet", () => {
-  assert.deepEqual(textOf("- [ ] Task one\n*emphasis* continues"), [
-    "Task one\n*emphasis* continues",
-  ]);
-});
-
-test("parseTasks: a block opener between tasks leaves the counts alone", () => {
-  const parsed = parseTasks("- [x] one\n- plain note\n- [ ] two\n");
-  assert.equal(parsed.total, 2);
-  assert.equal(parsed.completed, 1);
-  assert.deepEqual(
-    parsed.sections[0].tasks.map((t) => t.text),
-    ["one", "two"]
-  );
-});
-
-// Line endings and blankness are the two boundaries this parser used to inherit from its runtime,
-// where JavaScript and Kotlin disagree with each other and with CommonMark. Every case below is
-// written with escape sequences rather than literal characters, so neither an editor nor a
-// `.gitattributes` pass can quietly rewrite the thing under test. TaskParserTest.kt mirrors them.
-
-test("parseTasks: a carriage-return-only file separates its lines", () => {
-  // CommonMark counts a lone CR as a line ending, so this is two tasks, not one unparseable line.
-  const parsed = parseTasks("- [x] a\r- [ ] b");
-  assert.equal(parsed.total, 2);
-  assert.equal(parsed.completed, 1);
-});
-
-test("parseTasks: a stray carriage return before a CRLF does not survive into the line", () => {
-  // `\r\r\n` normalises to two line endings; the leftover CR used to make Java see a checkbox where
-  // JavaScript saw none.
-  assert.deepEqual(textOf("- [x] a\r\r\n- [x] b"), ["a", "b"]);
-});
-
-test("parseTasks: a final line ending in a carriage return is still a task", () => {
-  assert.deepEqual(textOf("- [x] a\n- [ ] b\r"), ["a", "b"]);
-});
-
 test("parseTasks: CRLF content parses the same as LF", () => {
+  // An equivalence between two inputs. Split into two fixtures with equal expectations the invariant
+  // is gone: someone edits one and not the other, and nothing notices.
   assert.deepEqual(
     parseTasks("## S\r\n- [x] a\r\n- [ ] b\r\n"),
     parseTasks("## S\n- [x] a\n- [ ] b\n")
   );
-});
-
-test("parseTasks: a no-break-space line does not end the task", () => {
-  // A blank line is spaces and tabs only, so this line is content and the prose after it is lazy
-  // continuation — which is what the reference renderer shows. `trim() === ""` called it blank and
-  // dropped the prose; Kotlin's `isBlank()` never did.
-  assert.deepEqual(textOf("- [ ] Task\n\u00a0\nprose"), ["Task\n\u00a0\nprose"]);
-});
-
-test("parseTasks: a file-separator line does not end the task", () => {
-  // The mirror image: Kotlin's `isBlank()` counts U+001C as whitespace, JavaScript's `trim()` does
-  // not, and CommonMark agrees with neither runtime's table — only spaces and tabs are blank.
-  assert.deepEqual(textOf("- [ ] Task\n\u001c\nprose"), ["Task\n\u001c\nprose"]);
-});
-
-test("parseTasks: a spaces-and-tabs line is blank", () => {
-  assert.deepEqual(textOf("- [ ] Task\n \t \nprose"), ["Task"]);
-});
-
-test("parseTasks: exotic trailing whitespace survives trimming", () => {
-  assert.deepEqual(textOf("- [x] Task\u00a0  "), ["Task\u00a0"]);
-});
-
-test("parseTasks: a section title is trimmed to the same class", () => {
-  // The title goes through the same spaces-and-tabs trim as a single-line task's text, so a trailing
-  // NBSP stays and ordinary trailing spaces go.
-  const parsed = parseTasks("## Phase\u00a0  \n- [x] a\n");
-  assert.deepEqual(
-    parsed.sections.map((s) => s.title),
-    ["Phase\u00a0"]
-  );
-});
-
-test("parseTasks: a next-line character stays in the text (known divergence)", () => {
-  // U+0085 is an ordinary character to JavaScript's `.` and a line terminator to Java's, so the
-  // Kotlin mirror counts no task here at all. Accepted rather than fixed — closing it means spelling
-  // an identical negated class into both engines' `(.+)` — and pinned on both sides so it stays a
-  // documented exception instead of drifting. See the task-parser spec.
-  assert.deepEqual(textOf("- [x] a\u0085b"), ["a\u0085b"]);
 });

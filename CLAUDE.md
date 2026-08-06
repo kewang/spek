@@ -272,11 +272,37 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   not inherited: **all three CommonMark line endings** (`\n`, `\r\n`, **lone `\r`**) are normalised
   before the split, and a **blank line is spaces and tabs only** — the same `[ \t]` class the indent
   rules already use, via `isBlankLine` / `trimSpacesTabs` on both sides. Patterns applied to a
-  split line anchor with `\z` in Kotlin. One divergence is knowingly kept and pinned by a test on both
-  sides: **U+0085** is an ordinary character to JS's `.` and a terminator to Java's, so a line
-  containing it is a task only in TypeScript. Case-mirrored tests **cannot** catch this class — the
-  spelling is the control, not the tests. New cases go in as escape sequences, never literal
-  characters: a raw U+001C or U+0085 gets rewritten on the way into the file and silently guts the test
+  split line anchor with `\z` in Kotlin. One divergence is knowingly kept: **U+0085** is an ordinary
+  character to JS's `.` and a terminator to Java's. It has **two** surfaces — on a checkbox line the
+  counts differ, and in a `##` heading the counts agree while only the section title moves. Case-mirrored
+  tests **cannot** catch this class — the spelling is the control, not the tests
+- **Both parsers are verified by one shared corpus, plus a generator for what nobody thought of.**
+  `test-fixtures/task-parser/` holds one JSON file per case (`name` = filename, `note`, `input`,
+  `expected`, optional per-implementation `divergences`), read in full by `tasks.corpus.test.ts` and
+  `TaskParserCorpusTest.kt`. **Adding a case is adding one file**; both languages assert it from the next
+  run. What stays hand-written is only what a fixture cannot express: an equivalence between two inputs
+  (CRLF ≡ LF) and a property of whatever the result is (a single-line task's text has no newline).
+  - Inputs are **always escaped, never literal** — a raw U+001C or U+0085 gets rewritten on the way into
+    the file and silently guts the case. A byte-level check in both loaders enforces printable ASCII plus
+    LF and tab. It is load-bearing, not tidiness: `JSON.parse` **rejects** a raw LF/CR/U+001C inside a
+    string and kotlinx-serialization **accepts** them, so a flattened escape would fail hard on one side
+    and pass silently on the other. Every rule is spelled out in both loaders for the same reason —
+    kotlinx also accepts `"total": "1"` for an `Int`, which the Node side refuses
+  - `invalid/` is the same trick for the **loaders**: one file per rejection case (document, filename,
+    which check must reject it, and a substring the message must contain), read by both. Asserting the
+    *message* holds their wording in agreement. It exists because the loaders' rules were themselves
+    hand-mirrored and had already diverged on `"meta": null` — Kotlin rejected it, Node threw a bare
+    `TypeError`. Deliberately **not** overridable by a scratch dir: generated inputs replace what the
+    parser parses, never the rules deciding a fixture is valid
+  - Expected values are **authored, not captured**: in both divergences found so far *each* side was wrong
+    in one direction, so generating them from either would have blessed the bug. The fields a case is
+    *about* are reasoned out; the structural remainder may be filled from a run and reviewed
+  - `scripts/generate-task-parser-corpus.ts` emits randomised inputs (seeded, reproducible) to an
+    untracked scratch dir with `expected` from the TS side — a **disagreement detector, not an oracle** —
+    which either loader reads via `SPEK_TASK_CORPUS_DIR` / `-Dspek.taskParserCorpus`. Never a CI gate. It
+    excludes U+0085 by default, since a generated fixture cannot carry a `divergences` entry and the known
+    difference would otherwise be ~3% of every batch. 2000 inputs across four seeds found **no** divergence
+    beyond the recorded one
 - **Webview CSP**: IIFE + nonce script + unsafe-inline styles (Tailwind needs it)
 - **Host flags**: VS Code sets `window.__vscodeApi` (`acquireVsCodeApi` called once, stored globally), IntelliJ
   `window.__spekIntellij`, Demo `window.__DEMO_DATA__`. `useFileWatcher` picks its refresh channel from these flags, so

@@ -1,0 +1,10 @@
+{
+  "name": "empty-input-has-no-tasks",
+  "note": "Empty input yields empty statistics and no sections at all -- not one empty section.",
+  "input": "",
+  "expected": {
+    "total": 0,
+    "completed": 0,
+    "sections": []
+  }
+}

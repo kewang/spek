@@ -1,0 +1,8 @@
+{
+  "name": "meta-null",
+  "note": "Found by hand during verification, not by either suite: Kotlin rejected this correctly while Node threw a bare TypeError with no filename. Exactly the class of divergence this corpus exists to make impossible.",
+  "fileName": "case.json",
+  "document": "{\"name\":\"case\",\"note\":\"why\",\"input\":\"\",\"expected\":{\"total\":0,\"completed\":0,\"sections\":[]},\"meta\":null}",
+  "stage": "parse",
+  "expectedMessage": "meta must be an object"
+}

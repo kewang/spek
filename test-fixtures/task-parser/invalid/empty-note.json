@@ -1,0 +1,8 @@
+{
+  "name": "empty-note",
+  "note": "A blank note is the same as no note.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"   \", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "note must not be empty"
+}

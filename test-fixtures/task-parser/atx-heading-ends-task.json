@@ -1,0 +1,20 @@
+{
+  "name": "atx-heading-ends-task",
+  "note": "An ATX heading other than '##' (which SECTION_RE handles) still opens a block and ends the item.",
+  "input": "- [ ] Task one\n### Heading",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

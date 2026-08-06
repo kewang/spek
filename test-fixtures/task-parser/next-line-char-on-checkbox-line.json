@@ -1,0 +1,33 @@
+{
+  "name": "next-line-char-on-checkbox-line",
+  "note": "Accepted divergence, surface 1 of 2. U+0085 is an ordinary character to JavaScript's `.` and a line terminator to Java's, so the checkbox line is a task to TypeScript and not to Kotlin. Retained rather than fixed: closing it means spelling an identical negated character class into both engines' (.+), in the parser's two most load-bearing patterns, for a character with no natural source in a task list.",
+  "input": "- [x] a\u0085b",
+  "expected": {
+    "total": 1,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "a\u0085b",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  },
+  "divergences": {
+    "kotlin": {
+      "reason": "Java's regex engine treats U+0085 as a line terminator, so (.+) cannot span it to reach the absolute end anchor and CHECKBOX_RE does not match. No task is counted. Accepted - see the task-parser spec.",
+      "expected": {
+        "total": 0,
+        "completed": 0,
+        "sections": []
+      }
+    }
+  },
+  "meta": {
+    "spec": "openspec/specs/task-parser/spec.md"
+  }
+}

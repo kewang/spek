@@ -74,5 +74,26 @@ tasks {
     }
     test {
         useJUnitPlatform()
+
+        // The shared task-parser fixture corpus, read by TaskParserCorpusTest alongside the Node
+        // suite in packages/core. Resolved from the Gradle project directory at configuration time,
+        // never from the process working directory: this suite runs at packages/intellij and the Node
+        // one at packages/core, and either can be invoked from the repo root. Overridable so the
+        // generator's scratch directory can be substituted:
+        //   ./gradlew test -Dspek.taskParserCorpus=<dir>
+        val repoCorpus = layout.projectDirectory.dir("../../test-fixtures/task-parser").asFile
+        val corpusDir = providers.systemProperty("spek.taskParserCorpus")
+            .map { file(it) }
+            .getOrElse(repoCorpus)
+        systemProperty("spek.taskParserCorpus", corpusDir.absolutePath)
+        // The invalid-fixture corpus verifies the *loader's* rejections, so it is deliberately NOT
+        // overridable: a generated scratch corpus replaces the parser's inputs, never the loader's
+        // own rules.
+        systemProperty("spek.taskParserInvalidCorpus", File(repoCorpus, "invalid").absolutePath)
+        // Without this the task is up to date when only a fixture changed, and the suite silently
+        // does not run — a change to test data that appears to pass without having executed.
+        // It is not a guard against a wrong path: a directory that exists and is empty passes
+        // validation here, so the loader's own zero-fixtures check is what fails that.
+        inputs.dir(repoCorpus).withPropertyName("taskParserCorpus")
     }
 }

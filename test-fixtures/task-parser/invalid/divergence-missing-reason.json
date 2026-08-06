@@ -1,0 +1,8 @@
+{
+  "name": "divergence-missing-reason",
+  "note": "A divergence is a decision, and a decision without a reason is not readable.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}, \"divergences\": {\"kotlin\": {\"expected\": {\"total\": 0, \"completed\": 0, \"sections\": []}}}}",
+  "stage": "parse",
+  "expectedMessage": "is missing \"reason\""
+}

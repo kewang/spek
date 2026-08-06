@@ -1,0 +1,20 @@
+{
+  "name": "backslash-hard-break-survives-folding",
+  "note": "The other hard-break spelling. A trailing backslash is ordinary text to the parser and must survive folding untouched.",
+  "input": "- [ ] First line\\\n  second line",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "First line\\\nsecond line",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

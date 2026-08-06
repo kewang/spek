@@ -1,0 +1,8 @@
+{
+  "name": "completed-wrong-type",
+  "note": "A task's completed flag has to be a boolean, not a string spelling one.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 1, \"completed\": 0, \"sections\": [{\"title\": \"\", \"tasks\": [{\"text\": \"a\", \"completed\": \"no\"}]}]}}",
+  "stage": "parse",
+  "expectedMessage": "completed must be a boolean"
+}

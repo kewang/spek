@@ -1,0 +1,20 @@
+{
+  "name": "ordered-list-not-starting-at-one-ends-task",
+  "note": "The 'only a list starting at 1 interrupts a paragraph' rule is about running text. Inside a bullet list a '2.' opens a list of a different type and the reference renderer ends the item on it -- checked against the renderer, not read off the spec.",
+  "input": "- [ ] Task one\n2. second",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

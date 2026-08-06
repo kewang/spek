@@ -102,6 +102,12 @@ Key properties spek relies on:
 The core scan/read logic exists once in `@spekjs/core` and is mirrored in Kotlin for the IntelliJ
 server. Behavior changes in one must be checked against the other.
 
+For the **task parser** specifically that check is mechanised: both implementations read one shared
+fixture corpus (`test-fixtures/task-parser/`), so adding a case is adding a file and both languages
+assert it. A generator feeds the same loaders randomised inputs to find divergences nobody thought
+of. The rest of the mirrored logic — scanner, change reader, artifact discovery, schema order — is
+still checked by hand.
+
 ### 5.2 API adapter pattern
 
 The frontend abstracts its transport behind an `ApiAdapter` interface, injected via React context:

@@ -1,0 +1,20 @@
+{
+  "name": "unindented-prose-after-blank-ends-task",
+  "note": "After a blank line a line must reach the content offset to stay in the item. A standard renderer puts this prose in its own paragraph outside the list, so it is not part of the task.",
+  "input": "- [ ] Task one\n\nStandalone prose.",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

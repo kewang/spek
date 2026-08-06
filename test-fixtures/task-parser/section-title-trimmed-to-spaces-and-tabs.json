@@ -1,0 +1,20 @@
+{
+  "name": "section-title-trimmed-to-spaces-and-tabs",
+  "note": "A section title goes through the same spaces-and-tabs trim as a single-line task's text. The title is the field this case is about.",
+  "input": "## Phase\u00a0  \n- [x] a\n",
+  "expected": {
+    "total": 1,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "Phase\u00a0",
+        "tasks": [
+          {
+            "text": "a",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "exotic-trailing-whitespace-survives-trim",
+  "note": "A single-line task's text is trimmed to spaces and tabs only, so a trailing U+00A0 the reference renderer displays is kept while ordinary trailing spaces go.",
+  "input": "- [x] Task\u00a0  ",
+  "expected": {
+    "total": 1,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task\u00a0",
+            "completed": true
+          }
+        ]
+      }
+    ]
+  }
+}

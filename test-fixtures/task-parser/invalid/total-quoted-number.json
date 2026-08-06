@@ -1,0 +1,8 @@
+{
+  "name": "total-quoted-number",
+  "note": "The asymmetry that forced both loaders to spell out every type rule: kotlinx-serialization accepts a quoted number for an Int, JSON.parse plus the Node loader does not. Without this case the two disagree about which fixtures are valid.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": \"1\", \"completed\": 0, \"sections\": []}}",
+  "stage": "parse",
+  "expectedMessage": "total must be a non-negative integer"
+}

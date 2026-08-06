@@ -1,0 +1,8 @@
+{
+  "name": "not-valid-json",
+  "note": "A file that is not JSON at all must be reported as such, naming the file.",
+  "fileName": "case.json",
+  "document": "{",
+  "stage": "parse",
+  "expectedMessage": "not valid JSON"
+}

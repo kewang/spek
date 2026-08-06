@@ -1,0 +1,20 @@
+{
+  "name": "tab-counts-as-one-dedent-char",
+  "note": "The dedent counts characters, not columns, so a leading tab is one of the two removed. Same [ \\t] class the indent rules use.",
+  "input": "- [ ] Parent\n\t- a",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n- a",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

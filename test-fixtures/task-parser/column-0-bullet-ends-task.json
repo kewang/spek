@@ -1,0 +1,20 @@
+{
+  "name": "column-0-bullet-ends-task",
+  "note": "Lazy continuation is paragraph-only: a column-0 bullet opens a new block, so a standard renderer puts it outside the list. Folding it in would make the Tasks tab the only viewer that nests it.",
+  "input": "- [ ] Task one\n- plain note",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

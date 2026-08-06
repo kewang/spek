@@ -1,0 +1,20 @@
+{
+  "name": "lazy-continuation-at-column-0",
+  "note": "CommonMark lazy continuation: an unindented prose line with no blank line before it is still part of the paragraph inside the list item.",
+  "input": "- [ ] Task one\nprose line",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\nprose line",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

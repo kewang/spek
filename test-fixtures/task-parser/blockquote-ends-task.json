@@ -1,0 +1,20 @@
+{
+  "name": "blockquote-ends-task",
+  "note": "A blockquote marker at column 0 opens a block and ends the item.",
+  "input": "- [ ] Task one\n> quoted",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

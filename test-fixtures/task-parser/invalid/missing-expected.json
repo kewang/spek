@@ -1,0 +1,8 @@
+{
+  "name": "missing-expected",
+  "note": "Without an expectation the fixture asserts nothing.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\"}",
+  "stage": "parse",
+  "expectedMessage": "fixture is missing \"expected\""
+}

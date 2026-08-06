@@ -1,0 +1,20 @@
+{
+  "name": "trailing-blank-lines-dropped",
+  "note": "Blank lines at the end of a task's text are removed, so a trailing newline in the file does not become trailing whitespace in the rendered task.",
+  "input": "- [ ] Task one\n  - a\n\n\n",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Task one\n- a",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

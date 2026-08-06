@@ -1,0 +1,8 @@
+{
+  "name": "sections-wrong-type",
+  "note": "sections is an array; an object there is a malformed expectation.",
+  "fileName": "case.json",
+  "document": "{\"name\": \"case\", \"note\": \"why\", \"input\": \"\", \"expected\": {\"total\": 0, \"completed\": 0, \"sections\": {}}}",
+  "stage": "parse",
+  "expectedMessage": "sections must be an array"
+}

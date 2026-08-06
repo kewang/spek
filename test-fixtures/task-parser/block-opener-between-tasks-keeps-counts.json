@@ -1,0 +1,24 @@
+{
+  "name": "block-opener-between-tasks-keeps-counts",
+  "note": "A block opener ends a task without starting one, since none of them is a column-0 checkbox. The counts are the point of this case.",
+  "input": "- [x] one\n- plain note\n- [ ] two\n",
+  "expected": {
+    "total": 2,
+    "completed": 1,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "one",
+            "completed": true
+          },
+          {
+            "text": "two",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "relative-nesting-preserved",
+  "note": "Dedenting by a fixed 2 characters keeps the relative indentation between continuation lines, so an inner bullet still renders beneath its outer one.",
+  "input": "- [ ] Parent\n  - a\n    - b",
+  "expected": {
+    "total": 1,
+    "completed": 0,
+    "sections": [
+      {
+        "title": "",
+        "tasks": [
+          {
+            "text": "Parent\n- a\n  - b",
+            "completed": false
+          }
+        ]
+      }
+    ]
+  }
+}

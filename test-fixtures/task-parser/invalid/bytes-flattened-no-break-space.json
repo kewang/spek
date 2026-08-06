@@ -1,0 +1,8 @@
+{
+  "name": "bytes-flattened-no-break-space",
+  "note": "The same for U+00A0, which is not a control character at the byte level and which JSON.parse accepts raw.",
+  "fileName": "case.json",
+  "document": "{\"input\":\"a\u00a0b\"}",
+  "stage": "bytes",
+  "expectedMessage": "written as a"
+}
