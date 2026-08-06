@@ -3,6 +3,33 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.5.0
+
+- **`parseTasks` states its line-ending and blank-line boundaries instead of inheriting them from the
+  JavaScript runtime.** Both were previously delegated: line splitting normalised only `\r\n`, and
+  blankness was `line.trim() === ""`. Neither matches CommonMark, and neither matches what the Kotlin
+  re-implementation shipped in spek's IntelliJ plugin did, so the same `tasks.md` could produce
+  different results on different surfaces (issue #33).
+
+  **Behavior change for consumers**, on content this affects:
+
+  - All three CommonMark line endings — `\n`, `\r\n`, and a **lone `\r`** — are now recognised. Content
+    using carriage-return line endings, or carrying a stray `\r` before a `\r\n`, previously had
+    checkboxes on those lines skipped entirely; they are now counted, so `total`, `completed` and
+    `sections` change for such content.
+  - A line is blank only when it is empty or contains **spaces and tabs alone**. `trim()` also strips
+    U+00A0, U+FEFF, U+2007 and U+202F, so a line holding one of those used to end a task's
+    continuation and drop the text after it from `TaskItem.text`; it is now content, as CommonMark and
+    a reference renderer treat it. The same class governs the trim applied to a single-line task's
+    `text` and to a section `title`, so a trailing U+00A0 there is now preserved rather than stripped.
+
+  Content using ordinary `\n` line endings and no exotic whitespace — the overwhelming majority —
+  parses identically to 1.4.0.
+
+  One divergence from the Kotlin implementation is knowingly retained and pinned by a test on both
+  sides: U+0085 is an ordinary character to JavaScript's `.` and a line terminator to Java's, so a
+  checkbox line containing it is a task here and not there.
+
 ## 1.4.0
 
 - **`parseTasks` keeps a task's continuation lines instead of discarding them.** The line loop
