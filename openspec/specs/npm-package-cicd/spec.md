@@ -47,6 +47,14 @@ The job SHALL request the `id-token: write` permission, and SHALL ensure an npm 
 perform a trusted publish before invoking `npm publish` — the Node version pinned by `.nvmrc` ships
 an npm older than the minimum, so relying on the bundled npm fails.
 
+That npm SHALL be pinned to a major line, and SHALL NOT be tracked as `@latest`. The constraint is
+two-sided: the npm installed must be new enough to trusted-publish **and** still declare support for
+the Node version `.nvmrc` pins, and those two bounds move independently of each other and of this
+repository. Tracking `@latest` satisfies only the lower bound, and leaves the upper one to be
+breached by an npm release — which is what happened, npm 12 raising its floor above the pinned Node
+and killing the step that installs it. Raising the pin to a line that requires a newer Node SHALL
+happen in the same commit as the `.nvmrc` bump that admits it.
+
 Trusted publishing attaches a provenance attestation automatically. Both packages already declare
 the `repository` URL and `directory` that provenance requires.
 
@@ -66,6 +74,13 @@ the `repository` URL and `directory` that provenance requires.
 - **WHEN** the workflow runs on a Node version whose bundled npm predates trusted publishing support
 - **THEN** the workflow installs a new enough npm before publishing, rather than failing at the
   publish step
+
+#### Scenario: npm's newest release outruns the pinned Node
+
+- **WHEN** the newest published npm declares a Node requirement above the version `.nvmrc` pins
+- **THEN** the workflow still installs an npm that both runs on that Node and can trusted-publish,
+  rather than failing while installing one — a failure that lands before authentication and names
+  neither the pinned Node nor the version policy as the cause
 
 ### Requirement: The publishing workflow's filename is part of its configuration
 
