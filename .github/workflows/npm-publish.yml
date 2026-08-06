@@ -96,9 +96,16 @@ jobs:
 
       # .nvmrc pins Node 22, which bundles npm 10 — older than trusted publishing requires. Without
       # this the job fails at publish with an authentication error that does not name the cause.
+      #
+      # Pinned to the 11 line, NOT npm@latest. npm needs to be new enough to trusted-publish
+      # (>= 11.5.1) and old enough to still run on the Node .nvmrc pins — and those two ends move
+      # independently. npm@latest reached 12.0.2, whose engines are `^22.22.2 || ^24.15.0 || >=26`,
+      # and this step died on Node 22.22.0 before the job ever got near authentication. The 11 line
+      # accepts `^20.17.0 || >=22.9.0`, so it stays installable across ordinary .nvmrc bumps.
+      # Raising this to 12 requires bumping .nvmrc past 22.22.2 in the same commit.
       - name: Ensure npm supports trusted publishing
         run: |
-          npm install -g npm@latest
+          npm install -g npm@11
           npm --version
 
       - run: npm ci
