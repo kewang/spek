@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.1
+
+- **A `tasks.md` whose lines don't end in a plain newline is counted correctly, and counted the same on every surface.** A file using carriage-return line endings — a legacy Mac export, or a stray `\r` left in front of a Windows one — had checkboxes silently skipped: they appeared as ordinary text and contributed nothing to the progress count, so the total was simply wrong with nothing on screen to explain it. The IntelliJ plugin and the Web / VS Code surfaces also disagreed about the same file, because the two are separate implementations of one rule whose regex engines read the same pattern differently. Both now follow CommonMark, which counts a lone `\r` as a line ending like any other (issue #33)
+- **An invisible-whitespace line no longer truncates the task above it.** A line holding only a no-break space — what a paste from a word processor or a web page often leaves behind — was treated as a blank line on Web and VS Code, and a blank line ends a task's continuation: every sub-bullet and paragraph after it vanished from the Tasks tab, with the line that caused it invisible. IntelliJ kept the same text, so the two surfaces showed different tasks. Both now use CommonMark's rule, where only spaces and tabs make a line blank
+- **Nothing moves for a `tasks.md` that uses ordinary newlines** — the overwhelming majority. Both fixes were verified against a reference Markdown renderer, and every progress bar, count and CI badge in this repo is unchanged
+- *Internal:* the unreferenced `server/lib/` copies of the core scanning logic were removed from the web package, and the repository gained CI quality gates plus automated npm publishing for `@spekjs/*`. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) for the dead-code removal
+
 ## 1.10.0
 
 **Highlight: the Tasks tab shows what your `tasks.md` actually says.** Two independent defects had made it the least faithful view in the app — one discarded content before it ever reached the UI, the other displayed what survived as literal source. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) for reporting and contributing both.

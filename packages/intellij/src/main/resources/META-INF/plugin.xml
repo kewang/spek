@@ -25,13 +25,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.10.0</b></p>
-        <p><b>The Tasks tab shows what your tasks.md actually says.</b> Two independent defects had made it the least faithful view in the app &mdash; one discarded content before it ever reached the UI, the other displayed what survived as literal source. Thanks to <a href="https://github.com/nthansen">@nthansen</a> (Norman Hansen) for reporting and contributing both.</p>
+        <p><b>1.10.1</b></p>
         <ul>
-            <li><b>A task's continuation lines are no longer discarded.</b> Sub-bullets, explanatory paragraphs and code blocks written underneath a <code>- [ ]</code> item were dropped by the parser itself, so they were missing from the data rather than merely hidden by styling &mdash; no amount of scrolling or resizing would reveal them. They now display as the source describes.</li>
-            <li><b>Task text renders as Markdown.</b> The Tasks tab was the one artifact view whose text never reached a Markdown parser, so <code>**bold**</code> appeared as four asterisks and backtick-quoted code kept its backticks. Inline formatting, links, nested lists and code blocks now render as they do on every other tab.</li>
-            <li><b>A bullet at column 0 after a checkbox stays outside that task.</b> A plain <code>- Note: &hellip;</code> line following a <code>- [ ]</code> item is a separate bullet in Markdown, and is now shown as one instead of being absorbed into the task above it. The same applies to a heading, blockquote, code fence, numbered item or <code>---</code> &mdash; indent any of them and it still belongs to the task.</li>
-            <li><b>Progress counts, section grouping and the task badge are unchanged.</b> Only checkboxes at column 0 are counted, as before; an indented <code>- [ ]</code> belongs to its parent task's text and is not a task of its own.</li>
+            <li><b>A tasks.md whose lines don't end in a plain newline is counted the same here as on the other surfaces.</b> The plugin re-implements the task parser in Kotlin, and Java's regex engine reads a trailing carriage return differently from JavaScript's &mdash; so a file using carriage-return line endings, or carrying a stray <code>\r</code>, produced a different task count in the IDE than in the Web and VS Code viewers reading the same repo. Both implementations now follow CommonMark, which counts a lone <code>\r</code> as a line ending like any other (issue #33).</li>
+            <li><b>An invisible-whitespace line is treated the same way on every surface.</b> Kotlin and JavaScript disagree about which characters count as whitespace, so a line holding only a no-break space, or only a control character such as U+001C, ended a task's continuation on one surface and not the other. Only spaces and tabs make a line blank now, as CommonMark defines it.</li>
+            <li><b>Nothing moves for a tasks.md that uses ordinary newlines</b> &mdash; the overwhelming majority. Both fixes were verified against a reference Markdown renderer, and no progress bar or count changes.</li>
         </ul>
     ]]></change-notes>
 

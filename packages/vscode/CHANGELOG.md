@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.1
+
+- **A `tasks.md` whose lines don't end in a plain newline is counted correctly.** A file using carriage-return line endings — a legacy Mac export, or a stray `\r` left in front of a Windows one — had checkboxes silently skipped: they appeared as ordinary text and contributed nothing to the progress count, so the total was simply wrong with nothing on screen to explain it. Line endings now follow CommonMark, which counts a lone `\r` like any other (issue #33)
+- **An invisible-whitespace line no longer truncates the task above it.** A line holding only a no-break space — what a paste from a word processor or a web page often leaves behind — was treated as a blank line, and a blank line ends a task's continuation: every sub-bullet and paragraph after it vanished from the Tasks tab, with the line that caused it invisible. Only spaces and tabs make a line blank now, as CommonMark defines it
+- **Nothing moves for a `tasks.md` that uses ordinary newlines** — the overwhelming majority. Both fixes were verified against a reference Markdown renderer, and no progress bar or count changes
+
 ## 1.10.0
 
 **Highlight: the Tasks tab shows what your `tasks.md` actually says.** Two independent defects had made it the least faithful view in the app — one discarded content before it ever reached the UI, the other displayed what survived as literal source. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) for reporting and contributing both.

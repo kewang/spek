@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.10.1
+
+- **A `tasks.md` whose lines don't end in a plain newline is counted the same here as on the other surfaces.** The plugin re-implements the task parser in Kotlin, and Java's regex engine reads a trailing carriage return differently from JavaScript's — so a file using carriage-return line endings, or carrying a stray `\r`, produced a different task count in the IDE than in the Web and VS Code viewers reading the same repo. Both implementations now follow CommonMark, which counts a lone `\r` as a line ending like any other (issue #33)
+- **An invisible-whitespace line is treated the same way on every surface.** Kotlin and JavaScript disagree about which characters count as whitespace, so a line holding only a no-break space, or only a control character such as U+001C, ended a task's continuation on one surface and not the other. Only spaces and tabs make a line blank now, as CommonMark defines it
+- **Nothing moves for a `tasks.md` that uses ordinary newlines** — the overwhelming majority. Both fixes were verified against a reference Markdown renderer, and no progress bar or count changes
+
 ## 1.10.0
 
 **Highlight: the Tasks tab shows what your `tasks.md` actually says.** Two independent defects had made it the least faithful view in the app — one discarded content before it ever reached the UI, the other displayed what survived as literal source. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) for reporting and contributing both.
