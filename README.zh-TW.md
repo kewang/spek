@@ -378,6 +378,7 @@ spek 會監看 `openspec/` 並在檔案變更時即時重載。在不傳遞原�
   - 開啟 change 不再每個都查一次 OpenSpec CLI —— 權威 artifact 順序改以 schema 為單位快取，因為共用同一 schema 的 change 得到的答案完全相同
   - 項目間有空行的清單，項目符號與編號改為與內容首行同行，不再被擠到自己一行
   - Tasks 分頁的 task 文字改以 Markdown 呈現，且 task 的續行 —— 子項目、段落、程式碼區塊 —— 不再於 parser 階段就被丟棄，得以完整顯示
+  - 移除 web server 中未被引用的 `server/lib/` 核心掃描邏輯副本 —— 它是 `@spekjs/core` 之外的第二份同規則實作，會成為漂移的溫床
 
 - [@david-lutz](https://github.com/david-lutz)（David Lutz）
   - Changes 列表與關聯圖中，跨 git worktree 共用的 active change 去重 —— 勝出的副本以 git 分歧選舉決定，而非檔案時間戳（fresh checkout 會把它整個重寫掉）
