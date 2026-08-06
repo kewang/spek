@@ -210,4 +210,78 @@ class TaskParserTest {
         assertEquals(1, parsed.completed)
         assertEquals(listOf("one", "two"), parsed.sections[0].tasks.map { it.text })
     }
+
+    // Line endings and blankness are the two boundaries this parser used to inherit from its runtime,
+    // where Kotlin and JavaScript disagree with each other and with CommonMark. Every case below is
+    // written with escape sequences rather than literal characters, so neither an editor nor a
+    // `.gitattributes` pass can quietly rewrite the thing under test. tasks.test.ts mirrors them.
+
+    @Test
+    fun `a carriage-return-only file separates its lines`() {
+        // CommonMark counts a lone CR as a line ending, so this is two tasks, not one unparseable line.
+        val parsed = TaskParser.parse("- [x] a\r- [ ] b")
+        assertEquals(2, parsed.total)
+        assertEquals(1, parsed.completed)
+    }
+
+    @Test
+    fun `a stray carriage return before a CRLF does not survive into the line`() {
+        // The leftover CR used to make this parser see a checkbox where @spekjs/core saw none.
+        assertEquals(listOf("a", "b"), textOf("- [x] a\r\r\n- [x] b"))
+    }
+
+    @Test
+    fun `a final line ending in a carriage return is still a task`() {
+        assertEquals(listOf("a", "b"), textOf("- [x] a\n- [ ] b\r"))
+    }
+
+    @Test
+    fun `CRLF content parses the same as LF`() {
+        assertEquals(
+            TaskParser.parse("## S\n- [x] a\n- [ ] b\n"),
+            TaskParser.parse("## S\r\n- [x] a\r\n- [ ] b\r\n"),
+        )
+    }
+
+    @Test
+    fun `a no-break-space line does not end the task`() {
+        // A blank line is spaces and tabs only, so this line is content and the prose after it is
+        // lazy continuation — which is what the reference renderer shows. JS's `trim() === ""` called
+        // it blank and dropped the prose; `isBlank()` never did.
+        assertEquals(listOf("Task\n\u00a0\nprose"), textOf("- [ ] Task\n\u00a0\nprose"))
+    }
+
+    @Test
+    fun `a file-separator line does not end the task`() {
+        // The mirror image: `isBlank()` counts U+001C as whitespace, JS's `trim()` does not, and
+        // CommonMark agrees with neither runtime's table — only spaces and tabs are blank.
+        assertEquals(listOf("Task\n\u001c\nprose"), textOf("- [ ] Task\n\u001c\nprose"))
+    }
+
+    @Test
+    fun `a spaces-and-tabs line is blank`() {
+        assertEquals(listOf("Task"), textOf("- [ ] Task\n \t \nprose"))
+    }
+
+    @Test
+    fun `exotic trailing whitespace survives trimming`() {
+        assertEquals(listOf("Task\u00a0"), textOf("- [x] Task\u00a0  "))
+    }
+
+    @Test
+    fun `a section title is trimmed to the same class`() {
+        // The title goes through the same spaces-and-tabs trim as a single-line task's text, so a
+        // trailing NBSP stays and ordinary trailing spaces go.
+        val parsed = TaskParser.parse("## Phase\u00a0  \n- [x] a\n")
+        assertEquals(listOf("Phase\u00a0"), parsed.sections.map { it.title })
+    }
+
+    @Test
+    fun `a next-line character is not a task here (known divergence)`() {
+        // U+0085 is a line terminator to Java's `.` and an ordinary character to JavaScript's, so
+        // @spekjs/core counts one task here and this parser counts none. Accepted rather than fixed —
+        // closing it means spelling an identical negated class into both engines' `(.+)` — and pinned
+        // on both sides so it stays a documented exception instead of drifting. See the task-parser spec.
+        assertEquals(0, TaskParser.parse("- [x] a\u0085b").total)
+    }
 }

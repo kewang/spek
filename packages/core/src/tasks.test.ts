@@ -177,3 +177,71 @@ test("parseTasks: a block opener between tasks leaves the counts alone", () => {
     ["one", "two"]
   );
 });
+
+// Line endings and blankness are the two boundaries this parser used to inherit from its runtime,
+// where JavaScript and Kotlin disagree with each other and with CommonMark. Every case below is
+// written with escape sequences rather than literal characters, so neither an editor nor a
+// `.gitattributes` pass can quietly rewrite the thing under test. TaskParserTest.kt mirrors them.
+
+test("parseTasks: a carriage-return-only file separates its lines", () => {
+  // CommonMark counts a lone CR as a line ending, so this is two tasks, not one unparseable line.
+  const parsed = parseTasks("- [x] a\r- [ ] b");
+  assert.equal(parsed.total, 2);
+  assert.equal(parsed.completed, 1);
+});
+
+test("parseTasks: a stray carriage return before a CRLF does not survive into the line", () => {
+  // `\r\r\n` normalises to two line endings; the leftover CR used to make Java see a checkbox where
+  // JavaScript saw none.
+  assert.deepEqual(textOf("- [x] a\r\r\n- [x] b"), ["a", "b"]);
+});
+
+test("parseTasks: a final line ending in a carriage return is still a task", () => {
+  assert.deepEqual(textOf("- [x] a\n- [ ] b\r"), ["a", "b"]);
+});
+
+test("parseTasks: CRLF content parses the same as LF", () => {
+  assert.deepEqual(
+    parseTasks("## S\r\n- [x] a\r\n- [ ] b\r\n"),
+    parseTasks("## S\n- [x] a\n- [ ] b\n")
+  );
+});
+
+test("parseTasks: a no-break-space line does not end the task", () => {
+  // A blank line is spaces and tabs only, so this line is content and the prose after it is lazy
+  // continuation — which is what the reference renderer shows. `trim() === ""` called it blank and
+  // dropped the prose; Kotlin's `isBlank()` never did.
+  assert.deepEqual(textOf("- [ ] Task\n\u00a0\nprose"), ["Task\n\u00a0\nprose"]);
+});
+
+test("parseTasks: a file-separator line does not end the task", () => {
+  // The mirror image: Kotlin's `isBlank()` counts U+001C as whitespace, JavaScript's `trim()` does
+  // not, and CommonMark agrees with neither runtime's table — only spaces and tabs are blank.
+  assert.deepEqual(textOf("- [ ] Task\n\u001c\nprose"), ["Task\n\u001c\nprose"]);
+});
+
+test("parseTasks: a spaces-and-tabs line is blank", () => {
+  assert.deepEqual(textOf("- [ ] Task\n \t \nprose"), ["Task"]);
+});
+
+test("parseTasks: exotic trailing whitespace survives trimming", () => {
+  assert.deepEqual(textOf("- [x] Task\u00a0  "), ["Task\u00a0"]);
+});
+
+test("parseTasks: a section title is trimmed to the same class", () => {
+  // The title goes through the same spaces-and-tabs trim as a single-line task's text, so a trailing
+  // NBSP stays and ordinary trailing spaces go.
+  const parsed = parseTasks("## Phase\u00a0  \n- [x] a\n");
+  assert.deepEqual(
+    parsed.sections.map((s) => s.title),
+    ["Phase\u00a0"]
+  );
+});
+
+test("parseTasks: a next-line character stays in the text (known divergence)", () => {
+  // U+0085 is an ordinary character to JavaScript's `.` and a line terminator to Java's, so the
+  // Kotlin mirror counts no task here at all. Accepted rather than fixed — closing it means spelling
+  // an identical negated class into both engines' `(.+)` — and pinned on both sides so it stays a
+  // documented exception instead of drifting. See the task-parser spec.
+  assert.deepEqual(textOf("- [x] a\u0085b"), ["a\u0085b"]);
+});

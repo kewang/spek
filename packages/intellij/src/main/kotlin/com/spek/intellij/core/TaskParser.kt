@@ -7,8 +7,20 @@ package com.spek.intellij.core
 object TaskParser {
     // Anchored at column 0 on purpose: an indented checkbox is part of its parent task's text, not a
     // task of its own. Relaxing this would silently change every total / completed and CI badge.
-    private val CHECKBOX_RE = Regex("""^- \[([ xX])] (.+)$""")
-    private val SECTION_RE = Regex("""^## (.+)$""")
+    //
+    // `\z`, not `$`, for the same reason BLOCK_OPENER_RE below uses it: on an already-split line JS's
+    // `$` means the absolute end of the string, while Java's also matches before a trailing line
+    // terminator — and Java's terminator set is wider than CommonMark's, covering U+2028 and U+2029
+    // as well as CR. The normalisation in parse() removes CR, so `\z` is what closes the rest.
+    private val CHECKBOX_RE = Regex("""^- \[([ xX])] (.+)\z""")
+    private val SECTION_RE = Regex("""^## (.+)\z""")
+
+    // Every CommonMark line ending: LF, CRLF, and a *lone* CR. Normalising only CRLF left a lone CR
+    // sitting inside a line, and from there this parser and the TypeScript one disagreed about
+    // whether such a line held a checkbox at all (issue #33) — both wrong, since the reference
+    // renderer treats the CR as a line ending and sees a task on each side of it. String.replace with
+    // two strings is literal in Kotlin, so this is a regex.
+    private val LINE_ENDING_RE = Regex("""\r\n?""")
 
     // Width of the "- " list marker, i.e. CommonMark's content offset for these items. Continuation
     // lines are dedented by this much so the folded text renders the way a standard renderer shows
@@ -25,6 +37,26 @@ object TaskParser {
         var n = 0
         while (n < line.length && (line[n] == ' ' || line[n] == '\t')) n++
         return n
+    }
+
+    // CommonMark's blank line — spaces and tabs only — spelled out rather than delegated to the
+    // runtime. `isBlank()` and JS's `trim() === ""` are each a different set: Kotlin counts U+001C,
+    // JavaScript strips U+00A0, U+FEFF, U+2007 and U+202F, and CommonMark counts none of them. Since
+    // blankness moves the continuation boundary, the two implementations folded different text for the
+    // same file. Same `[ \t]` class leadingWhitespace measures, written the same way as its TS twin.
+    private fun isBlankLine(line: String): Boolean {
+        for (ch in line) if (ch != ' ' && ch != '\t') return false
+        return true
+    }
+
+    // Trim to the same class, for the same reason: Kotlin's trim() would leave a trailing U+00A0 that
+    // JS's would eat, and the reference renderer displays it.
+    private fun trimSpacesTabs(text: String): String {
+        var start = 0
+        var end = text.length
+        while (start < end && (text[start] == ' ' || text[start] == '\t')) start++
+        while (end > start && (text[end - 1] == ' ' || text[end - 1] == '\t')) end--
+        return text.substring(start, end)
     }
 
     // A column-0 line that opens a new block, which ends the preceding item rather than continuing
@@ -58,7 +90,7 @@ object TaskParser {
     }
 
     fun parse(content: String): ParsedTasks {
-        val lines = content.replace("\r\n", "\n").split("\n")
+        val lines = LINE_ENDING_RE.replace(content, "\n").split("\n")
         val sections = mutableListOf<TaskSection>()
         var currentTitle = ""
         var currentTasks = mutableListOf<TaskItem>()
@@ -73,14 +105,14 @@ object TaskParser {
         fun flush() {
             val task = pending ?: return
             val rest = task.rest
-            while (rest.isNotEmpty() && rest[rest.size - 1].isBlank()) rest.removeAt(rest.size - 1)
+            while (rest.isNotEmpty() && isBlankLine(rest[rest.size - 1])) rest.removeAt(rest.size - 1)
             // With continuation lines the first line is kept verbatim: two trailing spaces are a hard
             // line break, and trimming them would quietly downgrade it to a soft one.
             val text = if (rest.isNotEmpty()) {
-                (listOf(task.first) + rest.map { if (it.isBlank()) "" else dedentContinuation(it) })
+                (listOf(task.first) + rest.map { if (isBlankLine(it)) "" else dedentContinuation(it) })
                     .joinToString("\n")
             } else {
-                task.first.trim()
+                trimSpacesTabs(task.first)
             }
             currentTasks.add(TaskItem(text, task.completed))
             total++
@@ -95,7 +127,7 @@ object TaskParser {
                 if (currentTasks.isNotEmpty()) {
                     sections.add(TaskSection(currentTitle, currentTasks.toList()))
                 }
-                currentTitle = sectionMatch.groupValues[1].trim()
+                currentTitle = trimSpacesTabs(sectionMatch.groupValues[1])
                 currentTasks = mutableListOf()
                 sawBlank = false
                 continue
@@ -114,7 +146,7 @@ object TaskParser {
 
             val task = pending ?: continue
 
-            if (line.isBlank()) {
+            if (isBlankLine(line)) {
                 sawBlank = true
                 task.rest.add(line)
                 continue
