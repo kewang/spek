@@ -22,6 +22,8 @@ The system SHALL render Markdown content using react-markdown with remark-gfm pl
 ### Requirement: BDD keyword highlighting
 The system SHALL visually highlight BDD keywords in rendered Markdown content to improve readability of spec documents.
 
+Highlighting SHALL NOT reduce the font weight already applied by the surrounding markup.
+
 #### Scenario: WHEN/GIVEN keyword highlighting
 - **WHEN** rendered Markdown contains the word `WHEN` or `GIVEN` as a standalone uppercase keyword
 - **THEN** the keyword is displayed with a blue background label style (blue text on blue-tinted background)
@@ -41,6 +43,10 @@ The system SHALL visually highlight BDD keywords in rendered Markdown content to
 #### Scenario: ADDED/MODIFIED badge rendering
 - **WHEN** rendered Markdown contains `ADDED` or `MODIFIED` as standalone uppercase keywords
 - **THEN** `ADDED` is displayed as an orange badge and `MODIFIED` is displayed as a blue badge
+
+#### Scenario: Highlighting does not weaken author emphasis
+- **WHEN** a BDD keyword appears inside Markdown emphasis, such as `**SHALL**`
+- **THEN** the rendered keyword is no lighter in weight than the emphasis the author applied
 
 #### Scenario: Keywords inside code blocks are not highlighted
 - **WHEN** BDD keywords appear inside inline code or fenced code blocks
@@ -106,3 +112,31 @@ The MarkdownRenderer SHALL assign a deterministic, slug-based `id` attribute to 
 #### Scenario: Slug consistency with core utility
 - **WHEN** any heading is rendered by MarkdownRenderer
 - **THEN** its `id` exactly equals the `slug` produced by `extractHeadings(content)` from `@spekjs/core` for the same heading
+
+### Requirement: Rendered content is readable in every theme
+
+Every colour the renderer applies to text — BDD keywords, badges, inline code, spec references — SHALL
+be defined per theme rather than as one value shared by all themes, and SHALL meet WCAG 2 AA contrast of
+at least 4.5:1 against the background it is actually rendered on, which for a keyword is its own label
+background composited over the page.
+
+This requirement exists because the capability previously stated obligations for the dark theme only.
+No light-theme value was ever asserted, so none could fail, and every mark drifted to a value that is
+unreadable there — `THEN` reached 1.43:1 while the specification remained satisfied.
+
+Hue is not required to change between themes: the obligation is contrast, not appearance.
+
+#### Scenario: Marks are readable in the light theme
+
+- **WHEN** spec content is rendered with the light theme active
+- **THEN** every BDD keyword, badge, inline code span and spec reference meets at least 4.5:1 contrast against its own background
+
+#### Scenario: Marks are readable in the dark theme
+
+- **WHEN** spec content is rendered with the dark theme active
+- **THEN** every BDD keyword, badge, inline code span and spec reference meets at least 4.5:1 contrast against its own background
+
+#### Scenario: Colours are theme-scoped
+
+- **WHEN** the active theme changes
+- **THEN** each mark takes that theme's own colour value rather than one value shared across themes
