@@ -159,7 +159,15 @@ get) / `alpha` (title, via `localeCompare`, so ordering is host-collation depend
 from the exported `ARTIFACT_SORT_MODES` — validate a persisted preference against **that array**, never a hand-written
 copy: a copy missing an entry still satisfies the type, and the omitted mode silently stops restoring. Core owns what
 the modes mean; **each host owns where the choice is stored** (web: `localStorage["spek:artifact-sort"]`). `modified`
-may return the array it was given, so **callers must not mutate a returned list**.
+may return the array it was given, so **callers must not mutate a returned list**. It is **generic in the element**
+(`<T extends Pick<ChangeArtifact, "id" | "title">>`), so a consumer's own DTO survives the call — it reorders the
+objects it is handed and never rebuilds one, and returning `ChangeArtifact[]` regardless of the input dropped, at the
+type level only, fields the result still carried, leaving consumers an unchecked cast (issue #45). `byDefaultOrder`
+carries `Pick<ChangeArtifact, "id">` for the same reason — left at `ChangeArtifact`, `T` is not assignable to it and
+the generic version does not compile. The guard for this is a **type-level** test in `artifact-order.test.ts`
+(assignment back to the caller's own array type, plus a `@ts-expect-error` on an element missing `title`), because no
+behavior test can see a narrowed return type; it is checked by `tsconfig.test.json`, i.e. by `npm run type-check`,
+not by `npm test`.
 
 **Polling fallback**: inotify doesn't deliver events on 9p/drvfs/NFS/CIFS mounts (devcontainer/WSL), so the decision is
 by the watched path's fstype (`decidePolling` precedence: explicit override `SPEK_WATCH_POLLING` /

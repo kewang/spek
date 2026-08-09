@@ -87,6 +87,22 @@ back to the narrative order when unavailable), or `alpha` (by title). `ArtifactS
 from `ARTIFACT_SORT_MODES`, so validating a persisted preference against the array cannot drift from
 the type. Callers must not mutate a returned list: under `modified` it may be the array they passed in.
 
+It is generic in the element type, so **your own artifact type comes back out** — no cast, and fields
+of your own stay reachable on the result:
+
+```ts
+interface MyArtifact extends ChangeArtifact {
+  relPath: string
+}
+
+const sorted: MyArtifact[] = sortArtifacts(myArtifacts, 'schema', order)
+sorted[0].relPath // still typed — no cast anywhere
+```
+
+The element only has to carry the two fields the rule reads — `id` (the narrative rank, the
+`schemaOrder` lookup and both tiebreaks) and `title` (`alpha`) — so it need not be a `ChangeArtifact`.
+One missing either is rejected at compile time.
+
 ## License
 
 MIT © Kewang

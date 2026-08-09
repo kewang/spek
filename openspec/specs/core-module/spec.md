@@ -149,6 +149,20 @@ The narrative order is `DEFAULT_ORDER` with ids outside it ordered after it, amo
 Sorting SHALL change only the order, never the set: the returned list SHALL contain exactly the
 artifacts it was given.
 
+The sort SHALL also preserve the caller's **element type**: it is generic in the element, and the list
+it returns SHALL have the element type it was given. A consumer holding its own artifact DTO — a
+superset of `ChangeArtifact`, such as one carrying the path it opens the artifact's file by — therefore
+gets its own type back and needs no cast. The rule reorders the objects it is handed without rebuilding
+them, so a signature that returns `ChangeArtifact[]` regardless of the input would drop, at the type
+level only, fields the result still carries at runtime; the cast standing in for that is precisely what
+the caller cannot check.
+
+The element SHALL be constrained to the fields the rule reads — the artifact `id` and `title` — rather
+than to `ChangeArtifact` as a whole. `id` carries the narrative rank, the `schemaOrder` lookup and both
+tiebreaks; `title` carries `alpha`. Any element type providing those two SHALL be accepted, whatever
+else it holds, and one missing either SHALL be rejected: constraining to more than is read excludes
+consumers for no reason, and constraining to less cannot be implemented.
+
 `alpha` and `schema` SHALL return a new array and SHALL NOT mutate the input. `modified` **MAY** return
 the input array itself rather than a copy. Callers **SHALL NOT** mutate a returned list — under
 `modified` it may alias the caller's own array, so sorting it in place would reorder the data the
@@ -205,6 +219,18 @@ process can import it — see the subpath scenarios under "Published to the publ
 - **WHEN** the same artifacts are sorted in each of the three modes
 - **THEN** every result contains exactly the artifacts given, and the input array is unmodified except
   where it is returned as-is
+
+#### Scenario: A consumer's own artifact type survives the sort
+
+- **WHEN** a consumer sorts an array of its own artifact type — `ChangeArtifact` plus fields of its own —
+  in any of the three modes
+- **THEN** the result is typed as that same element type, so the consumer's own fields are reachable on
+  it and assigning the result back to its own array type needs no cast
+
+#### Scenario: An element type missing a field the rule reads is rejected
+
+- **WHEN** a consumer passes elements that carry an `id` but no `title`
+- **THEN** the call does not type-check, because `title` is one of the two fields the rule reads
 
 ### Requirement: Graph node id parsing
 
