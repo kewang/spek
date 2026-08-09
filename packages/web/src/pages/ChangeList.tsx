@@ -54,16 +54,16 @@ function ChangeRow({ c, today, accent, showSource }: {
           {showSource && c.source && <WorktreeBadge source={c.source} />}
           {c.isCurrent && (
             <span
-              className="shrink-0 text-[11px] text-accent border border-accent/40 rounded px-1.5 py-0.5"
-              title="目前 jj working copy (@) 正在編輯這個 change"
+              className="relative z-10 shrink-0 text-[11px] text-accent border border-accent/40 rounded px-1.5 py-0.5"
+              title="The jj working copy (@) is currently editing this change"
             >
               editing
             </span>
           )}
           {c.conflictsWith && (
             <span
-              className="shrink-0 text-[11px] text-amber-400 border border-amber-400/40 rounded px-1.5 py-0.5"
-              title={`此 jj workspace 的版本與 ${c.conflictsWith} 的內容分歧`}
+              className="relative z-10 shrink-0 text-[11px] text-amber-400 border border-amber-400/40 rounded px-1.5 py-0.5"
+              title={`This jj workspace's copy diverges in content from ${c.conflictsWith}`}
             >
               conflicts with {c.conflictsWith}
             </span>
@@ -73,7 +73,7 @@ function ChangeRow({ c, today, accent, showSource }: {
           <SchemaBadge schema={c.schema} defaultSchema={c.defaultSchema} />
           {meta && (
             <span
-              className="text-text-muted text-xs whitespace-nowrap tracking-wide [word-spacing:0.15em]"
+              className="relative z-10 text-text-muted text-xs whitespace-nowrap tracking-wide [word-spacing:0.15em]"
               title={meta.tooltip}
             >
               {meta.text}

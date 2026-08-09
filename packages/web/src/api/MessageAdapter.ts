@@ -13,6 +13,7 @@ import type {
   SchemasResponse,
   SchemaReadResult,
 } from "@spekjs/core";
+import { CLI_TIMEOUT_MS } from "@spekjs/core/cli-budget";
 import type { ApiAdapter, AggregationPrefs } from "./types.js";
 
 interface VsCodeApi {
@@ -29,6 +30,16 @@ interface ResponseMessage {
 }
 
 let requestCounter = 0;
+
+/** For work the host does in-process; anything this slow is broken rather than busy. */
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+/**
+ * For requests the host answers by spawning the CLI. Derived from the host's ceiling rather than
+ * chosen to match it: a budget merely equal to `CLI_TIMEOUT_MS` expires just as the host gives up,
+ * so the margin covers the host's own work either side of the CLI.
+ */
+const CLI_BACKED_TIMEOUT_MS = CLI_TIMEOUT_MS + 5_000;
 
 export class MessageAdapter implements ApiAdapter {
   private vscode: VsCodeApi;
@@ -55,7 +66,11 @@ export class MessageAdapter implements ApiAdapter {
     });
   }
 
-  private request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+  private request<T>(
+    method: string,
+    params?: Record<string, unknown>,
+    timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  ): Promise<T> {
     const id = `req-${++requestCounter}`;
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, {
@@ -65,13 +80,12 @@ export class MessageAdapter implements ApiAdapter {
 
       this.vscode.postMessage({ type: "request", id, method, params });
 
-      // 10 second timeout
       setTimeout(() => {
         if (this.pending.has(id)) {
           this.pending.delete(id);
           reject(new Error(`Request timeout: ${method}`));
         }
-      }, 10_000);
+      }, timeoutMs);
     });
   }
 
@@ -95,8 +109,9 @@ export class MessageAdapter implements ApiAdapter {
     return this.request("getChanges", { aggregate, includeJj });
   }
 
+  // CLI-backed less obviously: reading a change asks for its `schemaOrder`, via `openspec status`.
   getChange(slug: string, wt?: string): Promise<ChangeDetail> {
-    return this.request("getChange", { slug, wt });
+    return this.request("getChange", { slug, wt }, CLI_BACKED_TIMEOUT_MS);
   }
 
   search(query: string): Promise<SearchResult[]> {
@@ -120,11 +135,11 @@ export class MessageAdapter implements ApiAdapter {
   }
 
   getSchemas(aggregate?: boolean, includeJj?: boolean): Promise<SchemasResponse> {
-    return this.request("getSchemas", { aggregate, includeJj });
+    return this.request("getSchemas", { aggregate, includeJj }, CLI_BACKED_TIMEOUT_MS);
   }
 
-  getSchema(name: string): Promise<SchemaReadResult> {
-    return this.request("getSchema", { name });
+  getSchema(name: string, aggregate?: boolean, includeJj?: boolean): Promise<SchemaReadResult> {
+    return this.request("getSchema", { name, aggregate, includeJj }, CLI_BACKED_TIMEOUT_MS);
   }
 
   getWorktrees(includeJj?: boolean): Promise<WorktreeInfo[]> {

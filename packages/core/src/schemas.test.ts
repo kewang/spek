@@ -5,9 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  affectsSchemas,
   clearSchemaCache,
+  countSchemaUsage,
+  groupSchemaUsage,
   isSafeSchemaName,
-  listProjectSchemas,
+  listSchemas,
   listSchemasUncached,
   parseSchemaYaml,
   parseSchemasList,
@@ -18,7 +21,7 @@ import {
   type CliResult,
   type OpenspecRunner,
 } from "./schemas.js";
-import { schemaStageCount } from "./schema-flow.js";
+import { schemaArtifactCount } from "./schema-flow.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.resolve(here, "../../../test-fixtures/schemas/sample-schema.yaml");
@@ -126,9 +129,9 @@ test("parseSchemaYaml: shared fixture parses to the declared shape", () => {
   });
 
   // Pinned on the fixture so the stage rule is controlled across both languages too, not just the
-  // parse: the Kotlin mirror asserts this same 5 from this same file. Four artifacts, five stages —
-  // brainstorm(1) → proposal(2) → specs(3) → tasks(4) → apply(5).
-  assert.equal(schemaStageCount(parsed.artifacts, parsed.apply), 5);
+  // parse: the Kotlin mirror asserts this same 4 from this same file. One stage per declared step;
+  // the fixture's `apply` is not among them.
+  assert.equal(schemaArtifactCount(parsed.artifacts), 4);
 });
 
 test("parseSchemaYaml: unparsable or non-mapping input returns null", () => {
@@ -158,10 +161,9 @@ test("parseSchemaYaml: missing artifacts and apply are empty/null, not invented"
 
 // --- CLI enumeration parsing ----------------------------------------------
 
-// The enumeration cannot know a stage count — `openspec schemas --json` carries no `requires` — so
-// every entry it produces starts null and is filled in later, from each schema's definition. The
-// entry's `artifacts` array is therefore read for nothing and deliberately not counted: a summary
-// reports stages only.
+// The count comes straight off the enumeration's `artifacts` array, which names the artifacts
+// without their `requires` — exactly enough, so no summary needs a definition read and the list
+// costs one CLI round however many schemas are installed.
 test("parseSchemasList: maps CLI entries", () => {
   const list = parseSchemasList([
     { name: "spec-driven", description: "Default", artifacts: ["a", "b"], source: "package" },
@@ -172,17 +174,22 @@ test("parseSchemasList: maps CLI entries", () => {
       name: "spec-driven",
       description: "Default",
       source: "package",
-      stageCount: null,
+      artifactCount: 2,
       isDefault: false,
     },
     {
       name: "house-style",
       description: null,
       source: "project",
-      stageCount: null,
+      artifactCount: 0,
       isDefault: false,
     },
   ]);
+});
+
+test("parseSchemasList: an entry with no artifacts array reports no count", () => {
+  // Null rather than 0 — "the enumeration did not say" is not "this schema has no steps".
+  assert.deepEqual(parseSchemasList([{ name: "x", source: "package" }])?.[0].artifactCount, null);
 });
 
 test("parseSchemasList: unexpected shapes degrade rather than throw", () => {
@@ -196,7 +203,7 @@ test("parseSchemasList: unexpected shapes degrade rather than throw", () => {
       name: "x",
       description: null,
       source: "package",
-      stageCount: null,
+      artifactCount: null,
       isDefault: false,
     },
   ]);
@@ -308,8 +315,13 @@ test("listSchemas: CLI already dedupes shadowing — one entry, sourced project"
   assert.equal(catalog.schemas[0].source, "project");
 });
 
+// Which schemas exist is the CLI's answer alone. Without it there is no answer — not even for a
+// schema sitting in this repo's own openspec/schemas/, because reading that directory means
+// deciding from disk what OpenSpec resolves across three of them, with precedence and shadowing we
+// cannot see. The catalog degrades saying so, as `schemaOrder` does, rather than substituting a
+// reading of our own.
 for (const reason of ["cli-unavailable", "cli-failed", "cli-timeout"] as const) {
-  test(`listSchemas: ${reason} still lists project schemas, with the reason`, async () => {
+  test(`listSchemas: ${reason} yields no schemas, with the reason`, async () => {
     const repo = tempRepo();
     writeConfig(repo, "house-style");
     writeProjectSchema(repo, "house-style");
@@ -317,16 +329,24 @@ for (const reason of ["cli-unavailable", "cli-failed", "cli-timeout"] as const) 
 
     const catalog = await listSchemasUncached(repo);
     assert.equal(catalog.degradedReason, reason);
-    assert.deepEqual(
-      catalog.schemas.map((s) => s.name),
-      ["house-style"],
-    );
-    assert.equal(catalog.schemas[0].source, "project");
-    assert.equal(catalog.schemas[0].isDefault, true);
-    // Read straight off disk, so the stage count survives the CLI being unusable.
-    assert.equal(catalog.schemas[0].stageCount, 1);
+    assert.deepEqual(catalog.schemas, [], "a schema on disk is still not spek's to report");
+    // The repo's declared default is read from config.yaml, not from the CLI, so it survives.
+    assert.equal(catalog.defaultSchema, "house-style");
   });
 }
+
+test("readSchema: a name the CLI cannot resolve is not resolved from disk", async () => {
+  // Same rule on the detail path: with the CLI unusable, a project schema's directory is right
+  // there and still must not be served — the reader would get spek's parse of a file OpenSpec never
+  // approved, under OpenSpec's name.
+  const repo = tempRepo();
+  writeProjectSchema(repo, "house-style");
+  useRunner(stubRunner({ "schema which": { ok: false, reason: "cli-unavailable" } }));
+
+  const result = await readSchemaUncached(repo, "house-style");
+  assert.equal(result.ok, false);
+  assert.equal(result.ok === false && result.reason, "cli-unavailable");
+});
 
 test("listSchemas: unparsable CLI output degrades rather than throwing", async () => {
   const repo = tempRepo();
@@ -356,19 +376,16 @@ test("listSchemas: default schema that resolves to nothing is still reported", a
   assert.deepEqual(catalog.schemas, []);
 });
 
-test("listProjectSchemas: reads from disk with no CLI at all", () => {
+test("listSchemas: a schema directory on disk is not a schema until the CLI says so", () => {
+  // The repo's own openspec/schemas/ is never scanned. It is the one schema directory spek could
+  // read, and reading it is what let a definition OpenSpec refuses reach the page.
   const repo = tempRepo();
   writeProjectSchema(repo, "house-style");
-  writeProjectSchema(repo, "other");
-  // A directory with no schema.yaml is not a schema.
-  fs.mkdirSync(path.join(repo, "openspec", "schemas", "not-a-schema"), { recursive: true });
+  useRunner(stubRunner({ "schemas --json": { ok: true, json: [] } }));
 
-  const found = listProjectSchemas(repo).map((s) => s.name).sort();
-  assert.deepEqual(found, ["house-style", "other"]);
-});
-
-test("listProjectSchemas: missing schemas directory is empty, not an error", () => {
-  assert.deepEqual(listProjectSchemas(tempRepo()), []);
+  return listSchemasUncached(repo).then((catalog) => {
+    assert.deepEqual(catalog.schemas, []);
+  });
 });
 
 // --- definition reads ------------------------------------------------------
@@ -457,21 +474,6 @@ test("readSchema: a non-zero exit that still answers in JSON is not-found, not a
   const result = await readSchemaUncached(repo, "no-such-schema");
   assert.equal(result.ok, false);
   assert.equal(result.ok === false && result.reason, "not-found");
-});
-
-test("readSchema: CLI unavailable still resolves a project-local schema from disk", async () => {
-  const repo = tempRepo();
-  writeProjectSchema(repo, "house-style");
-  useRunner(stubRunner({ "schema which": { ok: false, reason: "cli-unavailable" } }));
-
-  const result = await readSchemaUncached(repo, "house-style");
-  assert.ok(result.ok);
-  assert.equal(result.schema.source, "project");
-  assert.deepEqual(result.schema.shadows, [], "shadowing is unknown without the CLI");
-  assert.deepEqual(
-    result.schema.artifacts.map((a) => a.id),
-    ["only"],
-  );
 });
 
 test("readSchema: package schema unreachable without the CLI is distinguished from not-found", async () => {
@@ -564,4 +566,158 @@ test("shortenSchemaPath: a package schema drops the npm install prefix", () => {
 test("shortenSchemaPath: anything else stays absolute rather than being guessed at", () => {
   const abs = path.join("/somewhere", "else", "schemas", "x");
   assert.equal(shortenSchemaPath(abs, { repoRoot: "/repo", homedir: "/home/u" }), abs);
+});
+
+// --- watcher-driven invalidation -------------------------------------------
+
+test("affectsSchemas: a schema definition matters", () => {
+  assert.equal(affectsSchemas("/repo/openspec/schemas/my-flow/schema.yaml"), true);
+});
+
+test("affectsSchemas: anything else under a schema directory matters", () => {
+  // Templates live beside schema.yaml, and a schema is its directory.
+  assert.equal(affectsSchemas("/repo/openspec/schemas/my-flow/templates/proposal.md"), true);
+});
+
+test("affectsSchemas: config.yaml matters — it names the default schema", () => {
+  assert.equal(affectsSchemas("/repo/openspec/config.yaml"), true);
+});
+
+test("affectsSchemas: change and spec content does not", () => {
+  // Nearly everything the watcher admits, and none of it read by a schema read.
+  assert.equal(affectsSchemas("/repo/openspec/changes/add-thing/tasks.md"), false);
+  assert.equal(affectsSchemas("/repo/openspec/specs/some-topic/spec.md"), false);
+  assert.equal(affectsSchemas("/repo/openspec/changes/add-thing/design.md"), false);
+});
+
+test("affectsSchemas: a config.yaml elsewhere in the tree does not", () => {
+  // Only openspec/config.yaml is the repo's config; a same-named file inside a change is not.
+  assert.equal(affectsSchemas("/repo/openspec/changes/add-thing/config.yaml"), false);
+});
+
+test("affectsSchemas: Windows separators are recognised", () => {
+  // Matching only "/" would make this always false on Windows, so a schema edit would never show.
+  assert.equal(affectsSchemas("C:\\repo\\openspec\\schemas\\my-flow\\schema.yaml"), true);
+  assert.equal(affectsSchemas("C:\\repo\\openspec\\config.yaml"), true);
+  assert.equal(affectsSchemas("C:\\repo\\openspec\\changes\\x\\tasks.md"), false);
+});
+
+test("affectsSchemas: a repo-relative path is recognised", () => {
+  assert.equal(affectsSchemas("openspec/schemas/my-flow/schema.yaml"), true);
+  assert.equal(affectsSchemas("openspec/config.yaml"), true);
+});
+
+// `openspec schemas` drops a schema it refuses without a word — no error, no mention. spek reports
+// what the CLI reported, so a refused schema is simply absent here too, exactly as it is from the
+// CLI's own output. The failure this prevents is the opposite one: spek rendering a workflow, from
+// its own more forgiving parse, that OpenSpec would decline to run.
+test("listSchemas: a schema the CLI refused is absent, not read from disk", async () => {
+  const repo = tempRepo();
+  writeProjectSchema(repo, "good");
+  writeProjectSchema(repo, "refused");
+  // The CLI answers and reports only `good` — what it does when the other one is invalid.
+  useRunner(
+    stubRunner({
+      "schemas --json": {
+        ok: true,
+        json: [{ name: "good", artifacts: ["a"], source: "project" }],
+      },
+    }),
+  );
+
+  const catalog = await listSchemas(repo);
+  assert.equal(catalog.degradedReason, null);
+  assert.deepEqual(
+    catalog.schemas.map((s) => s.name),
+    ["good"],
+  );
+});
+
+test("clearSchemaCache: scoping to a repo leaves another repo's entry alone", async () => {
+  const a = tempRepo();
+  const b = tempRepo();
+  let calls = 0;
+  useRunner(async () => {
+    calls++;
+    return { ok: true, json: [] };
+  });
+
+  await listSchemas(a);
+  await listSchemas(b);
+  assert.equal(calls, 2, "each repo enumerates once");
+
+  clearSchemaCache(a);
+  await listSchemas(b);
+  assert.equal(calls, 2, "b was still cached");
+  await listSchemas(a);
+  assert.equal(calls, 3, "a was dropped and re-enumerated");
+});
+
+test("clearSchemaCache: a repo whose path prefixes another is not caught by it", async () => {
+  const root = tempRepo();
+  const repo = path.join(root, "spek");
+  const sibling = path.join(root, "spek-fork");
+  for (const d of [repo, sibling]) fs.mkdirSync(path.join(d, "openspec"), { recursive: true });
+
+  let calls = 0;
+  useRunner(async () => {
+    calls++;
+    return { ok: true, json: [] };
+  });
+
+  await listSchemas(repo);
+  await listSchemas(sibling);
+  assert.equal(calls, 2);
+
+  clearSchemaCache(repo);
+  await listSchemas(sibling);
+  assert.equal(calls, 2, "the sibling survived");
+});
+
+// --- usage counting --------------------------------------------------------
+
+test("countSchemaUsage: counts only the changes declaring that schema", () => {
+  const changes = [
+    { slug: "a", schema: "spec-driven" },
+    { slug: "b", schema: "minimalist" },
+    { slug: "c", schema: "spec-driven" },
+    { slug: "d", schema: null },
+  ];
+  assert.deepEqual(countSchemaUsage(changes, "spec-driven"), {
+    count: 2,
+    slugs: ["a", "c"],
+  });
+});
+
+test("countSchemaUsage: a schema nothing declares counts zero", () => {
+  assert.deepEqual(countSchemaUsage([{ slug: "a", schema: "other" }], "unused"), {
+    count: 0,
+    slugs: [],
+  });
+});
+
+test("countSchemaUsage: agrees with groupSchemaUsage on the same input", () => {
+  // The list page shows the grouped count and the detail page this one, for the same schema.
+  const changes = [
+    { slug: "a", schema: "spec-driven" },
+    { slug: "b", schema: null },
+    { slug: "c", schema: "spec-driven" },
+  ];
+  const grouped = groupSchemaUsage(
+    {
+      defaultSchema: "spec-driven",
+      degradedReason: null,
+      schemas: [
+        {
+          name: "spec-driven",
+          description: null,
+          source: "package",
+          artifactCount: 4,
+          isDefault: true,
+        },
+      ],
+    },
+    changes,
+  );
+  assert.deepEqual(countSchemaUsage(changes, "spec-driven"), grouped.schemas[0].usage);
 });

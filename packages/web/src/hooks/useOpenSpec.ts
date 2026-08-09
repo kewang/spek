@@ -264,12 +264,17 @@ export function useSchemas(
 
 // An unreadable schema is data, not an error: the result carries whether it does not exist or
 // could not be looked up, and the view says which.
+// The aggregation scope rides along because the result carries a usage count, which is counted over
+// active changes — so it has to be counted over the same set of changes the list page counted, or
+// clicking a row shows a different number than the row did.
 export function useSchema(name: string): FetchState<SchemaReadResult> {
   const { repoPath } = useRepo();
   const adapter = useApiAdapter();
+  const scope = useAggregationScope();
+  const { aggregate, includeJj } = scope;
   return useAsyncData(
-    repoPath && name ? () => adapter.getSchema(name) : null,
-    [repoPath, name],
+    repoPath && name ? () => adapter.getSchema(name, aggregate, includeJj) : null,
+    [repoPath, name, aggregate, includeJj],
   );
 }
 

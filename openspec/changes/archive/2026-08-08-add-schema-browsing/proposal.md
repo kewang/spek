@@ -96,12 +96,21 @@ Both answers already exist on disk and in the `openspec` CLI. spek just doesn't 
 - What landed, for whoever writes the release note:
   - New runtime dependency **`yaml`** (core previously depended only on `cross-spawn`).
   - New exports from the package index: `listSchemas`, `readSchema`, `groupSchemaUsage`,
-    `parseSchemaYaml`, `isSafeSchemaName`, `shortenSchemaPath`, `clearSchemaCache`, the schema
-    types, and the CLI test seam (`setOpenspecRunner`, `OpenspecRunner`, `CliResult`).
+    `countSchemaUsage`, `parseSchemaYaml`, `isSafeSchemaName`, `shortenSchemaPath`,
+    `clearSchemaCache`, `affectsSchemas`, the schema types, and the CLI test seam
+    (`setOpenspecRunner`, `OpenspecRunner`, `CliResult`).
   - A **new subpath export `@spekjs/core/schema-flow`** — `computeArtifactLevels`, `applyStepLevel`,
-    `schemaStageCount`, `drawableRequires`. Separate from the index because the browser bundle
+    `schemaArtifactCount`, `drawableRequires`. Separate from the index because the browser bundle
     imports it and the index reaches for `child_process`. A subpath is part of the package's public
     surface, so removing or renaming it later is a breaking change.
+  - A **second new subpath export `@spekjs/core/cli-budget`** — `CLI_TIMEOUT_MS`,
+    `CLI_CACHE_TTL_MS`, also re-exported from the index. Its own module for the same reason: a
+    browser bundle waiting on a host that spawns the CLI must derive its request timeout from the
+    CLI's, and cannot import the module that does the spawning.
+  - `clearSchemaCache` takes an **optional** `repoRoot` to scope the discard to one repo; called
+    with no argument it behaves as before.
+  - `SchemaReadResult`'s success branch gained a required `usage` field. Additive for anyone
+    *reading* the result; breaking for anyone constructing one.
   - `openspec-cli.ts` is internal (the shared CLI runner and `ttlCached`), reached only through the
     re-exports above.
 

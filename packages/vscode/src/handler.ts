@@ -17,6 +17,7 @@ import {
   listSchemas,
   readSchema,
   groupSchemaUsage,
+  countSchemaUsage,
   clearSchemaCache,
 } from "@spekjs/core";
 
@@ -84,7 +85,11 @@ export class MessageHandler {
           params?.includeJj as boolean | undefined,
         );
       case "getSchema":
-        return this.getSchema(params?.name as string);
+        return this.getSchema(
+          params?.name as string,
+          params?.aggregate as boolean | undefined,
+          params?.includeJj as boolean | undefined,
+        );
       case "getAggregationPrefs":
         return this.getAggregationPrefs();
       case "setAggregationPrefs":
@@ -323,9 +328,18 @@ export class MessageHandler {
   }
 
   // Resolves rather than throws when the schema is unreadable: the result carries whether it does
-  // not exist or could not be looked up, and the view says which.
-  private getSchema(name: string) {
-    return readSchema(this.workspacePath, name);
+  // not exist or could not be looked up, and the view says which. Usage rides along as the web
+  // route does it, so the detail view needs no second request for the catalog.
+  private async getSchema(name: string, aggregate?: boolean, includeJj?: boolean) {
+    const [result, scan] = await Promise.all([
+      readSchema(this.workspacePath, name),
+      scanOpenSpecAggregated(this.workspacePath, {
+        aggregate: this.aggregateEnabled(aggregate),
+        includeJj: this.jjEnabled(includeJj),
+      }),
+    ]);
+    if (!result.ok) return result;
+    return { ...result, usage: countSchemaUsage(scan.activeChanges, name) };
   }
 
   // The header control in VS Code is the UI for these two settings: it reads them here...

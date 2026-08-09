@@ -4,9 +4,9 @@ import type {
   SchemaDegradedReason,
   SchemaSource,
 } from "@spekjs/core";
-// The levelling lives in core rather than here because the schemas *list* needs it too, to report a
-// stage count per row. One rule, one implementation. Imported from the `/schema-flow` subpath, not
-// the root: this file is bundled into the browser and the root entry reaches for child_process.
+// The levelling lives in core as facts about the `requires` graph, kept apart from this file's
+// geometry. Imported from the `/schema-flow` subpath, not the root: this file is bundled into the
+// browser and the root entry reaches for child_process.
 import { applyStepLevel, computeArtifactLevels } from "@spekjs/core/schema-flow";
 import { plural } from "./plural";
 
@@ -173,19 +173,23 @@ export function isFilePattern(generates: string | null): boolean {
 }
 
 /**
- * Why the schema list is incomplete, in the user's terms. Each reason is worded separately because
- * only one of them is the user's to fix — installing the CLI resolves the first and nothing else.
+ * Why no schemas are listed, in the user's terms. Each reason is worded separately because only one
+ * of them is the user's to fix — installing the CLI resolves the first and nothing else.
+ *
+ * These say *no* schemas rather than "built-in schemas", and promise nothing is shown in their
+ * place: the list comes from the CLI alone, including for the repo's own `openspec/schemas/`, so a
+ * CLI that cannot answer leaves nothing to fall back on.
  */
 export function degradedMessage(reason: SchemaDegradedReason): string {
   switch (reason) {
     case "cli-unavailable":
-      return "Built-in schemas could not be listed because the OpenSpec CLI is not available. Only this repo's own schemas are shown.";
+      return "Schemas could not be listed because the OpenSpec CLI is not available. Installing it would resolve this.";
     case "cli-timeout":
-      return "Built-in schemas could not be listed because the OpenSpec CLI did not respond in time. Only this repo's own schemas are shown.";
+      return "Schemas could not be listed because the OpenSpec CLI did not respond in time.";
     case "cli-failed":
-      return "Built-in schemas could not be listed because the OpenSpec CLI reported an error. Only this repo's own schemas are shown.";
+      return "Schemas could not be listed because the OpenSpec CLI reported an error.";
     case "cli-unparsable":
-      return "Built-in schemas could not be listed because the OpenSpec CLI returned output spek could not read. Only this repo's own schemas are shown.";
+      return "Schemas could not be listed because the OpenSpec CLI returned output spek could not read.";
   }
 }
 
@@ -196,7 +200,9 @@ export function schemaUnavailableMessage(
 ): string {
   if (reason === "not-found") return `No schema named "${name}" was found for this repo.`;
   if (reason === "cli-unavailable") {
-    return `"${name}" could not be read because the OpenSpec CLI is not available. If it is a built-in schema, installing the CLI would resolve this.`;
+    // Not "if it is a built-in schema": a name is resolved through the CLI whatever its source, so
+    // a schema in this very repo is just as unreadable without it.
+    return `"${name}" could not be read because the OpenSpec CLI is not available. Installing it would resolve this.`;
   }
   if (reason === "cli-timeout") {
     return `"${name}" could not be read because the OpenSpec CLI did not respond in time.`;

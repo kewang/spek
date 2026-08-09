@@ -17,7 +17,9 @@ import {
   listSchemas,
   readSchema,
   groupSchemaUsage,
+  countSchemaUsage,
   clearSchemaCache,
+  affectsSchemas,
   shouldUsePolling,
   pollingInterval,
   withAuthoritativeChokidarEnv,
@@ -34,7 +36,8 @@ interface WatcherEntry {
 const watchers = new Map<string, WatcherEntry>();
 
 // 聚合時 watchDirs 含全部 worktree；非聚合時只含指定目錄。key 區分不同的監看集合。
-function getOrCreateWatcher(key: string, watchDirs: string[]): WatcherEntry {
+// `repoRoot` is the directory being viewed — the only repo whose schema cache this watcher may drop.
+function getOrCreateWatcher(key: string, watchDirs: string[], repoRoot: string): WatcherEntry {
   const existing = watchers.get(key);
   if (existing) return existing;
 
@@ -64,14 +67,20 @@ function getOrCreateWatcher(key: string, watchDirs: string[]): WatcherEntry {
 
   const entry: WatcherEntry = { watcher, clients: new Set(), debounceTimer: null };
 
-  const notifyClients = () => {
-    // Schema reads are cached for 30s, so an edit under openspec/schemas/ would otherwise trigger a
-    // refetch that is served the pre-edit copy. Drop the cache with the same event that tells the
-    // client to refetch, or live-reload reports success while showing yesterday's schema.
-    clearSchemaCache();
+  // The schema cache must be dropped before clients are told to refetch, or live-reload reports
+  // success while serving the pre-edit copy. Narrowed to events that can have changed it, to this
+  // repo's entries, and to once per debounce window — none of which affects that ordering.
+  let schemasDirty = false;
+
+  const notifyClients = (filePath: string) => {
+    if (affectsSchemas(filePath)) schemasDirty = true;
     if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
     entry.debounceTimer = setTimeout(() => {
       entry.debounceTimer = null;
+      if (schemasDirty) {
+        schemasDirty = false;
+        clearSchemaCache(repoRoot);
+      }
       for (const client of entry.clients) {
         client.write(`data: ${JSON.stringify({ type: "changed" })}\n\n`);
       }
@@ -216,11 +225,19 @@ openspecRouter.get("/schemas", async (req, res) => {
   res.json(groupSchemaUsage(catalog, scan.activeChanges));
 });
 
+// The definition plus its usage count, so the detail view needs no second request for the catalog.
+// Aggregation params mirror /schemas, or the count would disagree with the row clicked through from.
 openspecRouter.get("/schemas/:name", async (req, res) => {
   const dir = req.query.dir as string;
-  const result = await readSchema(dir, req.params.name);
+  const aggregate = req.query.aggregate !== "false";
+  const includeJj = req.query.jj === "true";
+
+  const [result, scan] = await Promise.all([
+    readSchema(dir, req.params.name),
+    scanOpenSpecAggregated(dir, { aggregate, includeJj }),
+  ]);
   if (result.ok) {
-    res.json(result.schema);
+    res.json({ ...result.schema, usage: countSchemaUsage(scan.activeChanges, req.params.name) });
     return;
   }
   // "we could not look" and "it does not exist" are different problems; both are 404 to the client,
@@ -366,7 +383,7 @@ openspecRouter.get("/watch", async (req, res) => {
     }
   }
   const key = `${dir}::${aggregate}::${includeJj}`;
-  const entry = getOrCreateWatcher(key, watchDirs);
+  const entry = getOrCreateWatcher(key, watchDirs, dir);
   entry.clients.add(res);
 
   req.on("close", () => {

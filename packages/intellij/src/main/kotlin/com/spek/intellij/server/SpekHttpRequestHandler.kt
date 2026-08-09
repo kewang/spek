@@ -8,6 +8,9 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import org.jetbrains.ide.HttpRequestHandler
 import java.nio.charset.StandardCharsets
 
@@ -270,10 +273,21 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
      * "We could not look" and "it does not exist" stay distinct all the way to the view — only one
      * of them is the reader's to fix, and a missing CLI reported as "no such schema" sends them
      * hunting for a file that is right where they left it.
+     *
+     * Carries `usage` beside the definition's own fields, as the web route does.
      */
     private fun handleSchemaDetail(projectPath: String, name: String): ApiResult {
         return when (val result = SchemaCatalog.readSchema(projectPath, name)) {
-            is SchemaReadResult.Ok -> ApiResult.Json(json.encodeToString(result.schema))
+            is SchemaReadResult.Ok -> {
+                val scan = OpenSpecScanner.scan(projectPath)
+                val usage = SchemaCatalog.countSchemaUsage(scan.activeChanges, name)
+                // Merged as JSON, not via a second data class restating every SchemaDefinition field.
+                val body = JsonObject(
+                    json.encodeToJsonElement(result.schema).jsonObject +
+                        ("usage" to json.encodeToJsonElement(usage)),
+                )
+                ApiResult.Json(json.encodeToString(body))
+            }
             // Through the serializer like every other body in this file. Interpolating it worked only
             // because the reason spellings happen to contain nothing needing escaping.
             is SchemaReadResult.Failed -> notFound("Schema not found", result.reason)

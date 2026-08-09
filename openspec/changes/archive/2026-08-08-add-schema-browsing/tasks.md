@@ -44,7 +44,8 @@
   - **Superseded (was true until 3.14):** scoped during implementation so that the link is opt-in via a new `to` prop and only the **change-detail** badge passes it. On the Changes list and the Dashboard the badge sits inside a row-wide `<Link>`, where a nested `<a>` is invalid HTML — so those stay inert, as they already were. ChangeDetail calls `useSchemas()` purely to decide whether the name resolves; when it does not, `to` is null and the badge stays a plain span.
 - [x] 3.12 Write component tests: flow step order, apply as terminal step, degraded notice, not-found state, usage label, and the badge's linking rules (links unconditionally, escapes the name, hides on the repo default, and stays above a stretched row overlay)
   - **Deviation:** `SchemaList` / `SchemaDetail` / `SchemaFlow` use hooks, so they cannot be called as plain functions the way this repo's DOM-free tests do (see `SchemaBadge.test.ts`). Their decision logic was extracted into pure functions in `utils/schemaView.ts` (`buildFlowSteps`, `degradedMessage`, `schemaUnavailableMessage`, `usageLabel`) and tested there — 13 new tests. **Active-schema-first ordering is not retested here**: it is decided server-side and already covered by `listSchemas: CLI enumeration, active schema first then A–Z` in core, plus the route test. Empty state is a one-line render with no logic to assert without a DOM.
-- [x] 3.13 Report a stage count on the schemas list instead of an artifact count — move the dependency levelling out of `schemaView.ts` into `packages/core/src/schema-flow.ts` (exported at the `@spekjs/core/schema-flow` subpath so the browser bundle does not pull in `child_process`), add `schemaStageCount` and `SchemaSummary.stageCount`, and fill the counts in `listSchemasUncached` so every host reports the same number from one rule
+- [x] 3.13 Report an artifact count on the schemas list — move the dependency levelling out of `schemaView.ts` into `packages/core/src/schema-flow.ts` (exported at the `@spekjs/core/schema-flow` subpath so the browser bundle does not pull in `child_process`), add `schemaArtifactCount` and `SchemaSummary.artifactCount`, filled from the CLI enumeration so every host reports the same number from one rule
+  - **Deviation:** this landed first as a *stage* count meaning distinct dependency levels, and was corrected during review. Two problems with that: the stated rationale ("an artifact count reads as a number of files") argues for naming the unit carefully and says nothing about collapsing steps that share a level, and the levels are not in the CLI's enumeration — so filling the count cost a `schema which` per schema, i.e. 1+N subprocesses for a list. Counting declared artifacts needs no `requires`, so the list is one CLI call. `artifact` is also OpenSpec's own noun (`artifacts:`, `planningArtifacts`); neither "stage" nor "step" appears in its schema vocabulary.
 - [x] 3.14 Make every schema badge clickable: rebuild the changes-list and dashboard rows as a stretched title link over a `relative` card so the badge (`relative z-10`) escapes the row's click overlay, since an anchor cannot nest inside an anchor; link the Changes page's "Default schema:" name the same way
 - [x] 3.15 Extract `packages/web/src/utils/plural.ts` and route the five hand-written count pluralisations through it — a helper function rather than a `String.prototype` extension, because `@spekjs/core` and `@spekjs/ui` are published and a prototype patch would leak into every consumer's globals
 
@@ -112,11 +113,13 @@
   - `SchemaSource` / `SchemaDegradedReason` are enums with `@SerialName` giving the TypeScript's
     lowercase spelling, rather than raw strings: the same web SPA deserialises whichever backend
     served it, so the wire form has to match exactly while Kotlin keeps an exhaustive `when`.
-  - No `artifactCount` — it was dropped from the TypeScript summary (see 3.13); `stageCount` is the
-    only size a summary reports.
+  - `artifactCount` is the only size a summary reports, and it comes from the enumeration's
+    `artifacts` array (see 3.13) — no definition read.
 - [x] 5.3 Implement `core/SchemaCatalog.kt` — name validation anchored with `\A`/`\z`, project-local disk scan, CLI enumeration and path resolution with the same degradation codes, `schema.yaml` parsing via SnakeYAML, and the same TTL/size-capped caches
-  - Split as the TypeScript is: the pure levelling went to a separate `core/SchemaFlow.kt`, mirroring
-    `schema-flow.ts`, because the enumeration needs `schemaStageCount` to fill `stageCount`.
+  - **Deviation:** the pure levelling was split into a `core/SchemaFlow.kt` mirroring
+    `schema-flow.ts`, then removed during review. Once the count stopped needing dependency levels,
+    nothing in Kotlin called it — no Kotlin host draws the diagram, since the tool window loads the
+    same React SPA. `schemaArtifactCount` lives in `SchemaCatalog.kt` instead.
   - Two deliberate divergences from the TypeScript, both pre-existing repo rules: the CLI is invoked
     through `ProcessBuilder` with the Windows `openspec.cmd`/argv-injection allowlist (Node's
     cross-spawn removes that risk structurally, so only this side needs the guard), and SnakeYAML is
@@ -127,7 +130,7 @@
   - 22 tests. The fixture path is passed by the build (`spek.schemaFixtures`) and registered as a
     task input, the same wiring the task-parser corpus uses, so editing the fixture re-runs the suite
     rather than leaving it up to date.
-  - The fixture now also pins the **stage count** (5) on both sides, so it controls the levelling
+  - The fixture now also pins the **artifact count** (4) on both sides, so it controls the counting
     rule and not just the parse.
 - [x] 5.5 Add `GET /api/spek/openspec/schemas` and `GET /api/spek/openspec/schemas/{name}` to `server/SpekHttpRequestHandler.kt`, matching the web response shape and its 404 / degraded-200 behavior
   - **Deviation (widened):** `routeRequest` now returns an `ApiResult` (`Json` / `NotFound`) rather

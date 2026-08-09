@@ -67,21 +67,26 @@ export function applyStepLevel(
 }
 
 /**
- * Distinct dependency levels the schema's steps occupy, apply included — what a schema row reports
- * instead of a count of declared artifacts, which is exact but reads as a count of files: one
- * artifact declaring a glob output produces as many files as the change needs.
+ * How many artifacts a schema declares.
  *
- * Excludes archiving, which belongs to OpenSpec rather than to any schema.
+ * **`artifact` is OpenSpec's own word** — the `artifacts:` key in `schema.yaml`, the field in
+ * `openspec schemas --json`, `planningArtifacts` in `status`. Naming it anything else would make a
+ * reader who opens the schema translate our noun back into theirs to check the number.
+ *
+ * Two artifacts that share a dependency level are two artifacts: both are work, and neither stops
+ * being work because the other could be produced alongside it. The count says how much a schema
+ * asks for; the diagram says the shape, by drawing a shared level side by side. It follows that the
+ * count needs no `requires` — which is what lets it come from the CLI's enumeration, so a list of
+ * schemas costs one CLI call rather than one per row.
+ *
+ * Excludes `apply` and archiving, by one rule: both belong to every schema alike, so counting them
+ * would add the same constant everywhere and distinguish nothing. `apply` is also the only work a
+ * schema declares outside `artifacts:` — surveying every available schema, the sole top-level keys
+ * are `name`, `version`, `description`, `artifacts`, `apply` and `format` (parsing config, not a
+ * step) — so nothing else goes uncounted.
  */
-export function schemaStageCount(
-  artifacts: SchemaArtifactDef[],
-  apply: SchemaApplyDef | null,
-): number {
-  const levels = computeArtifactLevels(artifacts);
-  const stages = new Set(levels.values());
-  const applyLevel = applyStepLevel(levels, apply);
-  if (applyLevel !== null) stages.add(applyLevel);
-  return stages.size;
+export function schemaArtifactCount(artifacts: SchemaArtifactDef[]): number {
+  return artifacts.length;
 }
 
 /** The shape this module needs of a workflow step: an id and what it declares it requires. */
@@ -109,8 +114,8 @@ export interface RequiresNode {
  * longest path, so levels are unchanged either way, but computing them from the reduction would make
  * that a coincidence rather than a guarantee.
  *
- * Not mirrored in the Kotlin `SchemaFlow.kt`, deliberately: no Kotlin host draws the diagram — the
- * IntelliJ tool window loads the same React SPA — so nothing on that side has a use for it.
+ * Not mirrored in Kotlin, deliberately: no Kotlin host draws the diagram — the IntelliJ tool window
+ * loads the same React SPA — so nothing on that side has a use for it.
  */
 export function drawableRequires(steps: readonly RequiresNode[]): Map<string, string[]> {
   const declared = new Set(steps.map((s) => s.id));

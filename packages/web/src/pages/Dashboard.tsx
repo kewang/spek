@@ -88,7 +88,7 @@ export function Dashboard() {
                   <span className="flex items-center gap-2 shrink-0">
                     <SchemaBadge schema={c.schema} defaultSchema={c.defaultSchema} />
                     {(c.timestamp || c.date) && (
-                      <span className="text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
+                      <span className="relative z-10 text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
                         {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
                       </span>
                     )}
@@ -124,7 +124,7 @@ export function Dashboard() {
                 <span className="flex items-center gap-2 shrink-0">
                   <SchemaBadge schema={c.schema} defaultSchema={c.defaultSchema} />
                   {(c.timestamp || c.date) && (
-                    <span className="text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
+                    <span className="relative z-10 text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
                       {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
                     </span>
                   )}

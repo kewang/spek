@@ -111,10 +111,14 @@ the web side never saw it. Build core first, then run the web tests.
 **Package IntelliJ**: `npm run build -w @spekjs/core && npm run build:intellij`, then `cd packages/intellij && ./gradlew buildPlugin` (output: `build/distributions/spek-intellij-*.zip`)
 
 **`build:demo` reads the machine it runs on, and `docs/demo.html` is published as committed.** Pages does
-checkout → upload; CI builds the demo only as a discarded smoke test, so whatever you commit is what ships. Schema
-enumeration includes the *builder's* `~/.local/share/openspec/schemas` and any local-only project schema — a first
-build here embedded twelve machine-local schemas plus one excluded via `.git/info/exclude`. **Move those aside before
-rebuilding**, or the public demo advertises schemas nobody else has.
+checkout → upload; CI builds the demo only as a discarded smoke test, so whatever you commit is what ships.
+
+Schema enumeration reads the machine, and **the script guards this itself** — `filterPublishableSchemas` drops
+`source: "user"` and untracked project schemas, `deLocalise` replaces each definition's absolute `path` with its
+`displayPath`. What survives is what a clean checkout has. This replaced a note asking the builder to move their
+schemas aside by hand; another machine-dependent source belongs in that guard, not in a note here.
+
+Still unfiltered: `specs[].path` carries the builder's absolute repo path — predates schemas, separate cleanup.
 
 **`runIde` blocks on two one-time dialogs in a fresh sandbox** (the JetBrains agreement, then Trust Project), which
 matters on any machine without someone to click them — CI included. `./gradlew runIde -Pspek.headlessIde` sets
@@ -170,32 +174,50 @@ default), sharing a sentinel bucket `${repoRoot}::\0default`. **The only early n
 when the CLI is unavailable / for archived changes, and the frontend falls back to narrative order with a reason.
 
 **Workflow schemas** (`schemas.ts` + `schema-flow.ts`): `listSchemas(repoRoot)` enumerates via
-`openspec schemas --json` and merges project-local `openspec/schemas/*/schema.yaml` read from disk; `readSchema(repoRoot,
-name)` resolves the directory via `openspec schema which` and parses the YAML. Three sources in resolver precedence —
-`project`, `user` (the machine's global data dir), `package` (inside the npm package) — and **all three must be
-recognised**: an unhandled `source` made the enumeration drop the schema entirely, so a machine-level schema silently
-vanished rather than appearing mislabelled. `schema which` is consulted **first even for project-local schemas**,
-because `shadows` (a same-named schema this one takes precedence over) exists only in CLI output and nowhere on disk.
-A CLI failure is always a **degraded 200**, never a 5xx: project schemas still list, with a `degradedReason`.
+`openspec schemas --json`; `readSchema(repoRoot, name)` resolves the directory via `openspec schema which` and parses
+the YAML there. Three sources in resolver precedence — `project`, `user` (the machine's global data dir), `package`
+(inside the npm package) — and **all three must be recognised**: an unhandled `source` made the enumeration drop the
+schema entirely, so a machine-level schema silently vanished rather than appearing mislabelled.
+
+**Which schemas exist is only ever asked of the CLI — never worked out from disk, not even for the repo's own
+`openspec/schemas/`.** That is the one place spek does *not* read `openspec/` content directly, and the exception is
+the point: a schema is configuration for OpenSpec's engine, resolved across three directories with precedence and
+shadowing, of which a repo holds one. Reading it ourselves meant answering — with a more forgiving parser, against a
+versioned format whose commands the CLI still marks experimental — a question OpenSpec owns, and it showed: a
+`schema.yaml` OpenSpec refuses to run was drawn as though it were runnable. There is **no disk source, no merge, and no
+disk fallback in `resolveSchemaPath`**. A CLI failure is a **degraded 200** carrying an *empty* list plus a
+`degradedReason` — the same shape `schemaOrder` degrades to, and for the same reason. If you find yourself adding a
+filesystem read to decide what a schema is, that is the regression.
 
 **`schema-flow.ts` is browser-safe and exported at the `@spekjs/core/schema-flow` subpath** (like `headings`), because
 the SPA needs the graph maths and the package index reaches for `child_process`. It owns facts about the `requires`
-graph — `computeArtifactLevels`, `applyStepLevel`, `schemaStageCount`, `drawableRequires` — kept out of the view's
+graph — `computeArtifactLevels`, `applyStepLevel`, `schemaArtifactCount`, `drawableRequires` — kept out of the view's
 geometry on purpose. Two rules worth knowing:
-- **Stages, not artifacts.** A schema reports the number of distinct dependency levels its steps occupy. An artifact
-  count is exact but reads as a number of *files*, and it is not one: a step whose `generates` is a glob produces as
-  many files as the change needs. `SchemaSummary` deliberately carries no artifact count.
+- **`artifactCount` is one per declared artifact, and the noun is OpenSpec's, not ours.** `artifacts:` is the
+  `schema.yaml` key, the CLI's enumeration field, and `planningArtifacts` in `status`; spek views OpenSpec content, so a
+  synonym would just make a reader translate back. Two artifacts sharing a dependency level count separately — both are
+  work. The count says how much a schema asks for; the diagram says the shape. `apply` and archiving are excluded by one
+  rule: both belong to every schema alike, so counting them adds the same constant everywhere. `apply` is also the *only*
+  work declared outside `artifacts:` (the sole top-level keys any surveyed schema uses are `name`, `version`,
+  `description`, `artifacts`, `apply`, `format`), so nothing else goes uncounted.
+  **This is why `/schemas` costs one CLI call, not 1+N.** The enumeration lists artifact *names* without their
+  `requires` — enough for the count, so no summary needs a definition read. An earlier `stageCount` defined as *distinct
+  dependency levels* needed the whole `requires` graph, which meant a `schema which` per schema on a cold list. If you
+  find yourself reaching for a definition to fill a `SchemaSummary` field, that is the regression.
 - **The diagram draws the transitive reduction** (`drawableRequires`). A `requires` entry a longer path already implies
   states nothing new, and drawing it is worse than redundant — it detours around the very step that implies it. Across
   eleven community schemas surveyed, *every* curved edge was one of these. Levelling still uses the **full** `requires`.
 
-**`openspec-cli.ts`**: one place for spawning the CLI (10s timeout, stderr discarded, `windowsHide`) and for `ttlCached`
-(30s TTL — deliberately >= the CLI timeout so an in-flight call is never judged stale — plus a 256-entry cap). Both were
+**`openspec-cli.ts`**: one place for spawning the CLI (stderr discarded, `windowsHide`) and for `ttlCached` (256-entry
+cap). The two durations live in **`cli-budget.ts`** — its own browser-safe subpath, because the webview must derive its
+request timeout from the CLI's rather than coincide with it (10s timeout; 30s TTL, deliberately >= the timeout so an
+in-flight call is never judged stale). Both the runner and the cache were
 written twice before this existed, once in `schema-order.ts` and again in `schemas.ts`, and the cache's original
 "remember failures forever" bug had to be found once and hand-copied into the second copy. A non-zero exit that still
 returns a JSON body is **not** a tool failure: `schema which <unknown>` prints `{"error": "Schema 'x' not found"}` and
 exits 1, so discarding stdout there reports a working CLI as broken. The Kotlin side mirrors this split
-(`OpenspecCli.kt`, `SchemaCatalog.kt`, `SchemaFlow.kt`, `SpekCaches.kt`).
+(`OpenspecCli.kt`, `SchemaCatalog.kt`, `SpekCaches.kt`) — but **not** `schema-flow.ts`, which has no Kotlin caller: no
+Kotlin host draws the diagram, since the IntelliJ tool window loads the same React SPA.
 
 **Artifact sort**: the rule is `sortArtifacts(artifacts, mode, schemaOrder?)` in **core**, beside `DEFAULT_ORDER` /
 `defaultRank` on the `@spekjs/core/artifact-order` subpath — `modified` (the order given, i.e. mtime; default) /

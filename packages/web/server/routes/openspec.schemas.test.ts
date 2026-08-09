@@ -145,6 +145,9 @@ test("GET /schemas: changes declaring an unenumerated schema are reported, not d
 });
 
 test("GET /schemas: CLI failure is a degraded 200, not a 5xx", async () => {
+  // The repo has a schema on disk and it is still not reported: which schemas exist is the CLI's
+  // answer, and without the CLI there is none. The request succeeded — the answer is "nothing could
+  // be enumerated, here is why" — so 200 with an empty list beats a 5xx telling the client to retry.
   const repo = tempRepo({ defaultSchema: "house-style", projectSchemas: ["house-style"] });
   useRunner({ "schemas --json": { ok: false, reason: "cli-unavailable" } });
 
@@ -153,10 +156,7 @@ test("GET /schemas: CLI failure is a degraded 200, not a 5xx", async () => {
   const body = await res.json();
 
   assert.equal(body.degradedReason, "cli-unavailable");
-  assert.deepEqual(
-    body.schemas.map((s: { name: string }) => s.name),
-    ["house-style"],
-  );
+  assert.deepEqual(body.schemas, []);
 });
 
 test("GET /schemas: without dir → 400", async () => {

@@ -4,6 +4,8 @@ import com.intellij.openapi.application.ApplicationManager
 import java.io.File
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 
 /**
@@ -97,41 +99,59 @@ object OpenspecCli {
 }
 
 /**
- * A TTL- and size-capped cache, holding one value per key.
+ * A TTL- and size-capped cache holding one **computation** per key.
  *
- * Caching a failure forever meant a reader who installed the CLI after first load never got data
- * without restarting the IDE — and the same for editing a schema on disk. Hence a TTL, deliberately
- * **>= [OpenspecCli.TIMEOUT_SECONDS]** so an in-flight call can never be judged stale and run a
- * second time, plus a size cap: these caches are application-level singletons shared across every
- * project window, so they outlive any one project.
+ * A TTL because caching a failure forever meant a reader who installed the CLI after first load
+ * never got data without restarting the IDE; it must stay >= [OpenspecCli.TIMEOUT_SECONDS] so an
+ * in-flight call is never judged stale. A size cap because these are application-level singletons
+ * shared across every project window. (`cli-budget.ts` states the same bounds.)
  *
- * `ConcurrentHashMap` because the built-in server's handlers arrive on Netty threads. CHM forbids
- * null values, so entries wrap the value — "computed, and the answer was unavailable" must be
- * cacheable too, which is why [V] may be nullable. CHM has no insertion order, so the cap evicts an
- * arbitrary entry rather than the oldest; strict FIFO would need a synchronized LinkedHashMap, which
- * a best-effort cache does not warrant.
+ * `ConcurrentHashMap` because handlers arrive on Netty threads. CHM forbids null values, so entries
+ * wrap the result — [V] may be nullable, since "computed, and unavailable" must cache too. CHM has
+ * no insertion order, so the cap evicts an arbitrary entry rather than the oldest.
  *
- * The get→miss→compute→put race is benign: two callers may compute the same idempotent value and the
- * later write wins with an equal result.
+ * The entry holds a [FutureTask] so a caller arriving mid-flight joins the run rather than starting
+ * a second one — storing the value instead made two concurrent callers each run the whole CLI
+ * enumeration for one answer. `putIfAbsent` + `run()`, **not** `computeIfAbsent`, which would hold
+ * the bin lock across a subprocess.
  */
 class TtlCache<K : Any, V>(
     private val ttlMs: Long = 30_000L,
     private val maxSize: Int = 256,
 ) {
-    private data class Entry<V>(val at: Long, val value: V)
+    private class Entry<V>(val at: Long, val task: FutureTask<V>)
 
     private val map = ConcurrentHashMap<K, Entry<V>>()
 
     fun getOrCompute(key: K, compute: () -> V): V {
-        map[key]?.let {
-            if (System.currentTimeMillis() - it.at <= ttlMs) return it.value
-            map.remove(key)
+        while (true) {
+            val existing = map[key]
+            if (existing != null) {
+                if (System.currentTimeMillis() - existing.at <= ttlMs) return existing.task.awaitValue()
+                // Two-arg remove, so a fresher entry installed since the read is not discarded.
+                map.remove(key, existing)
+            }
+
+            val task = FutureTask(compute)
+            val raced = map.putIfAbsent(key, Entry(System.currentTimeMillis(), task))
+            // Someone else got there first; loop so their entry is freshness-checked like any hit.
+            if (raced != null) continue
+            if (map.size > maxSize) {
+                // Never the entry just installed, or a burst evicts the run everyone is waiting on.
+                map.keys.firstOrNull { it != key }?.let { map.remove(it) }
+            }
+            task.run()
+            return task.awaitValue()
         }
-        val value = compute()
-        if (map.size >= maxSize) map.keys.firstOrNull()?.let { map.remove(it) }
-        map[key] = Entry(System.currentTimeMillis(), value)
-        return value
     }
 
     fun clear() = map.clear()
+
+    /** Unwrapped, so a shared run reports the same exception an unshared one would. */
+    private fun FutureTask<V>.awaitValue(): V =
+        try {
+            get()
+        } catch (e: ExecutionException) {
+            throw e.cause ?: e
+        }
 }

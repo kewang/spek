@@ -9,11 +9,11 @@ The schemas endpoints SHALL be reachable only after the API handler readiness ch
 
 #### Scenario: Schemas list response
 - **WHEN** `GET /api/spek/openspec/schemas?projectPath=...` is called
-- **THEN** it returns the project's active schema name and the enumerated schemas with their source, stage count, and active-change usage
+- **THEN** it returns the project's active schema name and the enumerated schemas with their source, artifact count, and active-change usage
 
 #### Scenario: Schema detail response
 - **WHEN** `GET /api/spek/openspec/schemas/spec-driven?projectPath=...` is called
-- **THEN** it returns that schema's metadata, its artifacts in schema order with their instructions, and its apply step
+- **THEN** it returns that schema's metadata, its artifacts in schema order with their instructions, its apply step, and its active-change usage
 
 #### Scenario: Unknown schema
 - **WHEN** `GET /api/spek/openspec/schemas/no-such-schema?projectPath=...` is called
@@ -25,4 +25,4 @@ The schemas endpoints SHALL be reachable only after the API handler readiness ch
 
 #### Scenario: Degraded enumeration without the CLI
 - **WHEN** `GET /api/spek/openspec/schemas?projectPath=...` is called on a machine with no `openspec` CLI
-- **THEN** it returns HTTP 200 with the project-local schemas and a reason stating that package schemas could not be enumerated
+- **THEN** it returns HTTP 200 with an empty schema list and a reason stating that schemas could not be enumerated

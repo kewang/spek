@@ -12,6 +12,9 @@ import type { ReactNode } from "react";
  * container, the title carries the navigation, and anything that must remain clickable sits above
  * the overlay with `relative z-10` (see `SchemaBadge`).
  *
+ * The overlay intercepts hover, not just clicks, so this applies to **anything carrying a `title`**
+ * too — a tooltip beneath it silently stops appearing while looking unchanged.
+ *
  * A component rather than three copies of the incantation: the changes list and both dashboard lists
  * need it, and the technique is invisible enough that hand-copied versions drift silently — a change
  * to the overlay in one place would leave the others only partly clickable, with nothing to catch it

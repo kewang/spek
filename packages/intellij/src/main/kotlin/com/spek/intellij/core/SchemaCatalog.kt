@@ -119,7 +119,8 @@ object SchemaCatalog {
      * `{"error": "Schema 'x' not found"}` and exits 1 — so discarding stdout on a non-zero exit loses
      * the answer and reports a working CLI as broken.
      */
-    private sealed interface CliResult {
+    // `internal` rather than `private` so a test can supply one through `cliRunner`.
+    internal sealed interface CliResult {
         data class Ok(val json: JsonElement) : CliResult
         data class Failed(val reason: SchemaDegradedReason, val json: JsonElement?) : CliResult
     }
@@ -131,7 +132,16 @@ object SchemaCatalog {
      * reader of the schema views. Callers must have validated every interpolated argument with
      * [isSafeSchemaName] first — see the argv note on [OpenspecCli.run].
      */
-    private fun runOpenspecJson(args: List<String>, cwd: String): CliResult {
+    /**
+     * Test seam, mirroring the TypeScript `setOpenspecRunner`: lets a test drive the catalog with a
+     * stubbed CLI instead of requiring the real binary. Without it the only Kotlin-testable part of
+     * this file was the disk scan, which is precisely the thing that no longer exists.
+     */
+    internal var cliRunner: (List<String>, String) -> CliResult = ::spawnOpenspecJson
+
+    private fun runOpenspecJson(args: List<String>, cwd: String): CliResult = cliRunner(args, cwd)
+
+    private fun spawnOpenspecJson(args: List<String>, cwd: String): CliResult {
         return when (val outcome = OpenspecCli.run(args, cwd)) {
             is OpenspecCli.Outcome.StartFailed -> CliResult.Failed(SchemaDegradedReason.CLI_UNAVAILABLE, null)
             is OpenspecCli.Outcome.TimedOut -> CliResult.Failed(SchemaDegradedReason.CLI_TIMEOUT, null)
@@ -171,9 +181,6 @@ object SchemaCatalog {
     /**
      * Map `openspec schemas --json` output. An unexpected shape is a degradation, not a throw — the
      * schema commands are marked experimental by the CLI itself and may change.
-     *
-     * `stageCount` starts null: the enumeration carries no `requires`, so the level graph is not
-     * knowable from it. It is filled in from each definition by [listSchemasUncached].
      */
     fun parseSchemasList(element: JsonElement): List<SchemaSummary>? {
         val arr = element as? JsonArray ?: return null
@@ -187,38 +194,8 @@ object SchemaCatalog {
                     name = name,
                     description = jsonStr(o["description"]),
                     source = source,
-                    stageCount = null,
-                    isDefault = false,
-                ),
-            )
-        }
-        return out
-    }
-
-    /**
-     * Project-local schemas read straight from disk. This is what keeps the view useful when the CLI
-     * is unavailable, and it is the only source that needs no subprocess at all.
-     *
-     * The directory name — not schema.yaml's `name` — is authoritative, because the directory name
-     * is what the name resolves back to on the filesystem.
-     */
-    fun listProjectSchemas(repoRoot: String): List<SchemaSummary> {
-        val entries = projectSchemasDir(repoRoot).listFiles() ?: return emptyList()
-        val out = mutableListOf<SchemaSummary>()
-        for (entry in entries) {
-            if (!entry.isDirectory || !isSafeSchemaName(entry.name)) continue
-            val file = File(entry, "schema.yaml")
-            val parsed = try {
-                parseSchemaYaml(file.readText())
-            } catch (_: Exception) {
-                null // no readable schema.yaml → not a schema directory
-            } ?: continue
-            out.add(
-                SchemaSummary(
-                    name = entry.name,
-                    description = parsed.description,
-                    source = SchemaSource.PROJECT,
-                    stageCount = SchemaFlow.schemaStageCount(parsed.artifacts, parsed.apply),
+                    // The enumeration lists step names, which is all the count needs.
+                    artifactCount = (o["artifacts"] as? JsonArray)?.size,
                     isDefault = false,
                 ),
             )
@@ -236,11 +213,10 @@ object SchemaCatalog {
     }
 
     /**
-     * Enumerate the schemas available to a repo.
+     * Enumerate the schemas available to a repo, from the CLI and nowhere else.
      *
-     * The CLI already deduplicates project-over-package shadowing, so its list is taken as given and
-     * the disk scan only fills in schemas it did not report — which, when the CLI is unavailable, is
-     * all of them.
+     * Its list is taken as given: it already searches all three source directories and resolves
+     * project-over-package shadowing between them. When it cannot answer, neither can this.
      */
     fun listSchemasUncached(repoRoot: String): SchemaCatalogResult {
         val defaultSchema = readDefaultSchema(repoRoot)
@@ -257,38 +233,15 @@ object SchemaCatalog {
             is CliResult.Failed -> degradedReason = cli.reason
         }
 
-        // Project-local schemas the CLI did not report. On a complete enumeration this adds nothing;
-        // on a degraded one it is the whole list.
-        val seen = schemas.map { it.name }.toMutableSet()
-        for (local in listProjectSchemas(repoRoot)) {
-            if (seen.add(local.name)) schemas.add(local)
-        }
+        // No disk source and no merge: which schemas exist is the CLI's answer alone, and without it
+        // the catalog degrades saying so. See the TypeScript `listSchemasUncached` for why.
+        //
+        // One CLI round, deliberately: every field on a summary comes from the enumeration.
+        val marked = schemas
+            .map { it.copy(isDefault = it.name == defaultSchema) }
+            .sortedWith(::byDefaultThenName)
 
-        // Stage counts need each schema's `requires` graph, which `openspec schemas --json` does not
-        // carry. Filled in here so every surface reports the same number from the same rule. Project
-        // schemas were already counted from disk, so this only pays for the ones the CLI reported,
-        // and those reads are cached — they are the same reads the detail view is about to want.
-        // Concurrently, as the TypeScript does with Promise.all: each miss is a subprocess round
-        // trip, so serialising them makes a cold catalog cost the *sum* of N CLI calls instead of the
-        // slowest one — and an unresponsive CLI cost N x the timeout rather than one.
-        val marked = schemas.map { it.copy(isDefault = it.name == defaultSchema) }
-        val withStages = OpenspecCli.inParallel(
-            marked.map { s ->
-                {
-                    if (s.stageCount != null) {
-                        s
-                    } else {
-                        when (val read = readSchema(repoRoot, s.name)) {
-                            is SchemaReadResult.Ok ->
-                                s.copy(stageCount = SchemaFlow.schemaStageCount(read.schema.artifacts, read.schema.apply))
-                            is SchemaReadResult.Failed -> s
-                        }
-                    }
-                }
-            },
-        ).sortedWith(::byDefaultThenName)
-
-        return SchemaCatalogResult(defaultSchema, withStages, degradedReason)
+        return SchemaCatalogResult(defaultSchema, marked, degradedReason)
     }
 
     // --- one schema ----------------------------------------------------------
@@ -349,11 +302,10 @@ object SchemaCatalog {
     /**
      * Locate a schema.
      *
-     * `openspec schema which` is consulted first because it is the only source of the `shadows` list
-     * — a project-local schema taking precedence over a same-named package one is worth showing, and
-     * nothing on disk records it. When the CLI is unavailable the project-local directory still
-     * resolves (with shadowing unknown); only a package schema is genuinely unreachable then, and
-     * that reports the CLI reason rather than "not found", because those are different problems.
+     * `openspec schema which` is the only way a name is resolved. It is also the only source of the
+     * `shadows` list — a project-local schema taking precedence over a same-named package one is
+     * worth showing, and nothing on disk records it. When the CLI is unavailable no schema resolves,
+     * of any source, and that reports the CLI reason rather than "not found".
      */
     private fun resolveSchemaPath(repoRoot: String, name: String): PathResolution {
         if (!isSafeSchemaName(name)) return PathResolution.Failed(null)
@@ -368,12 +320,8 @@ object SchemaCatalog {
             }
         }
 
-        // CLI unusable (or it named a schema it could not describe): a project-local schema is still
-        // reachable from disk on its own.
-        val localDir = File(projectSchemasDir(repoRoot), name)
-        if (File(localDir, "schema.yaml").exists()) {
-            return PathResolution.Ok(ResolvedPath(localDir.absolutePath, SchemaSource.PROJECT, emptyList()))
-        }
+        // No disk fallback. Resolving a name is OpenSpec's job — three directories, precedence
+        // between them, and shadowing that is invisible from here. See the TypeScript counterpart.
 
         if (cli is CliResult.Failed) {
             // A failed run that still answered in JSON means the CLI worked and the *name* did not
@@ -467,12 +415,25 @@ object SchemaCatalog {
                     name = s.name,
                     description = s.description,
                     source = s.source,
-                    stageCount = s.stageCount,
+                    artifactCount = s.artifactCount,
                     isDefault = s.isDefault,
                     usage = SchemaUsage(slugs.size, slugs),
                 )
             },
             unresolved = unknown.map { (schema, slugs) -> UnresolvedSchemaUsage(schema, slugs.size, slugs) },
         )
+    }
+
+    /**
+     * How many artifacts a schema declares. Mirrors `schemaArtifactCount` in
+     * `packages/core/src/schema-flow.ts`, including what it leaves out — `apply` and archiving
+     * belong to every schema alike, so counting them would add the same constant everywhere.
+     */
+    fun schemaArtifactCount(artifacts: List<SchemaArtifactDef>): Int = artifacts.size
+
+    /** The single-schema counterpart to [groupSchemaUsage]. Mirrors the TypeScript core's. */
+    fun countSchemaUsage(changes: List<ChangeInfo>, name: String): SchemaUsage {
+        val slugs = changes.filter { it.schema == name }.map { it.slug }
+        return SchemaUsage(slugs.size, slugs)
     }
 }

@@ -231,14 +231,10 @@ export interface SchemaSummary {
   description: string | null;
   source: SchemaSource;
   /**
-   * Distinct dependency levels the schema's steps occupy — its stage count. Null when the schema's
-   * definition could not be read.
-   *
-   * This is the only size a summary reports. A count of declared artifacts was carried here at
-   * first and is deliberately gone: it is exact but reads as a number of files, and a step whose
-   * output is a pattern produces one file per match.
+   * How many artifacts the schema declares — see `schemaArtifactCount`, the one rule for it.
+   * Null only when the enumeration omitted the artifact list.
    */
-  stageCount: number | null;
+  artifactCount: number | null;
   /** True when this is the schema named by the repo's openspec/config.yaml. */
   isDefault: boolean;
 }
@@ -327,7 +323,15 @@ export interface SchemasResponse {
  * to fix.
  */
 export type SchemaReadResult =
-  | { ok: true; schema: SchemaDefinition }
+  | {
+      ok: true;
+      schema: SchemaDefinition;
+      /**
+       * Which active changes declare this schema. Not on `SchemaDefinition`, because a schema.yaml
+       * says nothing about the repo using it. Required-but-nullable so each host states it.
+       */
+      usage: SchemaUsage | null;
+    }
   | { ok: false; reason: "not-found" | SchemaDegradedReason };
 
 /** The schemas available to a repo, plus why the list may be incomplete. */

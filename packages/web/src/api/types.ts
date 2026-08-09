@@ -30,7 +30,7 @@ export interface ApiAdapter {
   // Workflow schemas available to the repo. getSchema resolves rather than rejects when the schema
   // is unreadable, so the view can tell "does not exist" from "the CLI could not be consulted".
   getSchemas(aggregate?: boolean, includeJj?: boolean): Promise<SchemasResponse>;
-  getSchema(name: string): Promise<SchemaReadResult>;
+  getSchema(name: string, aggregate?: boolean, includeJj?: boolean): Promise<SchemaReadResult>;
   // Read/write the aggregation-scope preference, abstracting each host's native storage:
   // Web = localStorage, VS Code = settings.
   getAggregationPrefs(): Promise<AggregationPrefs>;

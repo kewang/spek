@@ -39,13 +39,10 @@ function SchemaRow({ schema }: { schema: SchemaSummaryWithUsage }) {
           )}
           <SourceBadge source={schema.source} />
         </span>
-        {/* Stages, not artifacts — the same number the detail page leads with, for the same reason.
-            An artifact count is exact but reads as a count of files, and it is not one: a step
-            whose output is a glob produces as many files as the change needs. */}
         <span className="text-text-muted shrink-0 whitespace-nowrap text-xs">
-          {schema.stageCount !== null && (
+          {schema.artifactCount !== null && (
             <>
-              {schema.stageCount} {plural(schema.stageCount, "stage")} &middot;{" "}
+              {schema.artifactCount} {plural(schema.artifactCount, "artifact")} &middot;{" "}
             </>
           )}
           {usageLabel(schema.usage.count)}
@@ -71,11 +68,19 @@ export function SchemaList() {
   if (error) return <p className="text-red-400">Error: {error}</p>;
 
   const schemas = data?.schemas ?? [];
-  const unresolvedNamed = (data?.unresolved ?? []).filter((u) => u.schema !== null);
+  // Both "unresolved" readings below are inferred from a name's *absence* from the enumeration, so
+  // neither means anything once the enumeration itself failed: every name is absent then. Saying
+  // "no such schema was found" because the CLI could not be reached is the same conflation of
+  // "could not look" with "does not exist" that the reasons above exist to keep apart — and it
+  // would accuse a repo's own default schema of not existing while it sits on disk.
+  const degraded = data?.degradedReason != null;
+  const unresolvedNamed = degraded
+    ? []
+    : (data?.unresolved ?? []).filter((u) => u.schema !== null);
   // The repo names a schema its own toolchain could not resolve — worth saying plainly rather than
   // showing nothing.
   const activeUnresolved =
-    data?.defaultSchema && !schemas.some((s) => s.name === data.defaultSchema)
+    !degraded && data?.defaultSchema && !schemas.some((s) => s.name === data.defaultSchema)
       ? data.defaultSchema
       : null;
 
@@ -90,10 +95,9 @@ export function SchemaList() {
           </span>
         </div>
         <p className="text-text-muted mt-1 text-sm">
-          {/* "stages", not "steps" — it must be the noun the count beside each row uses. They are
-              not synonyms here: a stage is a dependency level, and two steps that require the same
-              thing share one. Individual steps are what the detail view opens. */}
-          The OpenSpec workflows available to this repo — the stages a change goes through, and what
+          {/* "artifacts" — the noun the count beside each row uses, and OpenSpec's own for what a
+              schema declares. */}
+          The OpenSpec workflows available to this repo — the artifacts a change produces, and what
           each one asks for.
         </p>
       </div>

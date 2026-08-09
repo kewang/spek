@@ -141,9 +141,14 @@ export class StaticAdapter implements ApiAdapter {
     );
   }
 
+  // Usage is read back off the embedded catalog rather than embedded a second time beside each
+  // definition — it was already computed there by the same rule the server uses, and two copies of a
+  // count in one payload is one copy too many to keep honest.
   getSchema(name: string): Promise<SchemaReadResult> {
     const schema = this.data.schemaDetails?.[name];
-    return Promise.resolve(schema ? { ok: true, schema } : { ok: false, reason: "not-found" });
+    if (!schema) return Promise.resolve({ ok: false, reason: "not-found" });
+    const usage = this.data.schemas?.schemas.find((s) => s.name === name)?.usage ?? null;
+    return Promise.resolve({ ok: true, schema, usage });
   }
 
   getAggregationPrefs(): Promise<AggregationPrefs> {

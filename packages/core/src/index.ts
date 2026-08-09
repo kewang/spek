@@ -32,12 +32,13 @@ export {
   readSchema,
   isSafeSchemaName,
   readDefaultSchema,
-  listProjectSchemas,
   parseSchemaYaml,
   parseSchemasList,
   groupSchemaUsage,
+  countSchemaUsage,
   shortenSchemaPath,
   clearSchemaCache,
+  affectsSchemas,
   // Test seam: lets a consumer's tests drive the openspec CLI with a stub instead of the real
   // binary, so they neither require it to be installed nor pay for spawning it.
   setOpenspecRunner,
@@ -94,5 +95,8 @@ export type {
 export {
   computeArtifactLevels,
   applyStepLevel,
-  schemaStageCount,
+  schemaArtifactCount,
 } from "./schema-flow.js";
+
+// Also on the `@spekjs/core/cli-budget` subpath, for clients that must not pull in the index.
+export { CLI_TIMEOUT_MS, CLI_CACHE_TTL_MS } from "./cli-budget.js";

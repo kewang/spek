@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { schemaStageCount } from "@spekjs/core/schema-flow";
+import { schemaArtifactCount } from "@spekjs/core/schema-flow";
 import { Link, useParams } from "react-router-dom";
-import { useSchema, useSchemas } from "../hooks/useOpenSpec";
+import { useSchema } from "../hooks/useOpenSpec";
 import { SchemaFlow, SchemaStepDetail } from "../components/SchemaFlow";
 import { StatCard } from "../components/StatCard";
 import {
@@ -17,10 +17,9 @@ import { plural } from "../utils/plural";
 export function SchemaDetail() {
   const { name = "" } = useParams<{ name: string }>();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // One request: `usage` rides along on the result rather than costing a second fetch of the whole
+  // catalog, which a deep link, a reload or a post-refresh cache miss would each pay in full.
   const { data, loading, error } = useSchema(name);
-  // The catalog is already cached by the time a user arrives from the list; it carries the usage
-  // counts, which the definition endpoint deliberately does not.
-  const { data: catalog } = useSchemas();
 
   // Derived here, above the early returns, because hooks cannot run after them — and memoised
   // because selecting a step re-renders this page. The workflow model depends only on the schema,
@@ -36,9 +35,9 @@ export function SchemaDetail() {
     const steps = withArchiveStep(declared);
     return {
       // From core, not re-derived here. It is the same number the schemas list renders per row,
-      // and the point of `schemaStageCount` is that one rule answers it everywhere. Counting
+      // and the point of `schemaArtifactCount` is that one rule answers it everywhere. Counting
       // `declared` locally would agree today and only by coincidence tomorrow.
-      stageCount: schemaStageCount(artifacts, apply),
+      artifactCount: schemaArtifactCount(artifacts),
       steps,
       levels: groupIntoLevels(steps),
     };
@@ -71,10 +70,10 @@ export function SchemaDetail() {
   }
 
   const schema = data.schema;
-  const usage = catalog?.schemas.find((s) => s.name === schema.name)?.usage;
+  const usage = data.usage;
   // Excludes the archive step: it is a stage of every OpenSpec workflow, not one this schema
   // declares, and counting it would inflate every schema by the same 1.
-  const { stageCount, steps, levels } = model;
+  const { artifactCount, steps, levels } = model;
   const selected = steps.find((s) => s.id === selectedId) ?? null;
 
   return (
@@ -123,7 +122,7 @@ export function SchemaDetail() {
           numeral over a caption. A filesystem path is not a figure — leading with it would put a
           wrapped monospace line where the eye expects a number. */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label={plural(stageCount, "Stage")} value={stageCount} delay={0} />
+        <StatCard label={plural(artifactCount, "Artifact")} value={artifactCount} delay={0} />
         <StatCard
           label={
             usage ? (
@@ -151,13 +150,15 @@ export function SchemaDetail() {
               {schema.displayPath}
             </code>
           </p>
-          {schema.shadows.length > 0 && (
-            <p className="text-text-muted mt-1 text-xs">
-              Takes precedence over the {schema.shadows.map((sh) => sh.source).join(", ")} schema of
-              the same name at{" "}
-              <code className="bg-bg-tertiary text-accent break-all rounded px-1.5 py-0.5">{schema.shadows[0].path}</code>.
+          {/* One line per shadowed schema, not one sentence listing every source against a single
+              path: a schema shadowing both a user and a package copy has two locations, and pairing
+              two sources with one path presents that path as if it covered both. */}
+          {schema.shadows.map((sh) => (
+            <p key={sh.path} className="text-text-muted mt-1 text-xs">
+              Takes precedence over the {sh.source} schema of the same name at{" "}
+              <code className="bg-bg-tertiary text-accent break-all rounded px-1.5 py-0.5">{sh.path}</code>.
             </p>
-          )}
+          ))}
         </div>
       </div>
 

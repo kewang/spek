@@ -9,12 +9,24 @@ contain — so that the process behind spek's changes is legible inside spek rat
 
 ### Requirement: Schema enumeration for a repo
 
-The system SHALL enumerate the workflow schemas available to a selected repo from two sources: the
-schemas known to the `openspec` CLI (which covers schemas shipped with the `openspec` package as
-well as project-local ones), and the project-local schema directories on disk at
-`<repo>/openspec/schemas/<name>/schema.yaml`. Each enumerated schema SHALL carry its `name`, its
-`description` (null when the schema declares none), its `source`, and the number of artifacts it
-defines (null when that count is not known from the enumeration source).
+The system SHALL enumerate the workflow schemas available to a selected repo from **one** source:
+the schemas the `openspec` CLI reports, which covers all three resolver locations. Each enumerated
+schema SHALL carry its `name`, its `description` (null when the schema declares none), its `source`,
+and the number of artifacts it declares (null when the enumeration does not say).
+
+The system SHALL NOT determine from the filesystem that something is a schema, including for the
+repo's own `openspec/schemas/`. Everywhere else spek reads `openspec/` content directly, so this
+exception needs stating: a schema is not repo content the way a spec is, but configuration for
+OpenSpec's own engine, resolved across three directories with precedence and shadowing between them
+of which a repo holds one. Deciding from disk that a directory is a schema means answering — with a
+parser of our own, against a versioned file format whose commands the CLI still marks
+experimental — a question OpenSpec owns, and answering it more leniently than OpenSpec does: a
+`schema.yaml` OpenSpec refuses to run was drawn as though it were runnable. It also couples spek to
+where those files live, which is OpenSpec's to change.
+
+The cost is accepted deliberately: without the CLI there is no enumeration at all, not even for a
+schema sitting in the repo being viewed. That matches how `schemaOrder` already degrades rather than
+reimplementing OpenSpec's ordering from disk.
 
 `source` SHALL cover every source the OpenSpec resolver searches — `project` (the repo's own
 `openspec/schemas/`), `user` (a machine-global data directory), and `package` (shipped inside the
@@ -173,6 +185,22 @@ reconcilable against the changes list.
 This attribution SHALL NOT require reading any change's artifacts, and SHALL NOT report how far an
 individual change has progressed through its schema's steps.
 
+The same attribution SHALL be reported for a single schema alongside its definition, counted over
+the same set of active changes and by the same rule as the list. A detail view needs the count, and
+obtaining it by fetching the whole catalog is the expensive direction: the catalog costs a CLI
+enumeration, whereas this count is taken from a change scan that needs no subprocess. The two SHALL
+NOT disagree — a reader opening a schema from the list sees the number that row showed.
+
+#### Scenario: Usage reported with a schema's definition
+
+- **WHEN** a single schema's definition is requested and two active changes declare it
+- **THEN** the response carries that definition together with a usage count of 2 and those two slugs, without enumerating the catalog
+
+#### Scenario: Detail usage agrees with the list
+
+- **WHEN** the same aggregation scope is in effect for both views
+- **THEN** the count shown on a schema's detail view equals the count shown for that schema in the list
+
 #### Scenario: Changes counted per schema
 
 - **WHEN** three active changes declare `spec-driven` and one declares `house-style`
@@ -190,26 +218,25 @@ individual change has progressed through its schema's steps.
 
 ### Requirement: Degradation when the OpenSpec CLI is unavailable
 
-Because package schemas can only be enumerated through the `openspec` CLI, the system SHALL, when
-the CLI is unavailable — not installed, exiting non-zero, timing out, or emitting unparsable
-output — still enumerate project-local schemas read directly from disk, and SHALL report that
-package schemas could not be enumerated together with the reason. The view SHALL surface that
-statement to the user. A CLI failure SHALL NOT produce an error response, an empty page with no
-explanation, or a hang.
+Because schemas can only be enumerated through the `openspec` CLI, the system SHALL, when the CLI is
+unavailable — not installed, exiting non-zero, timing out, or emitting unparsable output — report an
+empty enumeration together with the reason, and the view SHALL surface that statement. A CLI failure
+SHALL NOT produce an error response, an empty page with no explanation, or a hang.
 
-The same rule applies to a single schema's definition: when a package schema's path cannot be
-resolved because the CLI is unavailable, the system SHALL report that specific reason rather than
-reporting the schema as nonexistent.
+It SHALL NOT substitute a reading of its own. A schema in the repo being viewed is the one the
+system could reach without the CLI, and it is still not reported: serving it would mean answering
+from one directory a question OpenSpec answers across three, and vouching for a definition OpenSpec
+has not accepted. Empty-and-explained is the honest answer, and the same one `schemaOrder` gives.
 
-#### Scenario: CLI absent, project schemas still listed
+The same rule applies to a single schema's definition: when a name cannot be resolved because the
+CLI is unavailable, the system SHALL report that specific reason rather than reporting the schema as
+nonexistent, and SHALL NOT resolve the name from disk instead.
+
+#### Scenario: CLI absent, nothing enumerated
 
 - **WHEN** the `openspec` CLI is not installed and the repo contains `openspec/schemas/house-style/schema.yaml`
-- **THEN** the Schemas page lists `house-style` and states that built-in schemas could not be enumerated because the OpenSpec CLI is unavailable
-
-#### Scenario: CLI absent, no project schemas
-
-- **WHEN** the `openspec` CLI is not installed and the repo has no project-local schemas
-- **THEN** the Schemas page shows an empty list alongside the same explanation, and does not report an error
+- **THEN** the Schemas page lists nothing and states that schemas could not be enumerated because the OpenSpec CLI is unavailable
+- **AND** requesting `house-style`'s definition reports that same reason rather than serving it from disk
 
 #### Scenario: CLI failure is bounded
 
@@ -232,12 +259,47 @@ bounded cache size, so that repeatedly opening the schema views does not spawn t
 request, and so that installing the CLI (or editing a schema) is picked up without restarting the
 server.
 
+The cache SHALL hold the in-flight computation, not only its finished value, so that a caller
+arriving while a read is running joins it rather than starting a second one. Two callers racing on
+a cold entry compute the same answer either way, so the duplication is invisible in the result and
+paid in subprocesses — which is what the cache exists to avoid. The bounded lifetime SHALL exceed
+the CLI's own timeout, or an entry can be judged stale while the call filling it is still running.
+
+#### Scenario: Concurrent cold requests share one CLI run
+
+- **WHEN** two requests for the same uncached schema information arrive while the first is still running
+- **THEN** the CLI is spawned once and both requests are answered from that single run
+
 Because a cache can outlive the thing it describes, it SHALL be discarded both when the host
 observes a change under the watched `openspec/` tree and when the user requests a refresh. Only one
 of the three schema directories is watched — the repo's own — so an edit to a machine-global schema,
 or a schema promoted from the repo to that directory, produces no event at all; refresh is the
 authoritative way to pick those up, and without invalidation it would report success while serving
 the superseded copy.
+
+Watch-driven invalidation SHALL be scoped in two ways, neither of which may delay it past the
+refetch it precedes. It SHALL apply only to events that can have changed what a schema read
+returns — a file under a schema's own directory, or the repo's `openspec/config.yaml`, which names
+the default and so decides which entry is marked default. A watcher admits every `.md` and `.yaml`
+under `openspec/`, nearly all of which is change and spec content that no schema read consults, and
+invalidating on those re-pays the enumeration for edits that cannot have altered a single field.
+It SHALL also apply only to the repo the watcher observes: the caches are process-wide, shared by
+every repo a host has open, so an unscoped discard makes an edit in one repo cost another an
+enumeration.
+
+Every host that observes file changes SHALL perform this invalidation, not only those whose refresh
+command does. A host that notifies its client to refetch without discarding first will serve the
+pre-edit copy from a still-live cache entry while reporting the refresh as successful.
+
+#### Scenario: An unrelated edit does not discard the catalog
+
+- **WHEN** a change's `tasks.md` under the watched tree is saved while a client is watching
+- **THEN** the cached schema reads are retained, and the refetch that follows spawns no `openspec` process
+
+#### Scenario: One repo's edit does not discard another's cache
+
+- **WHEN** a schema is edited in one watched repo while a second repo's catalog is cached in the same host
+- **THEN** only the edited repo's cached reads are discarded, and the second repo's are still served from cache
 
 #### Scenario: Scanning spawns nothing new
 
@@ -268,12 +330,40 @@ the superseded copy.
 
 The system SHALL provide a Schemas view listing every enumerated schema for the selected repo. Each
 entry SHALL display the schema name, its description, its source (package, user, or project), its
-**stage** count, and the number of active changes using it — labelled so it is unambiguously a count
-of **active** changes, not of all changes. The stage count is the number of distinct dependency
-levels the schema's steps occupy, the same figure the detail view leads with, and is reported in
-place of a count of declared artifacts: an artifact count is exact but reads as a number of files,
-and a step whose output is a pattern produces one file per match. The repo's default schema SHALL be visually distinguished
+**artifact** count, and the number of active changes using it — labelled so it is unambiguously a count
+of **active** changes, not of all changes. The repo's default schema SHALL be visually distinguished
 from the rest. Each entry SHALL link to that schema's detail view.
+
+A schema's **artifact count** is the number of artifacts it declares. Two artifacts that share a
+dependency level count separately: both are work, and neither stops being work because the other
+could be produced alongside it. The count describes how much a schema asks for, not the shape of its
+dependency graph; the diagram on the detail view shows the shape, by drawing a shared level side by
+side.
+
+The unit SHALL be **artifact**, which is OpenSpec's own noun for the thing — the `artifacts:` key in
+`schema.yaml`, the field in the CLI's enumeration, `planningArtifacts` in its status output. spek is
+a viewer of OpenSpec content, so inventing a synonym would make a reader who opens `schema.yaml`
+translate our noun back into theirs to check the number against what they see. It is a count of
+artifacts, not of *files*: an artifact whose output is a glob produces as many files as the change
+needs, which is why the label names artifacts rather than anything file-shaped.
+
+This count SHALL agree with the number of artifacts a change under that schema is shown to have.
+Artifact discovery already collapses a non-empty `specs/` into a single artifact, so a change
+declaring five delta specs presents one `specs` artifact, not five — the glob multiplies files, not
+artifacts, on both views. A count derived any other way would put the schemas page and the change
+page on different units, and a reader moving between them would see two numbers for one thing.
+
+#### Scenario: A glob artifact counts once, on both pages
+
+- **WHEN** a schema declaring 4 artifacts — one of them a glob such as `specs/**/*.md` — is used by a change whose `specs/` holds 5 delta specs
+- **THEN** the schema reports 4 artifacts and that change is shown as having 4 artifacts, not 8
+
+Building the list SHALL cost one CLI invocation regardless of how many schemas are installed. No
+field on an entry may require reading a schema's definition: doing so would spawn a subprocess per
+row, and it would not even prefetch usefully, since definition reads are cached per schema and only
+the one the reader opens is ever wanted. The artifact count is compatible with that limit because
+the enumeration already names each schema's artifacts — it omits only their `requires`, which the
+count does not consult.
 
 When the enumeration is empty, the view SHALL show an empty state explaining that no workflow
 schemas were found, rather than a blank page.
@@ -281,12 +371,17 @@ schemas were found, rather than a blank page.
 #### Scenario: Schemas listed
 
 - **WHEN** the Schemas view is opened for a repo with two enumerated schemas
-- **THEN** both are listed with name, description, source, stage count, and change-usage count
+- **THEN** both are listed with name, description, source, artifact count, and change-usage count
 
-#### Scenario: Stage count reported rather than artifact count
+#### Scenario: Listing costs one CLI round
 
-- **WHEN** a schema declaring 8 artifacts, two of which sit at the same dependency level, is listed
-- **THEN** the entry reports 7 stages and presents no count of artifacts
+- **WHEN** the Schemas view is opened for a repo with a dozen enumerated schemas
+- **THEN** the enumeration spawns the `openspec` CLI once, and no schema definition is read to build the list
+
+#### Scenario: Artifacts sharing a dependency level are counted separately
+
+- **WHEN** a schema declares 8 artifacts, two of which sit at the same dependency level
+- **THEN** it reports 8 artifacts — the shared level changes how the diagram draws them, not how much work the schema asks for
 
 #### Scenario: Default schema distinguished
 
@@ -301,7 +396,8 @@ schemas were found, rather than a blank page.
 ### Requirement: Schema detail view renders the workflow as an ordered flow
 
 The system SHALL provide a schema detail view rendering one schema as its workflow. The view SHALL
-show the schema's name, description, source, and whether it is the repo's default schema; then its
+show the schema's name, description, source, whether it is the repo's default schema, its **artifact**
+count, and the number of active changes using it; then its
 artifacts as a visually connected sequence, each step showing the artifact id and the file or glob
 it generates. A step's description and the ids it requires SHALL be reachable from the step without
 being drawn on it — in the detail region described below, and as a pointer tooltip naming its
@@ -314,8 +410,8 @@ levels connected in ascending order. Steps within a level SHALL keep the schema'
 
 A level SHALL NOT carry a printed label or number. The rows of the diagram already are the levels,
 so a number beside each one restates what the layout shows, and nothing else in the app ever refers
-to "stage 3" for a reader to match it against. Numbering was added to reconcile the view's stage
-count with the diagram and produced only chrome — leader lines drawn to reattach labels that had
+to "level 3" for a reader to match it against. Numbering was added to reconcile the view's count
+with the diagram and produced only chrome — leader lines drawn to reattach labels that had
 detached — to fix a problem the labels themselves introduced.
 
 This grouping takes precedence over the schema's declared order, and MAY therefore present an
@@ -392,7 +488,7 @@ resolve against, which takes a flex chain spanning three components or a hand-co
 scrollbar.
 
 Archiving SHALL be rendered as the flow's terminal step, and SHALL be visually distinguished from
-the steps the schema declares. It is a real stage — every change, under every schema, ends by being
+the artifacts the schema declares. It is a real step — every change, under every schema, ends by being
 archived — so omitting it would leave the workflow without its ending. But no schema declares it:
 `schema.yaml` carries only `artifacts` and `apply`, and the OpenSpec authority returns no
 instruction, requirements, or tracked file for archiving. Drawing it identically to a declared step
@@ -403,7 +499,7 @@ The archive step SHALL depend on every **leaf** — each step nothing else requi
 the last step alone, because a change becomes archivable only once everything it declares is
 finished. It SHALL carry no instruction or output, and any guidance shown for it SHALL be
 identified as spek's own rather than the schema's. It SHALL be excluded from any count of the
-schema's stages, which would otherwise be inflated by one for every schema alike.
+schema's artifacts, which would otherwise be inflated by one for every schema alike.
 
 The apply step SHALL be rendered as a step of the same flow, showing what it requires, what file it
 tracks, and its instruction — because when a change becomes implementable is part of the workflow
@@ -413,6 +509,12 @@ implementation, and pinning apply last would place them before it. Only when app
 the schema declares — leaving no dependency to place it by — SHALL it be placed after every
 artifact. Because apply may therefore share a level with an artifact, its distinguishing marker
 SHALL be carried by the step itself rather than by the level.
+
+Apply SHALL be excluded from the artifact count, by the same rule that excludes archiving: it
+belongs to every schema alike, so counting it adds the same constant everywhere and distinguishes
+nothing. It is also the only work a schema declares outside `artifacts:` — the sole top-level keys
+any surveyed schema uses are `name`, `version`, `description`, `artifacts`, `apply` and `format`
+(parsing configuration, not a step) — so excluding it leaves nothing else uncounted.
 
 Requesting a schema that does not resolve SHALL render a not-found state naming the schema, not a
 blank or errored page.
@@ -527,10 +629,20 @@ blank or errored page.
 - **WHEN** a schema ends with two steps that feed nothing else, such as `apply` and `retrospective`
 - **THEN** the archive step depends on both, not on whichever comes last
 
-#### Scenario: Archiving is excluded from the stage count
+#### Scenario: The count does not depend on the requires graph
 
-- **WHEN** the stage count is shown for a schema
-- **THEN** it counts only the stages the schema declares, and the archive step is not among them
+- **WHEN** two schemas declare the same number of artifacts, one as a strict chain and one with no `requires` at all
+- **THEN** both report the same artifact count
+
+#### Scenario: Detail view needs no second request for its counts
+
+- **WHEN** a schema's detail view is opened directly by URL, with nothing cached
+- **THEN** it renders its artifact count and its active-change count without requesting the schemas catalog
+
+#### Scenario: Archiving is excluded from the artifact count
+
+- **WHEN** the artifact count is shown for a schema
+- **THEN** it counts only the artifacts the schema declares, and the archive step is not among them
 
 #### Scenario: Archiving shows no schema guidance
 

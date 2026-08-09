@@ -239,13 +239,13 @@ enum class SchemaDegradedReason {
     CLI_UNPARSABLE,
 }
 
-/** One schema as it appears in the list. `stageCount` is the only size reported — see schemaStageCount. */
+/** One schema as it appears in the list. `artifactCount` is what it declares — see schemaArtifactCount. */
 @Serializable
 data class SchemaSummary(
     val name: String,
     val description: String? = null,
     val source: SchemaSource,
-    val stageCount: Int? = null,
+    val artifactCount: Int? = null,
     val isDefault: Boolean = false,
 )
 
@@ -302,7 +302,7 @@ data class SchemaSummaryWithUsage(
     val name: String,
     val description: String? = null,
     val source: SchemaSource,
-    val stageCount: Int? = null,
+    val artifactCount: Int? = null,
     val isDefault: Boolean = false,
     val usage: SchemaUsage,
 )

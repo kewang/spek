@@ -1,15 +1,18 @@
 import type { ChangeInfo } from "@spekjs/core";
 
-// 聚合視圖中標示 change 來自哪個 worktree / jj workspace 的小標籤。
-// 來自主工作目錄的 change 不顯示，避免大量重複的標籤淹沒畫面。
-// jj workspace 來源以 `jj:` 前綴標示，與 git branch 區分。
+// A small label marking which worktree / jj workspace a change came from, in the aggregated view.
+// Changes from the main working directory show nothing, so the view isn't drowned in repeated
+// labels. A jj workspace source is prefixed `jj:` to distinguish it from a git branch.
+//
+// `relative z-10` keeps its tooltip above a stretched row's overlay (see `StretchedLink`); on the
+// component rather than each call site, since it is harmless in the one list that isn't one.
 export function WorktreeBadge({ source }: { source: NonNullable<ChangeInfo["source"]> }) {
   if (source.isMain) return null;
   const isJj = source.vcs === "jj";
   const label = isJj ? `jj:${source.branch ?? ""}` : (source.branch ?? "detached");
   return (
     <span
-      className="shrink-0 text-[11px] text-text-muted border border-border rounded px-1.5 py-0.5"
+      className="relative z-10 shrink-0 text-[11px] text-text-muted border border-border rounded px-1.5 py-0.5"
       title={`${source.path}${isJj ? " (jj workspace)" : ""}`}
     >
       {label}

@@ -110,12 +110,32 @@ The core package SHALL be published to the public npm registry under the name `@
 - **THEN** they list only the packages that core actually imports, so that consumers are never forced to install dependencies core does not use
 
 #### Scenario: Subpath exports resolve for external consumers
-- **WHEN** an external consumer imports `@spekjs/core/headings`, `@spekjs/core/artifact-order` or `@spekjs/core/graph-node-id`
+- **WHEN** an external consumer imports `@spekjs/core/headings`, `@spekjs/core/artifact-order`, `@spekjs/core/graph-node-id`, `@spekjs/core/schema-flow` or `@spekjs/core/cli-budget`
 - **THEN** each subpath resolves to its compiled module and type declarations
 
 #### Scenario: Node-free subpaths carry no Node dependency
 - **WHEN** a consumer imports one of those subpaths from a browser bundle or from a process that must not load `node:fs`
 - **THEN** the import succeeds, because each of those modules is pure logic with no runtime import of a Node built-in or of the package's server-side modules
+
+### Requirement: The CLI's timing budget is stated once
+
+The core module SHALL expose the `openspec` CLI's invocation timeout and the lifetime of its cached
+answers from a single browser-safe module, on the `@spekjs/core/cli-budget` subpath.
+
+Both numbers constrain callers on either side of a process boundary: the host that spawns the CLI,
+and a client waiting on that host with a timeout of its own. The client is often a browser bundle
+and so cannot import the module that spawns the CLI without acquiring a Node dependency. Stating the
+budget separately is what lets such a client **derive** its own ceiling rather than restate the
+number — two constants that merely happen to be equal look identical to two that are equal for a
+reason, and only one of them stays correct when the CLI's timeout changes.
+
+#### Scenario: A browser bundle reads the budget
+- **WHEN** a browser bundle imports `@spekjs/core/cli-budget`
+- **THEN** the import succeeds and pulls in no Node built-in and no CLI-spawning module
+
+#### Scenario: Raising the CLI timeout moves every derived deadline
+- **WHEN** the CLI invocation timeout is changed
+- **THEN** every deadline derived from it changes with it, with no other value needing to be edited
 
 ### Requirement: Artifact sort utility
 

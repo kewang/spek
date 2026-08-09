@@ -45,6 +45,10 @@
       "types": "./dist/schema-flow.d.ts",
       "import": "./dist/schema-flow.js"
     },
+    "./cli-budget": {
+      "types": "./dist/cli-budget.d.ts",
+      "import": "./dist/cli-budget.js"
+    },
     "./graph-node-id": {
       "types": "./dist/graph-node-id.d.ts",
       "import": "./dist/graph-node-id.js"

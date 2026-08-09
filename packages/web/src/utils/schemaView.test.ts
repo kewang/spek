@@ -281,6 +281,13 @@ test("degradedMessage: every reason gets its own wording", () => {
   assert.equal(new Set(messages).size, reasons.length, "no two reasons may share wording");
   // The one the user can act on says so.
   assert.match(degradedMessage("cli-unavailable"), /not available/);
+
+  // None of them may promise a fallback. The list comes from the CLI alone, including for the
+  // repo's own openspec/schemas/, so a degraded catalog is empty — copy claiming that "only this
+  // repo's own schemas are shown" sat directly above an empty-state reading "no schemas found".
+  for (const message of messages) {
+    assert.doesNotMatch(message, /own schemas are shown/i, message);
+  }
 });
 
 test("schemaUnavailableMessage: not-found and cli-unavailable read differently", () => {
@@ -291,7 +298,10 @@ test("schemaUnavailableMessage: not-found and cli-unavailable read differently",
   assert.doesNotMatch(notFound, /CLI/, "a missing schema must not blame the CLI");
 
   assert.match(unavailable, /OpenSpec CLI is not available/);
-  assert.match(unavailable, /installing the CLI/, "says what would fix it");
+  assert.match(unavailable, /[Ii]nstalling it/, "says what would fix it");
+  // Not "if it is a built-in schema": names resolve through the CLI whatever their source, so a
+  // schema in this very repo is equally unreadable without it.
+  assert.doesNotMatch(unavailable, /built-in/);
   assert.notEqual(notFound, unavailable);
 });
 

@@ -1,4 +1,5 @@
 import spawn from "cross-spawn";
+import { CLI_CACHE_TTL_MS, CLI_TIMEOUT_MS } from "./cli-budget.js";
 import type { SchemaDegradedReason } from "./types.js";
 
 /**
@@ -13,12 +14,8 @@ import type { SchemaDegradedReason } from "./types.js";
 // Stryker disable all: thin integration layer over a child process. The parsing it feeds is
 // unit-tested; this only spawns, times out, and classifies failure.
 
-/**
- * How long the CLI gets before it is killed.
- *
- * Load-bearing against CACHE_TTL_MS below, which must stay >= this — see the note there.
- */
-export const CLI_TIMEOUT_MS = 10_000;
+// Defined in cli-budget.ts so browser bundles can read them without pulling in child_process.
+export { CLI_TIMEOUT_MS } from "./cli-budget.js";
 
 /**
  * Every failure mode gets its own reason so surfaces can word them differently — "the CLI is not
@@ -121,13 +118,8 @@ export function runOpenspec(args: string[], cwd: string): Promise<CliResult> {
 // Caching
 // ---------------------------------------------------------------------------
 
-/**
- * Caching a failure forever meant a reader who installed the CLI after first load never got data
- * without a restart — and the same for editing a schema on disk. Hence a TTL, deliberately **>= the
- * CLI timeout** so an in-flight spawn can never be judged stale and spawned a second time, plus a
- * size cap so a long-running server does not grow without bound.
- */
-export const CACHE_TTL_MS = 30_000;
+/** TTL and its floor are stated in cli-budget.ts; the size cap is local and depends on nothing. */
+export const CACHE_TTL_MS = CLI_CACHE_TTL_MS;
 const CACHE_MAX = 256;
 
 export interface CacheEntry<T> {
