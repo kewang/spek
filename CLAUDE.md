@@ -152,8 +152,14 @@ issue #15). A change whose schema name doesn't resolve locally **still gets quer
 default), sharing a sentinel bucket `${repoRoot}::\0default`. **The only early null is an empty slug**; it's also null
 when the CLI is unavailable / for archived changes, and the frontend falls back to narrative order with a reason.
 
-**Frontend artifact sort**: preference in `localStorage["spek:artifact-sort"]` — `modified` (mtime, default) /
-`schema` (`schemaOrder`) / `alpha` (title).
+**Artifact sort**: the rule is `sortArtifacts(artifacts, mode, schemaOrder?)` in **core**, beside `DEFAULT_ORDER` /
+`defaultRank` on the `@spekjs/core/artifact-order` subpath — `modified` (the order given, i.e. mtime; default) /
+`schema` (`schemaOrder`, falling back to the narrative order when it is absent, which is what archived changes always
+get) / `alpha` (title, via `localeCompare`, so ordering is host-collation dependent). `ArtifactSortMode` is derived
+from the exported `ARTIFACT_SORT_MODES` — validate a persisted preference against **that array**, never a hand-written
+copy: a copy missing an entry still satisfies the type, and the omitted mode silently stops restoring. Core owns what
+the modes mean; **each host owns where the choice is stored** (web: `localStorage["spek:artifact-sort"]`). `modified`
+may return the array it was given, so **callers must not mutate a returned list**.
 
 **Polling fallback**: inotify doesn't deliver events on 9p/drvfs/NFS/CIFS mounts (devcontainer/WSL), so the decision is
 by the watched path's fstype (`decidePolling` precedence: explicit override `SPEK_WATCH_POLLING` /

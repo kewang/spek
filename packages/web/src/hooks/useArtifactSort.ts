@@ -1,14 +1,13 @@
 import { useCallback, useState } from "react";
-import type { ArtifactSortMode } from "../utils/artifact-sort";
+import { ARTIFACT_SORT_MODES, type ArtifactSortMode } from "@spekjs/core/artifact-order";
 
 const STORAGE_KEY = "spek:artifact-sort";
-const MODES: ArtifactSortMode[] = ["modified", "schema", "alpha"];
 
 // 讀取已儲存的排序偏好；localStorage 不可用（隱私模式 / 嵌入環境）或無效值時回預設 modified
 function readStored(): ArtifactSortMode {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
-    if (v && (MODES as string[]).includes(v)) return v as ArtifactSortMode;
+    if (v && (ARTIFACT_SORT_MODES as readonly string[]).includes(v)) return v as ArtifactSortMode;
   } catch {
     // 忽略：localStorage 不可用
   }

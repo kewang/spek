@@ -14,7 +14,7 @@ import { formatLifecycleBanner, todayIso } from "../utils/lifecycle";
 import { useArtifactSort } from "../hooks/useArtifactSort";
 import { FoldControls } from "../components/FoldControls";
 import { foldOptionsFor, useSpecFold, type SpecFold } from "../hooks/useSpecFold";
-import { sortArtifacts, type ArtifactSortMode } from "../utils/artifact-sort";
+import { sortArtifacts, type ArtifactSortMode } from "@spekjs/core/artifact-order";
 import { scrollToAnchorId } from "../utils/scrollOffset";
 
 const TOC_MIN_HEADINGS = 3;
