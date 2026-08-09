@@ -1,5 +1,6 @@
 package com.spek.intellij.core
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -185,3 +186,181 @@ data class GraphData(
     val nodes: List<GraphNode>,
     val edges: List<GraphEdge>,
 )
+
+// --- Workflow schemas -------------------------------------------------------
+// Mirrors @spekjs/core's schema types (packages/core/src/types.ts). The web SPA is the client for
+// both, so these names and nullability must match the TypeScript exactly — the same view code
+// deserialises whichever backend served it.
+
+/**
+ * Where a schema resolved from, in the resolver's precedence order: the repo's own
+ * `openspec/schemas/` (project), the machine's global data directory (user), then the schemas
+ * shipped inside the openspec package (package). An earlier match shadows a later one.
+ *
+ * Serialised as the lowercase string the TypeScript uses, not the enum name.
+ */
+@Serializable
+enum class SchemaSource {
+    @SerialName("package")
+    PACKAGE,
+
+    @SerialName("user")
+    USER,
+
+    @SerialName("project")
+    PROJECT,
+    ;
+
+    companion object {
+        /** Parse the CLI's / API's spelling. Unknown values are null rather than guessed at —
+         *  an unrecognised source once made the TypeScript drop the schema from the list entirely. */
+        fun from(value: String?): SchemaSource? = when (value) {
+            "package" -> PACKAGE
+            "user" -> USER
+            "project" -> PROJECT
+            else -> null
+        }
+    }
+}
+
+/** Why package schemas could not be enumerated. A code, not a sentence: each surface words it. */
+@Serializable
+enum class SchemaDegradedReason {
+    @SerialName("cli-unavailable")
+    CLI_UNAVAILABLE,
+
+    @SerialName("cli-failed")
+    CLI_FAILED,
+
+    @SerialName("cli-timeout")
+    CLI_TIMEOUT,
+
+    @SerialName("cli-unparsable")
+    CLI_UNPARSABLE,
+}
+
+/** One schema as it appears in the list. `stageCount` is the only size reported — see schemaStageCount. */
+@Serializable
+data class SchemaSummary(
+    val name: String,
+    val description: String? = null,
+    val source: SchemaSource,
+    val stageCount: Int? = null,
+    val isDefault: Boolean = false,
+)
+
+/** One artifact (workflow step) a schema declares. */
+@Serializable
+data class SchemaArtifactDef(
+    val id: String,
+    val generates: String? = null,
+    val description: String? = null,
+    val requires: List<String> = emptyList(),
+    val instruction: String? = null,
+)
+
+/** A schema's apply step: when a change authored under it becomes implementable. */
+@Serializable
+data class SchemaApplyDef(
+    val requires: List<String> = emptyList(),
+    val tracks: String? = null,
+    val instruction: String? = null,
+)
+
+/** A same-named schema this one takes precedence over. */
+@Serializable
+data class SchemaShadow(
+    val source: SchemaSource,
+    val path: String,
+)
+
+/** One schema's full definition, read from its schema.yaml. */
+@Serializable
+data class SchemaDefinition(
+    val name: String,
+    val version: Int? = null,
+    val description: String? = null,
+    val source: SchemaSource,
+    val path: String,
+    val displayPath: String,
+    val isDefault: Boolean = false,
+    val shadows: List<SchemaShadow> = emptyList(),
+    val artifacts: List<SchemaArtifactDef> = emptyList(),
+    val apply: SchemaApplyDef? = null,
+)
+
+/** Active changes declaring a schema. Counted from ChangeInfo.schema — no artifact reads. */
+@Serializable
+data class SchemaUsage(
+    val count: Int,
+    val slugs: List<String>,
+)
+
+/** A schema row as the API serves it: the summary plus who is using it. */
+@Serializable
+data class SchemaSummaryWithUsage(
+    val name: String,
+    val description: String? = null,
+    val source: SchemaSource,
+    val stageCount: Int? = null,
+    val isDefault: Boolean = false,
+    val usage: SchemaUsage,
+)
+
+/**
+ * Active changes whose declared schema matched no enumerated schema, grouped by that name (null
+ * groups changes declaring no schema at all), so the per-schema counts reconcile against the
+ * Changes page rather than quietly losing changes.
+ */
+@Serializable
+data class UnresolvedSchemaUsage(
+    val schema: String? = null,
+    val count: Int,
+    val slugs: List<String>,
+)
+
+/** The `/schemas` response: the catalog joined with change usage. */
+@Serializable
+data class SchemasResponse(
+    val defaultSchema: String? = null,
+    val schemas: List<SchemaSummaryWithUsage>,
+    val degradedReason: SchemaDegradedReason? = null,
+    val unresolved: List<UnresolvedSchemaUsage> = emptyList(),
+)
+
+/**
+ * A 404 body. Typed rather than interpolated: `reason` is what lets the shared frontend tell "we
+ * could not look" from "it does not exist", and hand-building the JSON only worked because the
+ * current `@SerialName`s happen to contain nothing needing escaping.
+ */
+@Serializable
+data class ApiErrorBody(
+    val error: String,
+    /** Either a [SchemaDegradedReason]'s wire spelling or "not-found" — the same union the web sends. */
+    val reason: String,
+)
+
+/**
+ * The wire spelling, read from the serializer rather than restated. Declaring it a second time (as a
+ * constructor arg, or by trimming quotes off `encodeToString`) would let the two drift silently.
+ */
+val SchemaDegradedReason.wire: String
+    get() = SchemaDegradedReason.serializer().descriptor.getElementName(ordinal)
+
+/** The schemas available to a repo, plus why the list may be incomplete. */
+data class SchemaCatalogResult(
+    val defaultSchema: String?,
+    val schemas: List<SchemaSummary>,
+    val degradedReason: SchemaDegradedReason?,
+)
+
+/**
+ * Reading one schema either works or explains why not. "We could not look" and "it does not exist"
+ * stay distinct all the way to the view — only one of them is the reader's to fix.
+ */
+sealed interface SchemaReadResult {
+    data class Ok(val schema: SchemaDefinition) : SchemaReadResult
+
+    /** `reason` is null for not-found; otherwise the CLI degradation code. */
+    data class Failed(val reason: SchemaDegradedReason?) : SchemaReadResult
+}

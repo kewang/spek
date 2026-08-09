@@ -6,6 +6,7 @@ import { formatRelativeTime } from "../utils/formatRelativeTime";
 import { formatLifecycleListRow, todayIso } from "../utils/lifecycle";
 import { WorktreeBadge } from "../components/WorktreeBadge";
 import { SchemaBadge } from "../components/SchemaBadge";
+import { StretchedLink } from "../components/StretchedLink";
 import { changeKey, changeTo } from "../utils/changeLink";
 
 function changeMetaDisplay(c: ChangeInfo, today: string): { text: string; tooltip: string } | null {
@@ -34,17 +35,22 @@ function ChangeRow({ c, today, accent, showSource }: {
 }) {
   const meta = changeMetaDisplay(c, today);
   return (
-    <Link
-      to={changeTo(c)}
-      className={`block bg-bg-secondary border border-border rounded p-4 hover:border-accent transition-colors${
+    // A div, not a Link — the schema badge inside is itself a link and anchors cannot nest. The
+    // card stays clickable through StretchedLink on the title; `relative` is what that overlay
+    // attaches to.
+    <div
+      className={`relative bg-bg-secondary border border-border rounded p-4 hover:border-accent transition-colors${
         accent ? " border-l-4 border-l-accent" : ""
       }`}
     >
       <div className={`flex items-center justify-between gap-4${accent ? " mb-2" : ""}`}>
         <span className="flex items-center gap-2 min-w-0">
-          <span className={`truncate ${accent ? "text-text-primary font-medium" : "text-text-primary"}`}>
+          <StretchedLink
+            to={changeTo(c)}
+            className={`truncate ${accent ? "text-text-primary font-medium" : "text-text-primary"}`}
+          >
             {c.description}
-          </span>
+          </StretchedLink>
           {showSource && c.source && <WorktreeBadge source={c.source} />}
           {c.isCurrent && (
             <span
@@ -78,7 +84,7 @@ function ChangeRow({ c, today, accent, showSource }: {
       {accent && c.taskStats && (
         <TaskProgress completed={c.taskStats.completed} total={c.taskStats.total} />
       )}
-    </Link>
+    </div>
   );
 }
 
@@ -102,7 +108,16 @@ export function ChangeList() {
       <h1 className="text-2xl font-bold">Changes</h1>
       {defaultSchema && (
         <p className="mt-1 text-text-muted text-sm" title="Repo default OpenSpec schema">
-          Default schema: <span className="text-text-secondary">{defaultSchema}</span>
+          Default schema:{" "}
+          {/* Links like the badges do. It is the one schema name on this page that never gets a
+              pill (a pill means "not the default"), but that is a rule about emphasis, not about
+              whether the name is worth following. */}
+          <Link
+            to={`/schemas/${encodeURIComponent(defaultSchema)}`}
+            className="text-text-secondary hover:text-accent underline decoration-dotted underline-offset-2 transition-colors"
+          >
+            {defaultSchema}
+          </Link>
         </p>
       )}
     </div>

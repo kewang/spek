@@ -24,6 +24,10 @@ import type {
   BrowseData,
   DetectData,
   GraphData,
+  SchemasResponse,
+  SchemaReadResult,
+  SchemaDefinition,
+  SchemaSummaryWithUsage,
 } from "@spekjs/core";
 
 // Re-export types for existing consumers
@@ -41,6 +45,10 @@ export type {
   BrowseEntry,
   BrowseData,
   DetectData,
+  SchemasResponse,
+  SchemaReadResult,
+  SchemaDefinition,
+  SchemaSummaryWithUsage,
 };
 export type { HistoryEntry as SpecHistoryEntry } from "@spekjs/core";
 
@@ -234,6 +242,34 @@ export function useGraphData(
   return useAsyncData(
     repoPath ? () => adapter.getGraphData(agg, jj) : null,
     [repoPath, agg, jj],
+  );
+}
+
+// --- Schema hooks ---
+
+export function useSchemas(
+  aggregate?: boolean,
+  includeJj?: boolean,
+): FetchState<SchemasResponse> {
+  const { repoPath } = useRepo();
+  const adapter = useApiAdapter();
+  const scope = useAggregationScope();
+  const agg = aggregate ?? scope.aggregate;
+  const jj = includeJj ?? scope.includeJj;
+  return useAsyncData(
+    repoPath ? () => adapter.getSchemas(agg, jj) : null,
+    [repoPath, agg, jj],
+  );
+}
+
+// An unreadable schema is data, not an error: the result carries whether it does not exist or
+// could not be looked up, and the view says which.
+export function useSchema(name: string): FetchState<SchemaReadResult> {
+  const { repoPath } = useRepo();
+  const adapter = useApiAdapter();
+  return useAsyncData(
+    repoPath && name ? () => adapter.getSchema(name) : null,
+    [repoPath, name],
   );
 }
 

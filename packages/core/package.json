@@ -41,6 +41,10 @@
       "types": "./dist/artifact-order.d.ts",
       "import": "./dist/artifact-order.js"
     },
+    "./schema-flow": {
+      "types": "./dist/schema-flow.d.ts",
+      "import": "./dist/schema-flow.js"
+    },
     "./graph-node-id": {
       "types": "./dist/graph-node-id.d.ts",
       "import": "./dist/graph-node-id.js"
@@ -54,7 +58,8 @@
     "test": "node --import tsx --test src/*.test.ts"
   },
   "dependencies": {
-    "cross-spawn": "^7.0.6"
+    "cross-spawn": "^7.0.6",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/cross-spawn": "^6.0.6",

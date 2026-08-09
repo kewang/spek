@@ -10,6 +10,8 @@ import type {
   DetectData,
   GraphData,
   WorktreeInfo,
+  SchemasResponse,
+  SchemaReadResult,
 } from "@spekjs/core";
 import type { ApiAdapter, AggregationPrefs } from "./types.js";
 
@@ -115,6 +117,14 @@ export class MessageAdapter implements ApiAdapter {
 
   getGraphData(aggregate?: boolean, includeJj?: boolean): Promise<GraphData> {
     return this.request("getGraphData", { aggregate, includeJj });
+  }
+
+  getSchemas(aggregate?: boolean, includeJj?: boolean): Promise<SchemasResponse> {
+    return this.request("getSchemas", { aggregate, includeJj });
+  }
+
+  getSchema(name: string): Promise<SchemaReadResult> {
+    return this.request("getSchema", { name });
   }
 
   getWorktrees(includeJj?: boolean): Promise<WorktreeInfo[]> {

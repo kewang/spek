@@ -14,6 +14,10 @@ import {
   listWorkspaces,
   toWorktreeSource,
   listChangeMarkdownFiles,
+  listSchemas,
+  readSchema,
+  groupSchemaUsage,
+  clearSchemaCache,
 } from "@spekjs/core";
 
 export class MessageHandler {
@@ -74,6 +78,13 @@ export class MessageHandler {
         );
       case "getWorktrees":
         return this.getWorktrees(params?.includeJj as boolean | undefined);
+      case "getSchemas":
+        return this.getSchemas(
+          params?.aggregate as boolean | undefined,
+          params?.includeJj as boolean | undefined,
+        );
+      case "getSchema":
+        return this.getSchema(params?.name as string);
       case "getAggregationPrefs":
         return this.getAggregationPrefs();
       case "setAggregationPrefs":
@@ -278,6 +289,10 @@ export class MessageHandler {
 
   private async resync() {
     await resyncTimestamps(this.workspacePath);
+    // Schemas resolve from three places and only the workspace's own openspec/schemas/ is watched.
+    // A schema promoted to the machine-global directory, or edited there, produces no event this
+    // host can see — so Refresh has to be the authoritative way to pick it up.
+    clearSchemaCache();
     return { ok: true };
   }
 
@@ -292,6 +307,25 @@ export class MessageHandler {
   // can offer the jj option even while jj aggregation is currently disabled.
   private getWorktrees(includeJj?: boolean) {
     return listWorkspaces(this.workspacePath, { includeJj: includeJj === true });
+  }
+
+  // Same shape the web route serves: the catalog joined with the changes using it. Aggregation
+  // follows settings here, like every other scan in this host.
+  private async getSchemas(aggregate?: boolean, includeJj?: boolean) {
+    const [catalog, scan] = await Promise.all([
+      listSchemas(this.workspacePath),
+      scanOpenSpecAggregated(this.workspacePath, {
+        aggregate: this.aggregateEnabled(aggregate),
+        includeJj: this.jjEnabled(includeJj),
+      }),
+    ]);
+    return groupSchemaUsage(catalog, scan.activeChanges);
+  }
+
+  // Resolves rather than throws when the schema is unreadable: the result carries whether it does
+  // not exist or could not be looked up, and the view says which.
+  private getSchema(name: string) {
+    return readSchema(this.workspacePath, name);
   }
 
   // The header control in VS Code is the UI for these two settings: it reads them here...

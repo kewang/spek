@@ -2,13 +2,23 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanOpenSpec, readSpec, readChange, readSpecAtChange, buildGraphData } from "../packages/core/dist/index.js";
+import {
+  scanOpenSpec,
+  readSpec,
+  readChange,
+  readSpecAtChange,
+  buildGraphData,
+  listSchemas,
+  readSchema,
+  groupSchemaUsage,
+} from "../packages/core/dist/index.js";
 import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
   ChangesData,
   ChangeDetail,
+  SchemaDefinition,
 } from "../packages/core/dist/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -95,11 +105,38 @@ async function main() {
   // 建立 graph 資料
   const graphData = buildGraphData(REPO_DIR);
 
-  const demoData = { overview, specs, specDetails, changes, changeDetails, specVersions, graphData };
+  // Workflow schemas, captured here so the demo needs neither the openspec CLI nor a filesystem at
+  // view time — the whole point of the static build. The catalog is joined with change usage exactly
+  // as the server routes do, and every enumerated schema's definition is read so the detail page
+  // works offline; a schema that cannot be read is left out rather than embedded half-formed, and
+  // the view's own not-found state covers it.
+  const catalog = await listSchemas(REPO_DIR);
+  const schemas = groupSchemaUsage(catalog, scan.activeChanges);
+  const schemaDetails: Record<string, SchemaDefinition> = {};
+  for (const summary of catalog.schemas) {
+    const result = await readSchema(REPO_DIR, summary.name);
+    if (result.ok) schemaDetails[summary.name] = result.schema;
+  }
+
+  const demoData = {
+    overview,
+    specs,
+    specDetails,
+    changes,
+    changeDetails,
+    specVersions,
+    graphData,
+    schemas,
+    schemaDetails,
+  };
   const demoDataJson = JSON.stringify(demoData);
 
   console.log(
     `  ${specs.length} specs, ${changes.active.length} active + ${changes.archived.length} archived changes`,
+  );
+  console.log(
+    `  ${schemas.schemas.length} schemas (${Object.keys(schemaDetails).length} readable)` +
+      (catalog.degradedReason ? `, degraded: ${catalog.degradedReason}` : ""),
   );
 
   // 2. 執行 Vite build

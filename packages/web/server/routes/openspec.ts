@@ -14,6 +14,10 @@ import {
   listWorkspaces,
   toWorktreeSource,
   listChangeMarkdownFiles,
+  listSchemas,
+  readSchema,
+  groupSchemaUsage,
+  clearSchemaCache,
   shouldUsePolling,
   pollingInterval,
   withAuthoritativeChokidarEnv,
@@ -61,6 +65,10 @@ function getOrCreateWatcher(key: string, watchDirs: string[]): WatcherEntry {
   const entry: WatcherEntry = { watcher, clients: new Set(), debounceTimer: null };
 
   const notifyClients = () => {
+    // Schema reads are cached for 30s, so an edit under openspec/schemas/ would otherwise trigger a
+    // refetch that is served the pre-edit copy. Drop the cache with the same event that tells the
+    // client to refetch, or live-reload reports success while showing yesterday's schema.
+    clearSchemaCache();
     if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
     entry.debounceTimer = setTimeout(() => {
       entry.debounceTimer = null;
@@ -187,6 +195,36 @@ openspecRouter.get("/changes/:slug", async (req, res) => {
   }
   if (source) result.source = source;
   res.json(result);
+});
+
+// Schemas: the catalog joined with the changes using it. Aggregation params mirror /changes so the
+// counts on the two pages agree; schema *resolution* is deliberately not aggregated — a schema is a
+// property of the repo spek was pointed at, a change is not.
+openspecRouter.get("/schemas", async (req, res) => {
+  const dir = req.query.dir as string;
+  const aggregate = req.query.aggregate !== "false";
+  const includeJj = req.query.jj === "true";
+
+  const [catalog, scan] = await Promise.all([
+    listSchemas(dir),
+    scanOpenSpecAggregated(dir, { aggregate, includeJj }),
+  ]);
+
+  // A CLI failure is a degraded 200, never a 5xx: the page still has project-local schemas to show
+  // and a reason to explain the rest.
+  res.json(groupSchemaUsage(catalog, scan.activeChanges));
+});
+
+openspecRouter.get("/schemas/:name", async (req, res) => {
+  const dir = req.query.dir as string;
+  const result = await readSchema(dir, req.params.name);
+  if (result.ok) {
+    res.json(result.schema);
+    return;
+  }
+  // "we could not look" and "it does not exist" are different problems; both are 404 to the client,
+  // but the reason distinguishes them so the view can say which.
+  res.status(404).json({ error: "Schema not found", reason: result.reason });
 });
 
 interface SearchDocument {
@@ -338,5 +376,10 @@ openspecRouter.get("/watch", async (req, res) => {
 openspecRouter.post("/resync", async (req, res) => {
   const dir = req.query.dir as string;
   await resyncTimestamps(dir);
+  // Schemas resolve from three places, and only one of them — this repo's openspec/schemas/ — is
+  // watched. A schema promoted from the repo to the machine-global directory, or edited there,
+  // produces no filesystem event spek can see, so Refresh has to be the authoritative way to pick
+  // it up rather than leaving the reader to wait out a cache TTL.
+  clearSchemaCache();
   res.json({ ok: true });
 });

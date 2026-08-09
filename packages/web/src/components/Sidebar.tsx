@@ -41,6 +41,16 @@ const links = [
     ),
   },
   {
+    to: "/schemas",
+    label: "Schemas",
+    icon: (
+      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h6v4H4V5zm10 10h6v4h-6v-4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 9v5a3 3 0 003 3h4" />
+      </svg>
+    ),
+  },
+  {
     to: "/timeline",
     label: "Timeline",
     icon: (

@@ -1,4 +1,4 @@
-import spawn from "cross-spawn";
+import { runOpenspec, ttlCached, type CacheEntry } from "./openspec-cli.js";
 
 /** schema 中單一 artifact 的權威參照（由 openspec CLI 提供） */
 export interface SchemaArtifactRef {
@@ -90,91 +90,35 @@ export function resolveSchemaOrder(
   return ordered.length > 0 ? ordered : null;
 }
 
-// Stryker disable all: 對 openspec CLI 的薄整合層（非阻塞 spawn 子行程）；以整合而非單元測試覆蓋。
-// 萃取邏輯在 parseOrderFromStatus（已單元測試）；此處只負責呼叫、快取與容錯。
-
-// 以 (repoRoot, schema) 記憶結果並附建立時間戳（存 Promise，順帶去重同時併發的呼叫）。
+// 以 (repoRoot, schema) 記憶結果（存 Promise，順帶去重同時併發的呼叫）。
 // 權威順序（planningArtifacts + artifactPaths）是 schema 的屬性、非個別 change 的屬性，故以
 // schema 為 key，同一 repo 內共用該 schema 的所有 change 至多 spawn 一次 CLI（issue #15）。
 // 呼叫端只在 change 有 schema 時才進來（無 schema → 無權威順序，提前回 null），故 key 不需 slug fallback。
-// 過去的版本永久快取（含 null），導致：openspec 之後才安裝也永遠拿不到順序、artifact 順序
-// 變更後仍供舊值、且條目無上限累積。改為短 TTL：
-//   - TTL 必須 ≥ CLI timeout（10s），使進行中的 spawn 永遠不會被判為過期而觸發第二次 spawn；
-//   - 過期後自動重查，讓 null / 舊順序在數十秒內自我修復；
-//   - 另設 size cap，長時間執行的 server 不致無限成長。
-const CACHE_TTL_MS = 30_000;
-const CACHE_MAX = 256;
-interface CacheEntry {
-  at: number;
-  promise: Promise<SchemaArtifactRef[] | null>;
-}
-const cache = new Map<string, CacheEntry>();
+//
+// The TTL / size-cap policy itself — and why caching a failure forever was a bug — now lives on
+// `ttlCached` in openspec-cli.ts, shared with schemas.ts. It was stated in both files before, and
+// the "remember failures forever" fix had to be made twice.
+const cache = new Map<string, CacheEntry<SchemaArtifactRef[] | null>>();
+
 /**
  * 預設 SchemaOrderProvider：非阻塞地呼叫 openspec CLI 取得權威順序（回 Promise）。
- * 以 async spawn 取代同步呼叫，避免在 change detail 讀取時卡住 Node event loop。
  * openspec 未安裝 / 非 0 結束 / archived change / 逾時 / 解析失敗時一律 resolve 為 null。
+ *
+ * The CLI's failure taxonomy is deliberately discarded here: this caller has one fallback (the
+ * frontend's narrative order) whatever went wrong, so every `!ok` collapses to null.
  */
 export const cliSchemaOrderProvider: SchemaOrderProvider = (repoRoot, slug, schema) => {
   // schema 已知 → 以 schema 分桶；schema 為 null/空（spek 本地解析不出名稱）→ 共用 repo 級預設桶：
   // CLI 會自行解析出同一個內建預設順序，故這類 change 正確地共享一次 spawn。schema 僅用於組 key，不進 argv。
   const cacheKey = `${repoRoot}::${schema || DEFAULT_SCHEMA_BUCKET}`;
-  const hit = cache.get(cacheKey);
-  // TTL ≥ CLI timeout，故 hit 若仍在 TTL 內必尚未過期即安全復用（含仍進行中的 Promise，不重複 spawn）
-  if (hit && Date.now() - hit.at <= CACHE_TTL_MS) return hit.promise;
-  if (hit) cache.delete(cacheKey);
-
-  // 以 argv 陣列（非 shell 字串）呼叫：slug 自成一個引數，結構上即無 shell injection 之虞，
-  // 毋須對 slug 另做過濾。cross-spawn 一併處理 Windows 上 openspec.cmd 的解析（無需 shell，
-  // 避免 DEP0190 / CVE-2024-27980）。
-  const promise = new Promise<SchemaArtifactRef[] | null>((resolve) => {
-    let out = "";
-    let settled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const finish = (r: SchemaArtifactRef[] | null) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(r);
-    };
-    let child;
+  return ttlCached(cache, cacheKey, async () => {
+    // slug 自成一個 argv 引數，結構上即無 shell injection 之虞，毋須對 slug 另做過濾。
+    const cli = await runOpenspec(["status", "--change", slug, "--json"], repoRoot);
+    if (!cli.ok) return null;
     try {
-      child = spawn("openspec", ["status", "--change", slug, "--json"], {
-        cwd: repoRoot,
-        stdio: ["ignore", "pipe", "ignore"],
-        windowsHide: true,
-      });
+      return parseOrderFromStatus(cli.json);
     } catch {
-      finish(null);
-      return;
+      return null;
     }
-    timer = setTimeout(() => {
-      child.kill();
-      finish(null);
-    }, 10000);
-    child.stdout?.setEncoding("utf-8");
-    child.stdout?.on("data", (d: string) => {
-      out += d;
-    });
-    child.on("error", () => finish(null)); // openspec 未安裝 → ENOENT
-    child.on("close", (code: number | null) => {
-      if (code === 0) {
-        try {
-          finish(parseOrderFromStatus(JSON.parse(out)));
-        } catch {
-          finish(null);
-        }
-      } else {
-        finish(null);
-      }
-    });
   });
-
-  // size cap：滿了先淘汰最舊插入的條目（Map 保留插入序）
-  if (cache.size >= CACHE_MAX) {
-    const oldest = cache.keys().next().value;
-    if (oldest !== undefined) cache.delete(oldest);
-  }
-  cache.set(cacheKey, { at: Date.now(), promise });
-  return promise;
 };
-// Stryker restore all

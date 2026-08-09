@@ -68,7 +68,8 @@ change to those still needs manual verification — a temporary `workflow_dispat
 
 ```
 packages/
-├── core/       # @spekjs/core — pure logic (scanner.ts, tasks.ts, artifacts.ts, schema-order.ts, git-cache.ts, types.ts)
+├── core/       # @spekjs/core — pure logic (scanner.ts, tasks.ts, artifacts.ts, schema-order.ts, schemas.ts,
+│            #   schema-flow.ts, openspec-cli.ts, git-cache.ts, types.ts)
 ├── ui/         # @spekjs/ui — visual components (SpecGraph.tsx, timeline/*, theme.ts=color contract, styles.css)
 ├── web/        # @spekjs/web — server/ (Express API) + src/ (React SPA + API adapters)
 ├── vscode/     # spek-vscode — src/ (extension.ts, panel.ts, handler.ts) + webview/ (from web build:webview)
@@ -108,6 +109,22 @@ the web side never saw it. Build core first, then run the web tests.
 
 **Package VS Code**: `npm run build -w @spekjs/core && npm run build:webview -w @spekjs/web && npm run build -w spek-vscode`, then `cd packages/vscode && npx vsce package --no-dependencies`
 **Package IntelliJ**: `npm run build -w @spekjs/core && npm run build:intellij`, then `cd packages/intellij && ./gradlew buildPlugin` (output: `build/distributions/spek-intellij-*.zip`)
+
+**`build:demo` reads the machine it runs on, and `docs/demo.html` is published as committed.** Pages does
+checkout → upload; CI builds the demo only as a discarded smoke test, so whatever you commit is what ships. Schema
+enumeration includes the *builder's* `~/.local/share/openspec/schemas` and any local-only project schema — a first
+build here embedded twelve machine-local schemas plus one excluded via `.git/info/exclude`. **Move those aside before
+rebuilding**, or the public demo advertises schemas nobody else has.
+
+**`runIde` blocks on two one-time dialogs in a fresh sandbox** (the JetBrains agreement, then Trust Project), which
+matters on any machine without someone to click them — CI included. `./gradlew runIde -Pspek.headlessIde` sets
+JetBrains' own `jb.consents.confirmation.enabled` / `jb.privacy.policy.text`; it is **opt-in because it suppresses a
+consent prompt**, appropriate only for a throwaway sandbox you are driving yourself. Trust is separate, seeded via
+`build/idea-sandbox/*/config/options/trusted-paths.xml`.
+
+**Rebuild the webview before verifying the tool window.** `src/main/resources/webview/` is a build artifact; a stale
+one silently shows old UI while the source is already fixed — VS Code got a wording fix hours before IntelliJ did,
+because only the VS Code bundle had been rebuilt.
 
 ## Architecture
 
@@ -152,6 +169,34 @@ issue #15). A change whose schema name doesn't resolve locally **still gets quer
 default), sharing a sentinel bucket `${repoRoot}::\0default`. **The only early null is an empty slug**; it's also null
 when the CLI is unavailable / for archived changes, and the frontend falls back to narrative order with a reason.
 
+**Workflow schemas** (`schemas.ts` + `schema-flow.ts`): `listSchemas(repoRoot)` enumerates via
+`openspec schemas --json` and merges project-local `openspec/schemas/*/schema.yaml` read from disk; `readSchema(repoRoot,
+name)` resolves the directory via `openspec schema which` and parses the YAML. Three sources in resolver precedence —
+`project`, `user` (the machine's global data dir), `package` (inside the npm package) — and **all three must be
+recognised**: an unhandled `source` made the enumeration drop the schema entirely, so a machine-level schema silently
+vanished rather than appearing mislabelled. `schema which` is consulted **first even for project-local schemas**,
+because `shadows` (a same-named schema this one takes precedence over) exists only in CLI output and nowhere on disk.
+A CLI failure is always a **degraded 200**, never a 5xx: project schemas still list, with a `degradedReason`.
+
+**`schema-flow.ts` is browser-safe and exported at the `@spekjs/core/schema-flow` subpath** (like `headings`), because
+the SPA needs the graph maths and the package index reaches for `child_process`. It owns facts about the `requires`
+graph — `computeArtifactLevels`, `applyStepLevel`, `schemaStageCount`, `drawableRequires` — kept out of the view's
+geometry on purpose. Two rules worth knowing:
+- **Stages, not artifacts.** A schema reports the number of distinct dependency levels its steps occupy. An artifact
+  count is exact but reads as a number of *files*, and it is not one: a step whose `generates` is a glob produces as
+  many files as the change needs. `SchemaSummary` deliberately carries no artifact count.
+- **The diagram draws the transitive reduction** (`drawableRequires`). A `requires` entry a longer path already implies
+  states nothing new, and drawing it is worse than redundant — it detours around the very step that implies it. Across
+  eleven community schemas surveyed, *every* curved edge was one of these. Levelling still uses the **full** `requires`.
+
+**`openspec-cli.ts`**: one place for spawning the CLI (10s timeout, stderr discarded, `windowsHide`) and for `ttlCached`
+(30s TTL — deliberately >= the CLI timeout so an in-flight call is never judged stale — plus a 256-entry cap). Both were
+written twice before this existed, once in `schema-order.ts` and again in `schemas.ts`, and the cache's original
+"remember failures forever" bug had to be found once and hand-copied into the second copy. A non-zero exit that still
+returns a JSON body is **not** a tool failure: `schema which <unknown>` prints `{"error": "Schema 'x' not found"}` and
+exits 1, so discarding stdout there reports a working CLI as broken. The Kotlin side mirrors this split
+(`OpenspecCli.kt`, `SchemaCatalog.kt`, `SchemaFlow.kt`, `SpekCaches.kt`).
+
 **Frontend artifact sort**: preference in `localStorage["spek:artifact-sort"]` — `modified` (mtime, default) /
 `schema` (`schemaOrder`) / `alpha` (title).
 
@@ -189,6 +234,8 @@ GET /api/openspec/specs/:topic/at/:slug?dir=...     # spec at a change (diff)
 GET /api/openspec/changes?dir=...&aggregate=        # changes list
 GET /api/openspec/changes/:slug?dir=...&wt=         # single change
 GET /api/openspec/graph?dir=...&aggregate=          # spec-change graph
+GET /api/openspec/schemas?dir=...&aggregate=        # workflow schemas + active-change usage
+GET /api/openspec/schemas/:name?dir=...             # one schema's definition (404 carries `reason`)
 GET /api/openspec/worktrees?dir=...&jj=             # worktree/jj list only (no change scan) — feeds the header scope control
 GET /api/openspec/search?dir=...&q=...              # full-text search
 ```
@@ -237,11 +284,19 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
     Platform Gradle Plugin is pinned at **2.9.0**: 2.11.0+ needs Gradle 8.13+, 2.14.0+ needs Gradle 9, and the wrapper
     is 8.11.1 — 2.9.0 is also the version that added the `intellijIdea(...)` helper the 2026.x target needs.
 
-**Frontend routes**: `/` (SelectRepo, web only) → `/dashboard` → `/specs` → `/specs/:topic` → `/changes` → `/changes/:slug` → `/graph`
+**Frontend routes**: `/` (SelectRepo, web only) → `/dashboard` → `/specs` → `/specs/:topic` → `/changes` → `/changes/:slug` → `/graph` → `/schemas` → `/schemas/:name`
 
 ## Key Design Decisions
 
-- **Security**: Express only reads `.md` / `.yaml` files under `openspec/`; no arbitrary file access
+- **Security**: **no arbitrary file access.** For repo-local reads that is achieved by containment —
+  Express only reads `.md` / `.yaml` files under `openspec/`. Schema reading is the one path that
+  reaches outside it: a package schema lives wherever npm installed the CLI, so the path comes from
+  `openspec schema which <name> --json` and the `schema.yaml` there is read directly. Containment
+  cannot be the guard there, so **name validation is** — an explicit allowlist
+  (`isSafeSchemaName`, no separators, no `.`/`..`, no leading/trailing punctuation) gates the name
+  before it reaches the CLI *or* the filesystem, and the same rule is stated in Kotlin with `\A`/`\z`
+  anchors (Java's `$` also matches before a trailing newline, so `^…$` would accept `"spec-driven\n"`
+  on that side only). The property is unchanged; only the mechanism differs for that one path
 - **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), ADDED/MODIFIED (orange/blue badge)
 - **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
@@ -303,6 +358,22 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
     excludes U+0085 by default, since a generated fixture cannot carry a `divergences` entry and the known
     difference would otherwise be ~3% of every batch. 2000 inputs across four seeds found **no** divergence
     beyond the recorded one
+- **Never leave a style unstated that a host will state for you.** The SPA runs inside a VS Code
+  webview, which injects **its own stylesheet into our document** and styles bare elements from the
+  *host's* theme. Concretely: every inline `<code>` must carry the app's chip utilities
+  (`bg-bg-tertiary text-accent px-1.5 py-0.5 rounded`, as in `MarkdownRenderer` / `TaskText`). The
+  schema pages once rendered `<code>` with only a text colour and picked up a **dark chip inside an
+  otherwise light panel** — while every other page, which had always set a background, was fine.
+  **It cannot reproduce in a browser** (no host stylesheet), so it passes every local check and every
+  test, and is only ever found by looking at the real webview. Do not fix this class of bug with a
+  global element rule: Tailwind's utilities sit in `@layer utilities`, an unlayered rule beats *any*
+  layered rule regardless of specificity, so a blanket `code { … }` silently flattens the deliberate
+  chips too
+- **Shared row/badge pieces** (`packages/web/src/components/`): `SourceBadge`, `DefaultSchemaBadge`, `StatCard`,
+  `StretchedLink`. `StretchedLink` is the non-obvious one: a row whose whole card is clickable **cannot** be wrapped in
+  a `<Link>` once it contains a link of its own (nested anchors are invalid, and the inner one becomes unreachable), so
+  the card is a `relative` container, the title carries an `after:absolute after:inset-0` overlay, and anything that
+  must stay clickable sits above it with `relative z-10` — which is why `SchemaBadge` carries those classes
 - **Webview CSP**: IIFE + nonce script + unsafe-inline styles (Tailwind needs it)
 - **Host flags**: VS Code sets `window.__vscodeApi` (`acquireVsCodeApi` called once, stored globally), IntelliJ
   `window.__spekIntellij`, Demo `window.__DEMO_DATA__`. `useFileWatcher` picks its refresh channel from these flags, so
