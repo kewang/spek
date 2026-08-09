@@ -3,6 +3,41 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.7.0
+
+- **`sortArtifacts` keeps the element type you give it.** It is now generic in the element, so an
+  array of your own artifact type comes back as your own type instead of `ChangeArtifact[]` — no
+  cast, and your fields stay reachable on the result:
+
+  ```ts
+  interface MyArtifact extends ChangeArtifact { relPath: string }
+
+  const sorted: MyArtifact[] = sortArtifacts(myArtifacts, 'schema', order)
+  sorted[0].relPath // typed
+  ```
+
+  Previously the signature returned `ChangeArtifact[]` whatever went in. Structural typing let you
+  pass your own DTO and every value survived at runtime, but the type dropped your fields, leaving an
+  unchecked cast as the only way through — on a function whose whole contract is reordering the
+  objects it was handed without rebuilding them.
+
+- **The element only has to carry what the rule reads** — `id` (the narrative rank, the `schemaOrder`
+  lookup and both tiebreaks) and `title` (`alpha`). It need not be a `ChangeArtifact`; one missing
+  either is rejected at compile time.
+
+- **No runtime change.** Same comparisons, same order, same array-identity rule (`modified` may still
+  return the array it was passed). Nothing was added, removed or renamed.
+
+- **Three narrow source-level caveats**, all from a call losing its contextual type rather than from
+  the constraint — annotating the call site restores each one. If your build breaks on the upgrade, it
+  is one of these:
+  - `ReturnType<typeof sortArtifacts>` / `Parameters<typeof sortArtifacts>` now resolve the element to
+    `Pick<ChangeArtifact, 'id' | 'title'>`, not `ChangeArtifact`.
+  - `let list = sortArtifacts([], 'modified')` infers `never[]`, so assigning artifacts *into* `list`
+    afterwards fails. Reading out of a result is unaffected in every case.
+  - An inline object-literal array at an uncontextualised call widens its literal fields: `kind`
+    becomes `string` rather than `ArtifactKind`.
+
 ## 1.6.0
 
 - **`sortArtifacts` is now part of the package**, exported from the `@spekjs/core/artifact-order`
