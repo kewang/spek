@@ -3,6 +3,36 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.6.0
+
+- **`sortArtifacts` is now part of the package**, exported from the `@spekjs/core/artifact-order`
+  subpath beside `DEFAULT_ORDER` and `defaultRank`. It orders a change's artifacts by one of three
+  modes and was previously private to spek's web package, so a consumer could import the narrative
+  order constant but had to reimplement the sort that applies it.
+
+  ```js
+  import { sortArtifacts, ARTIFACT_SORT_MODES } from '@spekjs/core/artifact-order'
+  ```
+
+  - `modified` — the order given, unchanged. **May return the array it was passed**, so callers must
+    not mutate a returned list.
+  - `schema` — the authoritative sequence in `ChangeDetail.schemaOrder`, with artifacts absent from it
+    following in narrative order. When `schemaOrder` is absent or empty the whole list takes the
+    narrative order — which is what every archived change gets, since the order is only queried for
+    active ones.
+  - `alpha` — by display title via `localeCompare`, with the artifact id as a tiebreak. The comparison
+    is locale- and ICU-dependent: two titles may order differently on two hosts, so impose your own
+    order if you need one that is host-independent.
+
+- **`ARTIFACT_SORT_MODES` and `ArtifactSortMode` ship with it**, and the type is *derived from* the
+  array (`(typeof ARTIFACT_SORT_MODES)[number]`). Validate a persisted preference against the array
+  rather than a hand-written copy: a copy that is missing an entry still satisfies the type, and the
+  omitted mode silently stops restoring.
+
+- **Additive only.** Nothing was removed or renamed, no existing behavior changed, and no new subpath
+  was added — these land on the subpath that already existed. The module remains free of any runtime
+  Node import, so it stays safe to value-import from a browser bundle or a host's main process.
+
 ## 1.5.0
 
 - **`parseTasks` states its line-ending and blank-line boundaries instead of inheriting them from the
