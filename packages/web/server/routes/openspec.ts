@@ -210,8 +210,9 @@ openspecRouter.get("/schemas", async (req, res) => {
     scanOpenSpecAggregated(dir, { aggregate, includeJj }),
   ]);
 
-  // A CLI failure is a degraded 200, never a 5xx: the page still has project-local schemas to show
-  // and a reason to explain the rest.
+  // 200, not 5xx: the CLI is one of two sources, not the operation. Project-local schemas still come
+  // off disk, so losing the CLI is a partial result carrying a `degradedReason`, not a failed
+  // request. Reading a single schema is the case that can genuinely fail; that one 404s (below).
   res.json(groupSchemaUsage(catalog, scan.activeChanges));
 });
 
