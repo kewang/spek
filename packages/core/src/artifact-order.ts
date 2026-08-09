@@ -39,7 +39,13 @@ export const ARTIFACT_SORT_MODES = ["modified", "schema", "alpha"] as const;
 
 export type ArtifactSortMode = (typeof ARTIFACT_SORT_MODES)[number];
 
-function byDefaultOrder(a: ChangeArtifact, b: ChangeArtifact): number {
+// Takes only what it reads — the id — so that it stays callable on whatever element type
+// `sortArtifacts` was handed. Typed `ChangeArtifact`, the generic element is not assignable to it and
+// the sort below does not compile; that is the half of this widening that is easy to miss.
+function byDefaultOrder(
+  a: Pick<ChangeArtifact, "id">,
+  b: Pick<ChangeArtifact, "id">,
+): number {
   const ra = defaultRank(a.id);
   const rb = defaultRank(b.id);
   if (ra !== rb) return ra - rb;
@@ -58,12 +64,20 @@ function byDefaultOrder(a: ChangeArtifact, b: ChangeArtifact): number {
  * that mode it can alias the caller's own array, so sorting it in place reorders the data they passed in.
  * `alpha` compares titles with `localeCompare`, which is locale- and ICU-dependent — a caller needing a
  * host-independent order has to impose one itself.
+ *
+ * Generic in the element, so **the caller's own type comes back out**: this function reorders the objects
+ * it is handed and never rebuilds one, and a signature returning `ChangeArtifact[]` regardless of the
+ * input would drop — at the type level only — fields the result still carries at runtime. A consumer
+ * with its own artifact DTO would then need a cast the compiler cannot check, on the one function whose
+ * contract is "same objects, different order". The constraint is the two fields the rule actually reads
+ * (`id` for the narrative rank, the schemaOrder lookup and both tiebreaks; `title` for `alpha`) rather
+ * than `ChangeArtifact` itself, so a DTO carrying the ordering fields but not the rest is accepted.
  */
-export function sortArtifacts(
-  artifacts: ChangeArtifact[],
+export function sortArtifacts<T extends Pick<ChangeArtifact, "id" | "title">>(
+  artifacts: T[],
   mode: ArtifactSortMode,
   schemaOrder?: string[],
-): ChangeArtifact[] {
+): T[] {
   if (mode === "modified") return artifacts;
 
   if (mode === "alpha") {

@@ -130,3 +130,60 @@ test("every mode returns the same set and leaves the input array as it found it"
     }
   }
 });
+
+// --- Element type ------------------------------------------------------------------------------
+//
+// What regressed in issue #45 was the *signature*, not the behavior: a return type of
+// `ChangeArtifact[]` dropped a consumer's own fields from the result's type while every value
+// survived at runtime, so no behavior test could see it. These assertions are therefore checked by
+// `tsc -p tsconfig.test.json` (`npm run type-check`) as much as by the runtime asserts below.
+
+/** The issue's shape: core's own artifact plus a field of the consumer's. */
+interface ArtifactWithPath extends ChangeArtifact {
+  relPath: string;
+}
+
+/** Only the two fields the rule reads, plus one of its own — deliberately not a `ChangeArtifact`. */
+interface OrderingFieldsOnly {
+  id: string;
+  title: string;
+  relPath: string;
+}
+
+test("sorting hands back the element type it was given, extra fields and all", () => {
+  const views: ArtifactWithPath[] = [
+    { ...art("tasks"), relPath: "changes/x/tasks.md" },
+    { ...art("proposal"), relPath: "changes/x/proposal.md" },
+  ];
+
+  for (const mode of ARTIFACT_SORT_MODES) {
+    // No cast. A signature narrowed back to ChangeArtifact[] fails to compile on this assignment,
+    // and reading .relPath off the result fails with it.
+    const sorted: ArtifactWithPath[] = sortArtifacts(views, mode, ["proposal", "tasks"]);
+    assert.deepEqual(
+      sorted.map((a) => a.relPath).sort(),
+      ["changes/x/proposal.md", "changes/x/tasks.md"],
+      `relPath did not survive ${mode} mode`,
+    );
+  }
+});
+
+test("an element carrying the fields the rule reads is enough — it need not be a ChangeArtifact", () => {
+  const minimal: OrderingFieldsOnly[] = [
+    { id: "tasks", title: "Tasks", relPath: "changes/x/tasks.md" },
+    { id: "proposal", title: "Proposal", relPath: "changes/x/proposal.md" },
+  ];
+  const sorted: OrderingFieldsOnly[] = sortArtifacts(minimal, "schema", ["proposal", "tasks"]);
+  assert.deepEqual(
+    sorted.map((a) => a.relPath),
+    ["changes/x/proposal.md", "changes/x/tasks.md"],
+  );
+});
+
+// Never called — tsc is the assertion. `title` is one of the two fields the rule reads, so elements
+// without it are not acceptable input; the directive also fails as *unused* if the constraint is
+// ever loosened enough to accept them, so this catches a widening as well as a narrowing.
+function _elementsWithoutTitleAreRejected(idsOnly: { id: string }[]) {
+  // @ts-expect-error element type is missing `title`, which `alpha` orders by
+  return sortArtifacts(idsOnly, "alpha");
+}
