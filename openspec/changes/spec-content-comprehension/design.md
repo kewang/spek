@@ -62,9 +62,10 @@ It also brings, for free, what the other would have had to reimplement: `summary
 Enter/Space toggles it, the open/closed state is exposed to assistive technology, and the browser's own
 print and find behaviours apply.
 
-**Consequence for the risk register**: if an embedding turns out not to auto-expand on find, the
-degradation is "Ctrl+F misses folded Scenario bodies until the reader clicks Expand all" — one click,
-not a dead end. That is why this is no longer a blocking unknown (see Open Questions).
+**Consequence for the risk register**: if an embedding turned out not to auto-expand on find, the
+degradation would be "Ctrl+F misses folded Scenario bodies until the reader clicks Expand all" — one
+click, not a dead end. In the event it does auto-expand, so the budgeted degradation never applies (see
+Resolved).
 
 ### 2. Section the tree in a rehype plugin, beside the existing one
 
@@ -228,15 +229,28 @@ weight involved is ≤ bold, so inheriting is always correct.
   a following Requirement into the previous one, which looks like content loss. This is why the
   transform is pure and directly tested rather than verified by eye.
 
-## Open Questions
+## Resolved
 
-- **Does find-in-page auto-expand a closed `<details>` in each embedding?** Chromium's behaviour here
-  (and `hidden="until-found"`, if it is needed at all) has to be checked against the three actual
-  runtimes — a browser, the VS Code webview at `engines.vscode ^1.85.0`, and JCEF on the platform range
-  down to `since-build 233` — **not** read off platform documentation, since the floor versions are old
-  enough that the answer may differ between them. Per decision 1 this is a quality question, not a
-  blocker: the mechanism is chosen either way, and the answer only decides whether an extra
-  `hidden="until-found"` wrapper earns its place.
-- **Does anything else render spec markdown with an expectation of flat output?** The demo builder
-  serialises spec content into `docs/demo.html`; it should inherit folding for free, but that is an
-  assumption until the demo is rebuilt and opened.
+- **Find-in-page does auto-expand a closed `<details>`.** Checked by hand in the browser: Ctrl+F on a
+  string that exists only inside a collapsed scenario finds it and opens the fold. So **no
+  `hidden="until-found"` wrapper is needed** — the native element already carries the behaviour, and the
+  degradation decision 1 budgeted for does not arise. Feature detection agrees (Chromium 145 reports
+  both `beforematch` and `hidden="until-found"`), but the gesture is what was actually tested.
+- **The demo inherits folding.** Rebuilt with `NODE_ENV=production` and opened: 27 folds, five
+  requirements open, no scenario open, and the light-theme keyword token resolving to `#1447e6`. The
+  built file is then reverted rather than committed — `pages.yml` uploads the committed `docs/`
+  verbatim, so it would publish ahead of the release.
+- **`useScrollspy` survives Collapse all.** Probed at five scroll positions in both states: the active
+  TOC entry matched the topmost heading every time. Two measurement traps if this is ever re-run — the
+  spy updates inside `requestAnimationFrame`, so a synchronous read after dispatching `scroll` reports
+  the previous state; and the fold preference persists, so a previous run leaves the page in whatever
+  state it ended in and mislabels the baseline.
+
+- **Both embedded hosts render folding identically to the Web.** Driven over CDP against the real
+  panels: the VS Code webview and IntelliJ's JCEF page each reported 27 folds, five requirements open,
+  no scenario open, working Expand/Collapse all, the dark token values, and a focusable `summary`.
+- **IntelliJ confirms the diagnosis the change was built on.** Its tool window renders at **461×575**,
+  and the spec-detail TOC is absent there (`toc: false` — it is gated at 1280px). On the surface issue
+  #42 was filed from, folding is the *only* structural affordance available, which is why a TOC was
+  never going to answer that report. All five requirement headings now fit on one screen of a 461px
+  panel.

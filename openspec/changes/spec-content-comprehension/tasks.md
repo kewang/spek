@@ -58,10 +58,10 @@ time. A caption changed without its image retaken leaves the README contradictin
 
 - [x] 9.0 Light and dark spec rendering after the contrast fix, captured side by side against the previous build
 - [x] 9.1 Web, both themes: folding, bulk controls, persistence across navigation and reload, TOC and hash navigation into collapsed sections
-- [ ] 9.2 VS Code webview
-- [ ] 9.3 IntelliJ tool window — the surface the issue was filed against, and the narrowest viewport; treat this as the acceptance test
+- [x] 9.2 VS Code webview — driven through the extension's own panel over CDP: 27 folds, 5 requirements open, 0 scenarios open, Expand/Collapse all working (0 ↔ 27), dark token values, `summary` focusable
+- [x] 9.3 IntelliJ tool window — the surface the issue was filed against, and the narrowest viewport; treat this as the acceptance test. Verified in a sandbox IDE at a **461×575** viewport: same 27/5/0 counts, controls working, all five requirement headings on one screen. Confirms the TOC never appears there (`toc: false`, it needs ≥1280px), so folding is the only structural affordance that surface has
 - [x] 9.4 Rebuild the demo with `NODE_ENV=production` and confirm it inherits folding and the new colours — then **revert `docs/demo.html`**: `pages.yml` uploads the committed `docs/` verbatim, so committing it would publish the unreleased feature to the live demo
-- [ ] 9.5 Resolve the design's open question: check whether find-in-page auto-expands a closed `<details>` in each of the three embeddings, and record the answer — it decides whether a `hidden="until-found"` wrapper earns its place. **Chromium 145 (headless) reports `beforematch` and `hidden="until-found"` both supported; the Ctrl+F gesture itself still needs a human in each host.**
+- [x] 9.5 Resolve the design's open question: find-in-page **does** auto-expand a closed `<details>` — confirmed by hand with the Ctrl+F gesture. No `hidden="until-found"` wrapper is needed
 - [x] 9.6 Check `useScrollspy` under Collapse all, where the compressed page can change which heading reads as active
 
 ## 10. Gates
