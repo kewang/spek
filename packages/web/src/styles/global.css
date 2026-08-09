@@ -11,6 +11,23 @@
   --color-text-muted: #64748b;
   --color-accent: #f59e0b;
   --color-accent-hover: #d97706;
+
+  /*
+   * BDD marks. Dark values are exactly what shipped before; the tokens exist so the light theme can
+   * carry its own. They were previously hard-coded Tailwind 400 shades used in both themes, and no
+   * 400 shade in any family reaches even 3:1 against the light background — every mark failed WCAG AA
+   * there while dark passed and hid it.
+   *
+   * Only the text colour is theme-scoped. The pill fills keep their `/20` alpha and composite over
+   * whichever page colour is active, so they need no token of their own.
+   */
+  --color-kw-when: #51a2ff;
+  --color-kw-then: #05df72;
+  --color-kw-and: #99a1af;
+  --color-kw-normative: #ff6467;
+  --color-badge-added: #ff8904;
+  --color-badge-modified: #51a2ff;
+  --color-code-text: #f59e0b;
 }
 
 /*
@@ -43,6 +60,17 @@
   --color-text-muted: #94a3b8;
   --color-accent: #d97706;
   --color-accent-hover: #b45309;
+
+  /* Same hue families, dark enough to clear 4.5:1 over each mark's own composited background
+     (5.17–6.47:1). `kw-then` and `kw-normative` were also picked to widen the red/green pair under
+     dichromacy: worst-case ΔE00 8.5 here against dark's 6.8. */
+  --color-kw-when: #1447e6;
+  --color-kw-then: #016630;
+  --color-kw-and: #45556c;
+  --color-kw-normative: #c10007;
+  --color-badge-added: #9f2d00;
+  --color-badge-modified: #1447e6;
+  --color-code-text: #92400e;
 }
 
 body {

@@ -70,11 +70,22 @@ directory not a jj repo, the jj helpers resolve to `[]` and results are identica
 
 ```js
 import { extractHeadings, slugifyHeading } from '@spekjs/core/headings'
-import { DEFAULT_ORDER, defaultRank } from '@spekjs/core/artifact-order'
+import {
+  DEFAULT_ORDER,
+  defaultRank,
+  sortArtifacts,
+  ARTIFACT_SORT_MODES,
+} from '@spekjs/core/artifact-order'
 ```
 
-`@spekjs/core/headings` is kept separate so browser bundles can import heading utilities without
-pulling in server-only modules.
+These subpaths are kept separate so browser bundles can import the utilities without pulling in
+server-only modules.
+
+`sortArtifacts(artifacts, mode, schemaOrder?)` orders a change's artifacts by one of
+`ARTIFACT_SORT_MODES` — `modified` (the order given), `schema` (the authoritative sequence, falling
+back to the narrative order when unavailable), or `alpha` (by title). `ArtifactSortMode` is derived
+from `ARTIFACT_SORT_MODES`, so validating a persisted preference against the array cannot drift from
+the type. Callers must not mutate a returned list: under `modified` it may be the array they passed in.
 
 ## License
 

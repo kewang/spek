@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0
+
+**Highlight: a spec opens as an outline with substance, instead of a wall of text.** This was reported from this plugin (issue #42): "you are asked to read all these fine details, but you don't even really know the shape of the thing first." A tool window is narrower than a browser window, which made the wall worse here than anywhere else.
+
+- **Requirements and scenarios fold in place.** Each `### Requirement:` shows its heading *and* its lead SHALL paragraph; each `#### Scenario:` shows as a heading with its WHEN/THEN body collapsed. Scenario blocks are 59% of the character volume in a typical spec — so the first screen becomes a contents page that still says what each requirement requires. Expand all / Collapse all is available, and your choice is remembered. This does **not** depend on the tool window's width, unlike the table of contents, which stays hidden below 1280px
+- **Find-in-page still finds folded text, and links still land.** Folding uses the browser's native disclosure elements rather than hiding content with CSS, so a find reaches text inside a collapsed scenario. Navigating to a heading expands whatever encloses it before scrolling, so a link never arrives at something invisible
+- **Folding applies only to spec-shaped content** — the spec detail page and a change's Specs tab. Proposal, design and other markdown artifacts render unfolded exactly as before
+- **Every BDD keyword is legible in the light theme.** WHEN / THEN / SHALL and the rest were hard-coded to one set of colours shared by both themes, and against the light background all 8 failed WCAG AA — 7 below even 3:1, with `THEN` at **1.43:1**. The dark theme passed everywhere, which is why this went unseen. Light now has its own values in the same hue families, clearing AA at 5.17–6.47:1; dark is unchanged byte for byte, and no hue or pill fill moves on either theme
+- **A highlighted keyword no longer renders lighter than the emphasis around it.** A keyword inside `**bold**` was drawn at a lower font weight than the bold text containing it
+- *Internal:* the Kotlin task parser is now verified against the same shared fixture corpus as the TypeScript one, so a case added in either language is asserted by both from the next run. This is what keeps the two from drifting apart on the same `tasks.md`
+
 ## 1.10.1
 
 - **A `tasks.md` whose lines don't end in a plain newline is counted the same here as on the other surfaces.** The plugin re-implements the task parser in Kotlin, and Java's regex engine reads a trailing carriage return differently from JavaScript's — so a file using carriage-return line endings, or carrying a stray `\r`, produced a different task count in the IDE than in the Web and VS Code viewers reading the same repo. Both implementations now follow CommonMark, which counts a lone `\r` as a line ending like any other (issue #33)

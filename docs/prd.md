@@ -160,6 +160,10 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   stats (avg archived lifecycle, stale active changes).
 - **Specs browser** — alphabetical list with instant filter, detail view with BDD highlighting and a
   table of contents, revision history, and **spec diff** between change versions.
+- **Foldable spec sections** — requirements and scenarios render as collapsible sections
+  (requirements open, scenarios closed) so a spec opens as an outline carrying its normative
+  sentences rather than as a wall of text; Expand all / Collapse all, remembered across specs and
+  sessions. Applies to spec detail and a change's Specs tab, not to its other artifacts.
 - **Changes browser** — active and archived changes; each change renders its disk-discovered
   artifacts as tabs (Proposal / Design / Tasks / Specs and any custom-schema artifacts), with
   user-selectable tab ordering (Last modified / Schema order / A–Z) and a schema badge.

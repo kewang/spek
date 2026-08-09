@@ -12,7 +12,9 @@ import { SpecToc } from "../components/SpecToc";
 import { SchemaBadge } from "../components/SchemaBadge";
 import { formatLifecycleBanner, todayIso } from "../utils/lifecycle";
 import { useArtifactSort } from "../hooks/useArtifactSort";
-import { sortArtifacts, type ArtifactSortMode } from "../utils/artifact-sort";
+import { FoldControls } from "../components/FoldControls";
+import { foldOptionsFor, useSpecFold, type SpecFold } from "../hooks/useSpecFold";
+import { sortArtifacts, type ArtifactSortMode } from "@spekjs/core/artifact-order";
 import { scrollToAnchorId } from "../utils/scrollOffset";
 
 const TOC_MIN_HEADINGS = 3;
@@ -28,8 +30,9 @@ function isMarkdownLike(kind: ChangeArtifact["kind"]): boolean {
   return kind === "markdown" || kind === "specs";
 }
 
-function renderArtifact(artifact: ChangeArtifact, specTopics: string[]) {
+function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: SpecFold) {
   if (artifact.kind === "markdown") {
+    // proposal / design 等 markdown artifact 不摺疊 —— 只有 spec 形狀的內容摺
     return artifact.content ? (
       <MarkdownRenderer content={artifact.content} specTopics={specTopics} />
     ) : (
@@ -38,7 +41,11 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[]) {
   }
   if (artifact.kind === "specs") {
     return artifact.specs && artifact.specs.length > 0 ? (
-      <SpecsTabContent specs={artifact.specs} />
+      <SpecsTabContent
+        key={fold.generation}
+        specs={artifact.specs}
+        fold={foldOptionsFor(fold.mode)}
+      />
     ) : (
       <p className="text-text-muted text-sm">No delta specs</p>
     );
@@ -147,6 +154,7 @@ export function ChangeDetail() {
   const specTopics = specsData?.map((s) => s.topic) ?? [];
 
   const [sortMode, setSortMode] = useArtifactSort();
+  const fold = useSpecFold();
   const rawArtifacts = useMemo(() => data?.artifacts ?? [], [data]);
   const schemaOrder = data?.schemaOrder;
   // 依使用者選擇的模式重新排序（modified = core 交付的 mtime 序，即 last-modified）
@@ -214,7 +222,7 @@ export function ChangeDetail() {
   const tabs = artifacts.map((artifact) => ({
     id: artifact.id,
     label: artifact.title,
-    content: renderArtifact(artifact, specTopics),
+    content: renderArtifact(artifact, specTopics, fold),
   }));
 
   const lifecycleBanner = formatLifecycleBanner(data, todayIso());
@@ -240,11 +248,15 @@ export function ChangeDetail() {
         {lifecycleBanner && (
           <p className="text-text-muted text-xs tracking-wide [word-spacing:0.15em]">{lifecycleBanner}</p>
         )}
-        {artifacts.length >= 2 && (
-          <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          {/* 摺疊只作用在 specs tab，控制項也只在那裡出現 */}
+          {activeArtifact?.kind === "specs" && (
+            <FoldControls mode={fold.mode} onChange={fold.setMode} />
+          )}
+          {artifacts.length >= 2 && (
             <ArtifactSortControl mode={sortMode} onChange={setSortMode} schemaFallback={schemaFallback} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
       {artifacts.length >= 2 && schemaFallback && (
         <p className="mt-1 flex items-center gap-1 text-text-muted text-[11px]">

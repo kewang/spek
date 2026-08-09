@@ -197,8 +197,14 @@ returns a JSON body is **not** a tool failure: `schema which <unknown>` prints `
 exits 1, so discarding stdout there reports a working CLI as broken. The Kotlin side mirrors this split
 (`OpenspecCli.kt`, `SchemaCatalog.kt`, `SchemaFlow.kt`, `SpekCaches.kt`).
 
-**Frontend artifact sort**: preference in `localStorage["spek:artifact-sort"]` — `modified` (mtime, default) /
-`schema` (`schemaOrder`) / `alpha` (title).
+**Artifact sort**: the rule is `sortArtifacts(artifacts, mode, schemaOrder?)` in **core**, beside `DEFAULT_ORDER` /
+`defaultRank` on the `@spekjs/core/artifact-order` subpath — `modified` (the order given, i.e. mtime; default) /
+`schema` (`schemaOrder`, falling back to the narrative order when it is absent, which is what archived changes always
+get) / `alpha` (title, via `localeCompare`, so ordering is host-collation dependent). `ArtifactSortMode` is derived
+from the exported `ARTIFACT_SORT_MODES` — validate a persisted preference against **that array**, never a hand-written
+copy: a copy missing an entry still satisfies the type, and the omitted mode silently stops restoring. Core owns what
+the modes mean; **each host owns where the choice is stored** (web: `localStorage["spek:artifact-sort"]`). `modified`
+may return the array it was given, so **callers must not mutate a returned list**.
 
 **Polling fallback**: inotify doesn't deliver events on 9p/drvfs/NFS/CIFS mounts (devcontainer/WSL), so the decision is
 by the watched path's fstype (`decidePolling` precedence: explicit override `SPEK_WATCH_POLLING` /
@@ -297,7 +303,24 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   before it reaches the CLI *or* the filesystem, and the same rule is stated in Kotlin with `\A`/`\z`
   anchors (Java's `$` also matches before a trailing newline, so `^…$` would accept `"spec-driven\n"`
   on that side only). The property is unchanged; only the mechanism differs for that one path
-- **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), ADDED/MODIFIED (orange/blue badge)
+- **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), ADDED/MODIFIED
+  (orange/blue badge). Each hue is a **per-theme token** (`--color-kw-*`, `--color-badge-*`,
+  `--color-code-text`), not a Tailwind palette class — those were shared by both themes, and no 400
+  shade in any family clears even 3:1 on the light background, so every mark failed WCAG AA there while
+  dark passed and hid it. **Adding a mark means adding both theme's values.** Pill fills stay plain
+  `bg-*-500/20`: an alpha composites over whichever page colour is active and needs no token. The
+  highlight must never *lower* the weight it found — a keyword inside `**bold**` inherits instead
+  (`BDD_WEIGHTS` is suppressed inside `<strong>`), or the emphasised word renders lighter than the
+  emphasis around it
+- **Spec section folding**: `### Requirement:` / `#### Scenario:` render as native `<details>` —
+  requirements open, scenarios closed — so a spec opens as an outline with substance rather than a wall.
+  `rehypeSpekFoldSections` (pure, in `utils/foldSections.ts`) regroups the hast tree and **must run
+  after** `rehypeSpekHeadingIds`, which needs a still-flat tree for its dedup counter. Native
+  `<details>` is chosen because it is the only mechanism find-in-page can ever see, and it brings
+  keyboard and a11y behaviour for free; the elements are **uncontrolled** (React sets only the initial
+  `open`), so Expand/Collapse all works by remounting on a generation `key` and `scrollToAnchorId` may
+  open ancestors by touching the DOM directly. Folding is **opt-in per call site** (`fold` prop) — the
+  renderer is shared with proposal / design / tasks, which must stay unfolded
 - **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
@@ -430,5 +453,17 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   `/openspec-archive-change` to archive
 - **Exception**: pure-docs changes that don't touch any spec under `openspec/specs/` (README / CONTRIBUTING / `docs/*` /
   community files) are committed directly, without a change
-- **On archive**: update affected docs (CLAUDE.md / README, etc.) and create a git commit
+- **On archive**: update the docs that describe *master's implementation* — `CLAUDE.md`, `docs/prd.md`,
+  `openspec/specs/` — and create a git commit
+- **The READMEs and `docs/demo.html` are release-time, not archive-time.** `README.md` /
+  `README.zh-TW.md` describe what a user who installed the published build actually has, so a feature
+  sitting on master unreleased must not appear there yet — someone installing the current Marketplace
+  version would read about something they do not have. They move with the CHANGELOG and the version
+  bump, in `/release`. The `screenshots/` referenced by the README are part of the same batch:
+  **changing a caption without retaking its image makes the README contradict itself**, which is how
+  this rule got written down.
+  `docs/demo.html` is the same case for a sharper reason: `pages.yml` uploads the committed `docs/`
+  **verbatim** — it does not rebuild — so committing a rebuilt demo publishes the unreleased feature to
+  the live demo on the next master push. Rebuild it to *verify* a change if you like, then revert it;
+  git history shows it only ever landing in `Rebuild demo for vX.Y.Z` commits
 ```

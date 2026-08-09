@@ -25,11 +25,15 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.10.1</b></p>
+        <p><b>1.11.0</b></p>
+        <p><b>A spec opens as an outline with substance, instead of a wall of text.</b> Reported from this plugin (issue #42): "you are asked to read all these fine details, but you don't even really know the shape of the thing first." A tool window is narrower than a browser window, which made the wall worse here than anywhere else.</p>
         <ul>
-            <li><b>A tasks.md whose lines don't end in a plain newline is counted the same here as on the other surfaces.</b> The plugin re-implements the task parser in Kotlin, and Java's regex engine reads a trailing carriage return differently from JavaScript's &mdash; so a file using carriage-return line endings, or carrying a stray <code>\r</code>, produced a different task count in the IDE than in the Web and VS Code viewers reading the same repo. Both implementations now follow CommonMark, which counts a lone <code>\r</code> as a line ending like any other (issue #33).</li>
-            <li><b>An invisible-whitespace line is treated the same way on every surface.</b> Kotlin and JavaScript disagree about which characters count as whitespace, so a line holding only a no-break space, or only a control character such as U+001C, ended a task's continuation on one surface and not the other. Only spaces and tabs make a line blank now, as CommonMark defines it.</li>
-            <li><b>Nothing moves for a tasks.md that uses ordinary newlines</b> &mdash; the overwhelming majority. Both fixes were verified against a reference Markdown renderer, and no progress bar or count changes.</li>
+            <li><b>Requirements and scenarios fold in place.</b> Each <code>### Requirement:</code> shows its heading <i>and</i> its lead SHALL paragraph; each <code>#### Scenario:</code> shows as a heading with its WHEN/THEN body collapsed. Scenario blocks are 59% of the character volume in a typical spec, so the first screen becomes a contents page that still says what each requirement requires. Expand all / Collapse all is available, and your choice is remembered. This does <b>not</b> depend on the tool window's width, unlike the table of contents, which stays hidden below 1280px.</li>
+            <li><b>Find-in-page still finds folded text, and links still land.</b> Folding uses the browser's native disclosure elements rather than hiding content with CSS, so a find reaches text inside a collapsed scenario. Navigating to a heading expands whatever encloses it before scrolling, so a link never arrives at something invisible.</li>
+            <li><b>Folding applies only to spec-shaped content</b> &mdash; the spec detail page and a change's Specs tab. Proposal, design and other markdown artifacts render unfolded exactly as before.</li>
+            <li><b>Every BDD keyword is legible in the light theme.</b> WHEN / THEN / SHALL and the rest were hard-coded to one set of colours shared by both themes, and against the light background all 8 failed WCAG AA &mdash; 7 below even 3:1, with THEN at 1.43:1. The dark theme passed everywhere, which is why this went unseen. Light now has its own values in the same hue families, clearing AA at 5.17&ndash;6.47:1; dark is unchanged byte for byte, and no hue or pill fill moves on either theme.</li>
+            <li><b>A highlighted keyword no longer renders lighter than the emphasis around it.</b> A keyword inside <code>**bold**</code> was drawn at a lower font weight than the bold text containing it.</li>
+            <li><i>Internal:</i> the Kotlin task parser is now verified against the same shared fixture corpus as the TypeScript one, so a case added in either language is asserted by both from the next run. This is what keeps the two from drifting apart on the same tasks.md.</li>
         </ul>
     ]]></change-notes>
 

@@ -3,16 +3,14 @@ import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
 import { type ReactNode } from "react";
 import { slugifyHeading } from "@spekjs/core/headings";
+import {
+  rehypeSpekFoldSections,
+  type FoldOptions,
+  type HastNode,
+} from "../utils/foldSections";
 
 // rehype plugin：為 h2/h3 加上 deterministic id（與 extractHeadings 的 slug 演算法一致）。
 // 在 hast 階段處理可避免 React Strict Mode 的 double render 讓 counter 翻倍。
-type HastNode = {
-  type: string;
-  tagName?: string;
-  value?: string;
-  properties?: Record<string, unknown>;
-  children?: HastNode[];
-};
 
 function hastToText(node: HastNode): string {
   if (node.type === "text") return node.value ?? "";
@@ -49,18 +47,41 @@ interface MarkdownRendererProps {
   specTopics?: string[];
   // 給 ChangeDetail Specs tab 使用：多份 delta spec 合併時以 `<topic>--` 前綴避免 id 衝突
   idPrefix?: string;
+  /**
+   * 開啟章節摺疊。由呼叫端指定而非由內容推斷 —— 這個 renderer 同時服務 proposal / design / tasks，
+   * 只有 spec 形狀的內容該摺疊，其餘靠「沒傳」而不是靠某處的判斷來排除。
+   */
+  fold?: FoldOptions;
 }
 
-// BDD 關鍵字樣式對應
+// BDD 關鍵字樣式對應。
+//
+// 文字色走 `--color-kw-*` / `--color-badge-*` token，因為淺色主題需要自己的一組值（原本兩個主題
+// 共用寫死的 Tailwind 400 色階，在淺色下全部不符 WCAG AA）。底色維持 `/20`，會自動疊在當前主題的
+// 頁面底色上，不需要 token。
+//
+// 字重不放在這裡而放 `BDD_WEIGHTS`：關鍵字若出現在 `**粗體**` 內，highlight 不得把字重調低。
 const BDD_KEYWORDS: Record<string, string> = {
-  WHEN: "bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-sm font-semibold",
-  GIVEN: "bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-sm font-semibold",
-  THEN: "bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded text-sm font-semibold",
-  AND: "bg-gray-500/20 text-gray-400 px-1.5 py-0.5 rounded text-sm font-semibold",
-  MUST: "text-red-400 font-bold",
-  SHALL: "text-red-400 font-bold",
-  ADDED: "bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded text-xs font-semibold",
-  MODIFIED: "bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-xs font-semibold",
+  WHEN: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm",
+  GIVEN: "bg-blue-500/20 text-kw-when px-1.5 py-0.5 rounded text-sm",
+  THEN: "bg-green-500/20 text-kw-then px-1.5 py-0.5 rounded text-sm",
+  AND: "bg-gray-500/20 text-kw-and px-1.5 py-0.5 rounded text-sm",
+  MUST: "text-kw-normative",
+  SHALL: "text-kw-normative",
+  ADDED: "bg-orange-500/20 text-badge-added px-1.5 py-0.5 rounded text-xs",
+  MODIFIED: "bg-blue-500/20 text-badge-modified px-1.5 py-0.5 rounded text-xs",
+};
+
+// 只在 `<strong>` 之外套用 —— 見 highlightBddKeywords。
+const BDD_WEIGHTS: Record<string, string> = {
+  WHEN: "font-semibold",
+  GIVEN: "font-semibold",
+  THEN: "font-semibold",
+  AND: "font-semibold",
+  MUST: "font-bold",
+  SHALL: "font-bold",
+  ADDED: "font-semibold",
+  MODIFIED: "font-semibold",
 };
 
 const BDD_PATTERN = new RegExp(
@@ -68,7 +89,12 @@ const BDD_PATTERN = new RegExp(
   "g"
 );
 
-function highlightBddKeywords(text: string): ReactNode[] {
+/**
+ * `inStrong` 時不輸出 highlight 自己的字重，改為繼承。否則 `**SHALL**` 會被 span 的
+ * `font-semibold`（600）以 specificity 蓋過父層 `<strong>` 的 700，作者標了粗體的字反而變細 ——
+ * 這裡的字重都 ≤ bold，繼承一律正確。
+ */
+function highlightBddKeywords(text: string, inStrong: boolean): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -79,8 +105,11 @@ function highlightBddKeywords(text: string): ReactNode[] {
       parts.push(text.slice(lastIndex, match.index));
     }
     const keyword = match[1];
+    const className = inStrong
+      ? BDD_KEYWORDS[keyword]
+      : `${BDD_KEYWORDS[keyword]} ${BDD_WEIGHTS[keyword]}`;
     parts.push(
-      <span key={match.index} className={BDD_KEYWORDS[keyword]}>
+      <span key={match.index} className={className}>
         {keyword}
       </span>
     );
@@ -94,14 +123,14 @@ function highlightBddKeywords(text: string): ReactNode[] {
   return parts;
 }
 
-function processChildren(children: ReactNode): ReactNode {
+function processChildren(children: ReactNode, inStrong = false): ReactNode {
   if (typeof children === "string") {
-    return highlightBddKeywords(children);
+    return highlightBddKeywords(children, inStrong);
   }
   if (Array.isArray(children)) {
     return children.map((child, i) =>
       typeof child === "string" ? (
-        <span key={i}>{highlightBddKeywords(child)}</span>
+        <span key={i}>{highlightBddKeywords(child, inStrong)}</span>
       ) : (
         child
       )
@@ -110,7 +139,13 @@ function processChildren(children: ReactNode): ReactNode {
   return children;
 }
 
-export function MarkdownRenderer({ content, specTopics, idPrefix }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, specTopics, idPrefix, fold }: MarkdownRendererProps) {
+  // 順序不可調換：heading id 必須在還是扁平樹時指派，否則 dedup counter 看到的走訪順序會變。
+  const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+    [rehypeSpekHeadingIds, { idPrefix }],
+  ];
+  if (fold) rehypePlugins.push([rehypeSpekFoldSections, fold]);
+
   return (
     // `overflow-wrap` is inherited, so this covers prose as well as inline code: instruction text
     // is full of bare paths (`openspec/changes/<name>/brainstorm.md`) that have no space to break
@@ -119,7 +154,7 @@ export function MarkdownRenderer({ content, specTopics, idPrefix }: MarkdownRend
     <div className="markdown-body [overflow-wrap:anywhere]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeSpekHeadingIds, { idPrefix }]]}
+        rehypePlugins={rehypePlugins}
         components={{
           // 段落：套用 BDD 高亮
           p({ children }) {
@@ -150,7 +185,7 @@ export function MarkdownRenderer({ content, specTopics, idPrefix }: MarkdownRend
           },
           // 強調
           strong({ children }) {
-            return <strong className="font-bold text-text-primary">{processChildren(children)}</strong>;
+            return <strong className="font-bold text-text-primary">{processChildren(children, true)}</strong>;
           },
           em({ children }) {
             return <em className="italic text-text-secondary">{children}</em>;
@@ -179,18 +214,21 @@ export function MarkdownRenderer({ content, specTopics, idPrefix }: MarkdownRend
               );
             }
             const text = typeof children === "string" ? children : String(children ?? "");
+            // inline code 與 spec 參照本來就同色（差別在虛線底線），一起走 `--color-code-text`：
+            // 深色維持既有的琥珀，淺色改用深一階的琥珀讓它符合 AA。頁面上其他連結仍走
+            // `--color-accent`，那是 app 層級的對比問題（issue #43），不在這個 change 的範圍。
             if (specTopics?.includes(text)) {
               return (
                 <Link
                   to={`/specs/${text}`}
-                  className="bg-bg-tertiary text-accent hover:text-accent-hover px-1.5 py-0.5 rounded text-sm underline decoration-dotted transition-colors"
+                  className="bg-bg-tertiary text-code-text hover:text-accent-hover px-1.5 py-0.5 rounded text-sm underline decoration-dotted transition-colors"
                 >
                   {text}
                 </Link>
               );
             }
             return (
-              <code className="bg-bg-tertiary text-accent px-1.5 py-0.5 rounded text-sm">
+              <code className="bg-bg-tertiary text-code-text px-1.5 py-0.5 rounded text-sm">
                 {children}
               </code>
             );
@@ -240,6 +278,29 @@ export function MarkdownRenderer({ content, specTopics, idPrefix }: MarkdownRend
           },
           ol({ children }) {
             return <ol className="list-decimal list-outside pl-8 mb-4 space-y-1">{children}</ol>;
+          },
+          // 摺疊區塊。用原生 <details>/<summary>：它是唯一能被瀏覽器自身 find-in-page 找到的機制，
+          // 而且鍵盤操作與輔助技術的狀態回報都不必自己重做。`group` 讓 summary 的箭頭能跟著 open 轉。
+          details({ children, ...props }) {
+            return (
+              <details {...props} className="group">
+                {children}
+              </details>
+            );
+          },
+          summary({ children }) {
+            return (
+              <summary className="list-none cursor-pointer flex items-baseline gap-1.5 [&::-webkit-details-marker]:hidden">
+                <svg
+                  viewBox="0 0 12 12"
+                  aria-hidden="true"
+                  className="w-2.5 h-2.5 shrink-0 translate-y-px text-text-muted transition-transform group-open:rotate-90"
+                >
+                  <path d="M4 2.5 L8 6 L4 9.5 Z" fill="currentColor" />
+                </svg>
+                <span className="min-w-0 flex-1">{children}</span>
+              </summary>
+            );
           },
           // 分隔線
           hr() {

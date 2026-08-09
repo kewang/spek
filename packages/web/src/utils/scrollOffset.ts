@@ -46,10 +46,33 @@ export function scrollOffset(doc: MinimalDoc = document, cssTop: CssTopReader = 
   return pinnedBottom(obstruction.getBoundingClientRect(), cssTop(obstruction)) + GAP;
 }
 
-/** 平滑捲到指定 id 的元素（存在才捲）；回傳是否找到，供 retry 迴圈判斷。 */
+/**
+ * 展開目標所有的 <details> 祖先。摺疊起來的章節裡，目標 heading 本身仍在 DOM（它是 summary 的內容），
+ * 所以捲得到卻看不到內容 —— 讀者要求前往某條 requirement，到了卻是空的。
+ *
+ * 直接改 DOM 是可以的：這些 <details> 是非受控的（React 只給初始 open，之後交給瀏覽器），沒有會被
+ * 弄不同步的 React state。
+ */
+function revealFoldedAncestors(el: Element): void {
+  let node: Element | null = el.parentElement;
+  while (node) {
+    const details = node.closest("details");
+    if (!details) break;
+    details.open = true;
+    node = details.parentElement;
+  }
+}
+
+/**
+ * 平滑捲到指定 id 的元素（存在才捲）；回傳是否找到，供 retry 迴圈判斷。
+ *
+ * 所有進入 heading 的路徑 —— TOC 點擊、載入時的 #hash、VS Code 的 navigateTo —— 都走這裡，所以
+ * 「先展開再捲動」只需要放在這一個地方。展開會改變版面，故必須在量測 rect 之前完成。
+ */
 export function scrollToAnchorId(id: string): boolean {
   const el = document.getElementById(id);
   if (!el) return false;
+  revealFoldedAncestors(el);
   const top = anchorScrollTop(el.getBoundingClientRect().top, window.scrollY, scrollOffset());
   window.scrollTo({ top, behavior: "smooth" });
   return true;

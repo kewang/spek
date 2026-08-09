@@ -6,6 +6,8 @@ import { useSpec, useSpecAtChange } from "../hooks/useOpenSpec";
 import { MarkdownRenderer } from "../components/MarkdownRenderer";
 import { SpecDiffViewer } from "../components/SpecDiffViewer";
 import { SpecToc } from "../components/SpecToc";
+import { FoldControls } from "../components/FoldControls";
+import { foldOptionsFor, useSpecFold } from "../hooks/useSpecFold";
 import { formatRelativeTime } from "../utils/formatRelativeTime";
 import { scrollToAnchorId } from "../utils/scrollOffset";
 
@@ -49,6 +51,7 @@ export function SpecDetail() {
   const location = useLocation();
   const { data, loading, error } = useSpec(topic ?? "");
   const [compareEntry, setCompareEntry] = useState<HistoryEntry | null>(null);
+  const fold = useSpecFold();
 
   const headings = useMemo(
     () => (data ? extractHeadings(data.content) : []),
@@ -90,7 +93,10 @@ export function SpecDetail() {
         <Link to="/specs" className="text-text-muted text-base font-medium hover:text-accent transition-colors">
           &larr; Back to Specs
         </Link>
-        <h1 className="text-2xl font-bold mt-2">{data.topic}</h1>
+        <div className="flex items-end justify-between gap-4 mt-2">
+          <h1 className="text-2xl font-bold">{data.topic}</h1>
+          {!compareEntry && <FoldControls mode={fold.mode} onChange={fold.setMode} />}
+        </div>
       </div>
 
       <div className={showToc ? "xl:grid xl:grid-cols-[minmax(0,1fr)_16rem] xl:gap-8" : ""}>
@@ -103,7 +109,12 @@ export function SpecDetail() {
               onClose={() => setCompareEntry(null)}
             />
           ) : (
-            <MarkdownRenderer content={data.content} />
+            // key: 非受控的 <details> 只吃初始 open，bulk 動作要靠重掛才會套用新狀態
+            <MarkdownRenderer
+              key={fold.generation}
+              content={data.content}
+              fold={foldOptionsFor(fold.mode)}
+            />
           )}
 
           <section>
