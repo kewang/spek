@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.11.0
+
+**Highlight: a spec opens as an outline with substance, instead of a wall of text.** Reported as "you are asked to read all these fine details, but you don't even really know the shape of the thing first" (issue #42, filed from the IntelliJ plugin).
+
+- **Requirements and scenarios fold in place.** Each `### Requirement:` shows its heading *and* its lead SHALL paragraph; each `#### Scenario:` shows as a heading with its WHEN/THEN body collapsed. Scenario blocks are 59% of the character volume in this repo's own specs — so the first screen becomes a contents page that still says what each requirement requires, rather than a parallel index you have to leave the content to read. Expand all / Collapse all is available, and your choice is remembered
+- **Find-in-page still finds folded text, and links still land.** Folding uses the browser's native disclosure elements rather than hiding content with CSS, so `Ctrl+F` reaches text inside a collapsed scenario. Navigating to a heading — from the table of contents, from a `#hash` on load, or from VS Code's navigate-to command — expands whatever encloses it before scrolling, so a link never arrives at something invisible
+- **Folding applies only to spec-shaped content** — the spec detail page and a change's Specs tab. Proposal, design and other markdown artifacts render unfolded exactly as before
+- **Every BDD keyword is legible in the light theme.** WHEN / THEN / SHALL and the rest were hard-coded to one set of colours shared by both themes, and against the light background all 8 failed WCAG AA — 7 below even 3:1, with `THEN` at **1.43:1**. The dark theme passed everywhere, which is why this went unseen. Light now has its own values in the same hue families, clearing AA at 5.17–6.47:1; dark is unchanged byte for byte, and no hue or pill fill moves on either theme
+- **A highlighted keyword no longer renders lighter than the emphasis around it.** A keyword inside `**bold**` was drawn at a lower font weight than the bold text containing it
+- *Internal:* the TypeScript and Kotlin task parsers are now verified against one shared fixture corpus, so a case added in one language is asserted by both from the next run. `@spekjs/core` also gained the artifact sort function that had been living in the web package
+
 ## 1.10.1
 
 - **A `tasks.md` whose lines don't end in a plain newline is counted correctly, and counted the same on every surface.** A file using carriage-return line endings — a legacy Mac export, or a stray `\r` left in front of a Windows one — had checkboxes silently skipped: they appeared as ordinary text and contributed nothing to the progress count, so the total was simply wrong with nothing on screen to explain it. The IntelliJ plugin and the Web / VS Code surfaces also disagreed about the same file, because the two are separate implementations of one rule whose regex engines read the same pattern differently. Both now follow CommonMark, which counts a lone `\r` as a line ending like any other (issue #33)
