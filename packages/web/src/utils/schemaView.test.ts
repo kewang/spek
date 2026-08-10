@@ -11,6 +11,7 @@ import {
   degradedMessage,
   groupIntoLevels,
   isFilePattern,
+  schemaCountClaims,
   withArchiveStep,
   schemaUnavailableMessage,
   sourceTitle,
@@ -308,6 +309,28 @@ test("schemaUnavailableMessage: not-found and cli-unavailable read differently",
 test("schemaUnavailableMessage: names the schema in every case", () => {
   for (const reason of ["not-found", "cli-unavailable", "cli-timeout", "cli-failed", "cli-unparsable"] as const) {
     assert.match(schemaUnavailableMessage(reason, "house-style"), /house-style/, reason);
+  }
+});
+
+// --- what the list may claim about the repo --------------------------------
+
+test("schemaCountClaims: a successful enumeration counts, and says so when it found nothing", () => {
+  assert.deepEqual(schemaCountClaims(3, null), { showCount: true, showEmptyState: false });
+  assert.deepEqual(schemaCountClaims(0, null), { showCount: true, showEmptyState: true });
+  assert.deepEqual(schemaCountClaims(0, undefined), { showCount: true, showEmptyState: true });
+});
+
+// Both are claims about the repo, and a degraded enumeration has not established one — the list is
+// empty because we could not look. They are asserted together because that is how they broke: the
+// empty state read "No workflow schemas were found for this repo." directly beneath "Schemas could
+// not be listed...", and "0 schemas" made the same claim a few lines up in a smaller font.
+test("schemaCountClaims: a degraded enumeration claims nothing about the repo", () => {
+  for (const reason of ["cli-unavailable", "cli-timeout", "cli-failed", "cli-unparsable"] as const) {
+    assert.deepEqual(
+      schemaCountClaims(0, reason),
+      { showCount: false, showEmptyState: false },
+      reason,
+    );
   }
 });
 

@@ -3,7 +3,7 @@ import type { SchemaSummaryWithUsage } from "@spekjs/core";
 import { useSchemas } from "../hooks/useOpenSpec";
 import { SourceBadge } from "../components/SourceBadge";
 import { DefaultSchemaBadge } from "../components/DefaultSchemaBadge";
-import { degradedMessage, usageLabel } from "../utils/schemaView";
+import { degradedMessage, schemaCountClaims, usageLabel } from "../utils/schemaView";
 import { plural } from "../utils/plural";
 
 // Same info glyph and treatment ChangeDetail uses for its schema-order fallback notice — this is
@@ -74,6 +74,7 @@ export function SchemaList() {
   // "could not look" with "does not exist" that the reasons above exist to keep apart — and it
   // would accuse a repo's own default schema of not existing while it sits on disk.
   const degraded = data?.degradedReason != null;
+  const { showCount, showEmptyState } = schemaCountClaims(schemas.length, data?.degradedReason);
   const unresolvedNamed = degraded
     ? []
     : (data?.unresolved ?? []).filter((u) => u.schema !== null);
@@ -90,9 +91,13 @@ export function SchemaList() {
         {/* Header row with a count on the right, matching SpecList's "N topics". */}
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">Schemas</h1>
-          <span className="text-text-muted shrink-0 text-sm">
-            {schemas.length} {plural(schemas.length, "schema")}
-          </span>
+          {/* Suppressed while degraded: "0 schemas" is a statement about the repo, and a failed
+              enumeration has not made one. The degraded line below says the true thing. */}
+          {showCount && (
+            <span className="text-text-muted shrink-0 text-sm">
+              {schemas.length} {plural(schemas.length, "schema")}
+            </span>
+          )}
         </div>
         <p className="text-text-muted mt-1 text-sm">
           {/* "artifacts" — the noun the count beside each row uses, and OpenSpec's own for what a
@@ -116,9 +121,14 @@ export function SchemaList() {
         </p>
       )}
 
-      {schemas.length === 0 ? (
+      {/* Same distinction the detail page keeps with `schemaUnavailableMessage`: "none exist" is
+          only sayable when the enumeration succeeded. Degraded, the list is empty because we could
+          not look, so this would contradict the line directly above it. */}
+      {showEmptyState && (
         <p className="text-text-muted">No workflow schemas were found for this repo.</p>
-      ) : (
+      )}
+
+      {schemas.length > 0 && (
         <div className="space-y-2">
           {schemas.map((schema) => (
             <SchemaRow key={schema.name} schema={schema} />

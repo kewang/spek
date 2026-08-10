@@ -366,8 +366,14 @@ the one the reader opens is ever wanted. The artifact count is compatible with t
 the enumeration already names each schema's artifacts — it omits only their `requires`, which the
 count does not consult.
 
-When the enumeration is empty, the view SHALL show an empty state explaining that no workflow
-schemas were found, rather than a blank page.
+When the enumeration is empty **and succeeded**, the view SHALL show an empty state explaining that
+no workflow schemas were found, rather than a blank page. When the enumeration is empty because it
+degraded, the view SHALL show neither that empty state nor a count of zero: both assert something
+about the repo, and a failed enumeration has established nothing about it. The degraded statement is
+what the view has to say, and saying "no schemas were found" beneath "schemas could not be listed"
+contradicts it. This is the same distinction a single schema's view keeps between "does not exist"
+and "could not look" — it applies to the list only because degradation made empty a state the list
+can now actually reach.
 
 #### Scenario: Schemas listed
 
@@ -388,6 +394,11 @@ schemas were found, rather than a blank page.
 
 - **WHEN** the Schemas view is opened for a repo with no enumerated schemas
 - **THEN** an empty state explains that no workflow schemas were found
+
+#### Scenario: Empty because degraded says only that
+
+- **WHEN** the Schemas view is opened and the enumeration degraded, so the list is empty and carries a reason
+- **THEN** the view states that reason, and shows neither the "no workflow schemas were found" empty state nor a count of zero schemas
 
 ### Requirement: Schema detail view renders the workflow as an ordered flow
 

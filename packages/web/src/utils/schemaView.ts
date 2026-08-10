@@ -222,3 +222,22 @@ export function usageLabel(count: number): string {
   if (count === 0) return "No active changes";
   return `${count} active ${plural(count, "change")}`;
 }
+
+/**
+ * What the list view is entitled to say about how many schemas the repo has.
+ *
+ * Both pieces of copy — the header count and the empty state — are claims about the *repo*, and a
+ * degraded enumeration has established nothing about it: the list is empty because we could not
+ * look. Rendering either beneath "schemas could not be listed" contradicts the line above it.
+ *
+ * They are decided together rather than at their two call sites because that is the way they broke:
+ * the empty state was suppressed for a reason that applied to the count just as much, in a smaller
+ * font a few lines up.
+ */
+export function schemaCountClaims(
+  schemaCount: number,
+  degradedReason: SchemaDegradedReason | null | undefined,
+): { showCount: boolean; showEmptyState: boolean } {
+  if (degradedReason != null) return { showCount: false, showEmptyState: false };
+  return { showCount: true, showEmptyState: schemaCount === 0 };
+}
