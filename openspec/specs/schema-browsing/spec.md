@@ -101,8 +101,10 @@ Fields absent from a schema SHALL be reported as null (or an empty list for `req
 substituted with a default, so that the view never presents invented guidance as if the schema had
 authored it.
 
-The path to a schema SHALL be resolved through the `openspec` CLI for package schemas and directly
-from `<repo>/openspec/schemas/<name>/` for project-local ones.
+The path to a schema SHALL be resolved through the `openspec` CLI whatever the schema's source, the
+repo's own project-local schemas included. Only OpenSpec knows what shadows what across the three
+directories it searches, so locating a schema from the one directory visible here could resolve a
+name to a different schema than the one OpenSpec would run.
 
 #### Scenario: Each source's location is written in its own terms
 
@@ -116,8 +118,8 @@ from `<repo>/openspec/schemas/<name>/` for project-local ones.
 
 #### Scenario: Read a project-local schema definition
 
-- **WHEN** a schema resolved as `source: "project"` is read
-- **THEN** its definition is read from `<repo>/openspec/schemas/<name>/schema.yaml` without consulting the `openspec` CLI for its path
+- **WHEN** a schema the CLI resolves as `source: "project"` is read
+- **THEN** its definition is read from the `schema.yaml` at the directory the CLI reported, under `<repo>/openspec/schemas/<name>/`
 
 #### Scenario: Shadowing reported on the definition
 
@@ -136,9 +138,9 @@ from `<repo>/openspec/schemas/<name>/` for project-local ones.
 
 ### Requirement: Schema name is validated before use as a path segment
 
-Because a schema name is taken from client input and used both as a CLI argument and as a filesystem
-path segment under `<repo>/openspec/schemas/`, the system SHALL reject any name that is not a single
-safe path segment — specifically, a name containing a path separator, a `.` or `..` segment, a null
+The system SHALL reject any schema name that is not a single safe path segment. A name is taken from
+client input and used both as a CLI argument and as a filesystem path segment under
+`<repo>/openspec/schemas/`, so a name containing a path separator, a `.` or `..` segment, a null
 byte, or a leading `-` SHALL be rejected before any filesystem or process access is attempted. A
 rejected name SHALL be reported as not found; it SHALL NOT be passed to the filesystem or the CLI.
 
