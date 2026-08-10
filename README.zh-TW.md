@@ -33,11 +33,12 @@
 ## 功能特色
 
 - **Dashboard 總覽** — Specs 數量、Changes 數量、任務完成率一覽，加上生命週期統計（已封存 change 平均週期、超過 30 天未封存的 stale active）
-- **Specs 瀏覽** — 依字母排序的主題列表，含詳細內容與修訂歷史
+- **Specs 瀏覽** — 依字母排序的主題列表，含詳細內容與修訂歷史；requirement 與 scenario 就地摺疊，一份 spec 打開時是一張仍帶著規範句的大綱
 - **Changes 瀏覽** — 進行中與已封存的 changes，分頁顯示 Proposal / Design / Tasks / Specs；每筆 row 顯示建立日期、封存日期與生命週期天數
+- **Schemas 瀏覽** — 列出該 repo 可用的每個 workflow schema，含來源與它定義了哪些 artifact；詳情頁把一份 schema 畫成可讀的流程 —— artifact 依相依順序排列，各自標明產生哪個檔案、動工前需要什麼，以及完整的 instruction 內文。repo 的預設 schema 會被標示，每個 schema 也能點進正在使用它的 change
 - **Worktree 聚合** — 自動探索 repo 的所有 git worktree，把各 worktree 進行中的 change 去重後合併到單一畫面 —— 為 AI agent 平行開發時代而生；也以實驗性選項支援 Jujutsu（jj）workspace
 - **Timeline 時間軸** — 用水平 Gantt 風格圖呈現所有 change 的生命週期，可依 spec topic 分群、依狀態過濾，時間軸刻度依跨度自動切換
-- **BDD 語法高亮** — WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUST/SHALL（紅）關鍵字上色
+- **BDD 語法高亮** — WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUST/SHALL（紅）關鍵字上色，四種 delta operation（ADDED / MODIFIED / REMOVED / RENAMED）各有專屬 badge
 - **任務進度** — 解析 checkbox，依章節分組顯示進度條
 - **全文搜尋** — `Cmd+K` / `Ctrl+K` 跨 specs 與 changes 搜尋
 - **深色 / 淺色主題** — 可切換，預設深色主題
@@ -124,8 +125,9 @@ Specs 數量、Changes 數量、任務完成率一覽。
 
 ![Specs 列表](screenshots/specs-list.png)
 
-### Spec 詳細內容 — BDD 語法高亮
-BDD 關鍵字上色 — WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUST/SHALL（紅）。
+### Spec 詳細內容
+一份 spec 打開時是一張大綱：每條 requirement 顯示它所規範的那句話，scenario 的細節則收著等你要求。BDD
+關鍵字上色 —— WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUST/SHALL（紅）。
 
 ![Spec 詳細](screenshots/spec-detail.png)
 
@@ -133,6 +135,11 @@ BDD 關鍵字上色 — WHEN/GIVEN（藍）、THEN（綠）、AND（灰）、MUS
 進行中與已封存的 changes 依時間排列，每筆 row 顯示生命週期天數。
 
 ![Changes 列表](screenshots/changes-list.png)
+
+### Schemas 工作流程
+一個 change 要經過的流程 —— artifact 依相依順序排列，點選任一步驟即可讀到它完整的 instruction 內文。
+
+![Schemas](screenshots/schemas.png)
 
 ### Timeline 時間軸
 水平 Gantt 風格呈現所有 change 的生命週期 — active 的 bar 延伸到今天，archived 為固定區段。
@@ -379,6 +386,7 @@ spek 會監看 `openspec/` 並在檔案變更時即時重載。在不傳遞原�
   - 項目間有空行的清單，項目符號與編號改為與內容首行同行，不再被擠到自己一行
   - Tasks 分頁的 task 文字改以 Markdown 呈現，且 task 的續行 —— 子項目、段落、程式碼區塊 —— 不再於 parser 階段就被丟棄，得以完整顯示
   - 移除 web server 中未被引用的 `server/lib/` 核心掃描邏輯副本 —— 它是 `@spekjs/core` 之外的第二份同規則實作，會成為漂移的溫床
+  - 各介面皆可瀏覽 workflow schema —— Schemas 頁面列出每個 schema 定義了什麼，詳情頁把它的 artifact 依相依順序畫成可讀的流程
 
 - [@david-lutz](https://github.com/david-lutz)（David Lutz）
   - Changes 列表與關聯圖中，跨 git worktree 共用的 active change 去重 —— 勝出的副本以 git 分歧選舉決定，而非檔案時間戳（fresh checkout 會把它整個重寫掉）
