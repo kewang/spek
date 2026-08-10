@@ -1,0 +1,63 @@
+# Shared fixture for the schema.yaml readers in @spekjs/core (TypeScript) and the IntelliJ plugin
+# (Kotlin). Both test suites parse THIS file and assert the same parsed shape, so a divergence
+# between the two implementations fails a test instead of shipping. Do not tailor it to either
+# side's parser; it is deliberately awkward in the ways real schemas are.
+#
+# It is not a runnable schema — no templates exist for it, and nothing should try to author a change
+# with it.
+name: fixture-workflow
+version: 1
+description: Fixture workflow used to pin schema.yaml parsing across two languages
+artifacts:
+  # A literal block scalar: newlines and blank lines must survive verbatim, and the trailing
+  # blank line must not become part of the value.
+  - id: brainstorm
+    generates: brainstorm.md
+    description: Open-ended exploration before anything is committed to
+    template: brainstorm.md
+    instruction: |
+      Explore the problem before proposing a solution.
+
+      Cover:
+      - What the user actually asked for
+      - What they did **not** ask for
+
+      ```
+      indented code inside a block scalar
+        stays indented
+      ```
+    requires: []
+
+  # No description at all: must parse as null, never as an empty string or a substituted default.
+  - id: proposal
+    generates: proposal.md
+    instruction: |
+      State why this change is needed.
+    requires:
+      - brainstorm
+
+  # A glob output, and a folded scalar rather than a literal one.
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Behavior contracts for the change
+    instruction: >
+      Write one spec file per capability.
+      This folded scalar joins onto a single line.
+    requires:
+      - proposal
+
+  # Multiple requires, and a quoted description containing a colon.
+  - id: tasks
+    generates: tasks.md
+    description: "Implementation checklist: ordered by dependency"
+    instruction: |
+      Break the work into checkboxes.
+    requires:
+      - specs
+      - proposal
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Work through pending tasks, marking each complete as it lands.

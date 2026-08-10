@@ -19,7 +19,8 @@ test("SchemaBadge: renders the schema name when it differs from the repo default
   const el = SchemaBadge({ schema: "superpowers-bridge", defaultSchema: "spec-driven" });
   assert.ok(el, "expected a pill element");
   assert.equal(el.props.children, "superpowers-bridge");
-  assert.equal(el.props.title, "Schema: superpowers-bridge");
+  // The tooltip says what the badge does now that it is a link, not just what it names.
+  assert.equal(el.props.title, "Schema: superpowers-bridge — open its workflow");
 });
 
 test("SchemaBadge: renders a non-default schema even when the repo default is not spec-driven", () => {

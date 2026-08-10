@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { MessageHandler } from "./handler";
 import { watchOpenspecDir } from "./watcher";
-import { listWorkspaces } from "@spekjs/core";
+import { listWorkspaces, affectsSchemas, clearSchemaCache } from "@spekjs/core";
 
 export class SpekPanel {
   private static instance: SpekPanel | undefined;
@@ -14,11 +14,16 @@ export class SpekPanel {
   private pendingMessages: unknown[] = [];
   private disposed = false;
   private fileChangeTimer: ReturnType<typeof setTimeout> | undefined;
+  private workspacePath = "";
+  // Whether anything seen since the last notification could have changed a schema read — see
+  // notifyFileChange.
+  private schemasDirty = false;
 
   private constructor(
     private readonly context: vscode.ExtensionContext,
   ) {
     const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || "";
+    this.workspacePath = workspacePath;
 
     this.panel = vscode.window.createWebviewPanel(
       "spek",
@@ -131,7 +136,7 @@ export class SpekPanel {
   // 對指定目錄的 openspec/ 建立檔案監看，變更時 debounce 通知 webview
   private watchOpenspec(dir: string): void {
     if (this.disposed) return;
-    const watcher = watchOpenspecDir(dir, () => this.notifyFileChange());
+    const watcher = watchOpenspecDir(dir, (filePath) => this.notifyFileChange(filePath));
     this.disposables.push(watcher);
   }
 
@@ -152,9 +157,19 @@ export class SpekPanel {
     });
   }
 
-  private notifyFileChange(): void {
+  /**
+   * Tell the webview to refetch, dropping the schema cache first so the refetch is not served the
+   * pre-edit copy. `filePath` is optional: a configuration change also lands here, with no file
+   * behind it and nothing to invalidate.
+   */
+  private notifyFileChange(filePath?: string): void {
+    if (filePath !== undefined && affectsSchemas(filePath)) this.schemasDirty = true;
     if (this.fileChangeTimer) clearTimeout(this.fileChangeTimer);
     this.fileChangeTimer = setTimeout(() => {
+      if (this.schemasDirty) {
+        this.schemasDirty = false;
+        clearSchemaCache(this.workspacePath);
+      }
       this.panel.webview.postMessage({ type: "fileChanged" });
     }, 500);
   }

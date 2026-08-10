@@ -147,7 +147,11 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold }: Markdo
   if (fold) rehypePlugins.push([rehypeSpekFoldSections, fold]);
 
   return (
-    <div className="markdown-body">
+    // `overflow-wrap` is inherited, so this covers prose as well as inline code: instruction text
+    // is full of bare paths (`openspec/changes/<name>/brainstorm.md`) that have no space to break
+    // at, and one of them widens the whole page on a phone. A page that overflows makes mobile
+    // Safari zoom out to fit, which reads as the layout jumping on every selection.
+    <div className="markdown-body [overflow-wrap:anywhere]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={rehypePlugins}

@@ -1,15 +1,10 @@
 package com.spek.intellij.core
 
-import com.intellij.openapi.application.ApplicationManager
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import java.io.File
-import java.util.concurrent.Callable
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 
 /** schema 中單一 artifact 的權威參照（由 openspec CLI 提供） */
 data class SchemaArtifactRef(
@@ -32,20 +27,13 @@ fun interface SchemaOrderProvider {
 object SchemaOrder {
     private val json = Json { ignoreUnknownKeys = true }
 
-    // 內建 server 的 handler 由 Netty 多執行緒進入 → 用 ConcurrentHashMap 避免 HashMap 併發改寫
-    // 造成結構性損壞 / ConcurrentModificationException。值以非空的 CacheEntry 包裝：CHM 不允許
-    // null value，而 CLI 不可用時的結果本身是 null，故不可直接存 null——包一層即可安全快取「已算過、
-    // 無順序」。get→測 TTL→spawn→put 之間的競態是良性的（重複做一次等冪工作、後寫覆蓋、值相同）。
-    private data class CacheEntry(val at: Long, val value: List<SchemaArtifactRef>?)
+    // 快取策略（TTL、size cap、CHM 併發性、可快取 null 值）都在 TtlCache 上，與 SchemaCatalog 共用
+    // 同一份實作——這段原本在兩個檔案各寫一次。
     // schema 為 null/空（本地解析不出）時的分桶哨兵：這類 change 由 CLI 解析出同一 repo 級預設順序，
     // 故全部共用此桶。NUL 字元前綴確保絕不與真實 schema 名撞。對齊 @spekjs/core。
     private const val DEFAULT_SCHEMA_BUCKET = "\u0000default"
-    private const val CACHE_TTL_MS = 30_000L
-    // size cap（對齊 TS 版）：SchemaOrder 為整個 IDE 生命週期的 application 級 singleton，跨所有專案
-    // 視窗共用，比 TS 的 dev-server 行程更長壽，更需要上限。CHM 無插入序，故非嚴格 FIFO——僅在超限時
-    // 移除任一既有條目以「有界化」成長（嚴格 FIFO 需 synchronized LinkedHashMap，對 best-effort 快取不值得）。
-    private const val CACHE_MAX = 256
-    private val cache = ConcurrentHashMap<String, CacheEntry>()
+    // 值型別可為 null——「已查過、但沒有權威順序」也必須是可快取的結果。
+    private val cache = TtlCache<String, List<SchemaArtifactRef>?>()
 
     /**
      * 由 `openspec status --change <slug> --json` 輸出萃取權威順序：
@@ -118,50 +106,23 @@ object SchemaOrder {
         val key = "$repoRoot::${if (schema.isNullOrEmpty()) DEFAULT_SCHEMA_BUCKET else schema}"
         // TTL ≥ CLI timeout：TTL 內的 hit 必已完成計算（CLI 至多 10s），復用安全、不重複 spawn。
         // 過期後（openspec 之後才安裝、artifact 順序改變）自動重查，避免 null / 舊順序被永久快取。
-        cache[key]?.let {
-            if (System.currentTimeMillis() - it.at <= CACHE_TTL_MS) return@SchemaOrderProvider it.value
-            cache.remove(key)
-        }
-
-        var result: List<SchemaArtifactRef>? = null
-        // slug 來自資料夾名稱。Windows 上以 ProcessBuilder 啟動 openspec.cmd 時，argv 會再經
-        // cmd.exe 解析（BatBadBut / CVE-2024-27980），ProcessBuilder 不會像 Node 的 cross-spawn
-        // 那樣自動轉義 —— 故此處必須以白名單限定安全字元擋掉 argument injection。此為安全邊界，
-        // 勿為「對齊 TS 版」而刪除：TS 改用 cross-spawn 已由結構排除注入，兩邊刻意不同。
-        if (Regex("""^[\w.-]+$""").matches(slug)) {
-            try {
-                val bin = if (System.getProperty("os.name").orEmpty().lowercase().contains("win"))
-                    "openspec.cmd" else "openspec"
-                // 防呆點：(1) stderr 導向 DISCARD（不併入 stdout，故 JSON 不被診斷訊息污染，也沒有
-                // 未被抽乾的 stderr pipe 會塞爆而卡死子行程）；(2) 於 IDE 的 pooled thread 抽乾 stdout，
-                // 子行程不會因 stdout pipe 滿而阻塞；用 executeOnPooledThread 而非 commonPool——後者
-                // parallelism = cores-1，阻塞式 read 會佔住 worker，低核機併發時 reader task 可能排不上
-                // 而讓 get 誤逾時、把健康 CLI 的結果誤存成 null；IDE pooled pool 為 cached 型、適合阻塞 IO。
-                // (3) waitFor 有硬性 timeout，逾時 destroyForcibly 收掉子行程 → stdout 關閉 → read 得 EOF
-                // 而返回（Future.cancel 無法中斷執行中的 read，真正解除阻塞的是 destroyForcibly）。
-                // (4) 以 future.get 取回輸出（提供 happens-before，避免跨執行緒讀取的資料競態）。
-                val proc = ProcessBuilder(bin, "status", "--change", slug, "--json")
-                    .directory(File(repoRoot))
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start()
-                val reader = ApplicationManager.getApplication().executeOnPooledThread(
-                    Callable { proc.inputStream.bufferedReader().use { it.readText() } },
-                )
-                val finished = proc.waitFor(10, TimeUnit.SECONDS)
-                if (!finished) {
-                    proc.destroyForcibly()
-                    reader.cancel(true)
-                } else if (proc.exitValue() == 0) {
-                    result = parseOrderFromStatus(reader.get(2, TimeUnit.SECONDS))
+        cache.getOrCompute(key) {
+            // slug 來自資料夾名稱。Windows 上以 ProcessBuilder 啟動 openspec.cmd 時，argv 會再經
+            // cmd.exe 解析（BatBadBut / CVE-2024-27980），ProcessBuilder 不會像 Node 的 cross-spawn
+            // 那樣自動轉義 —— 故此處必須以白名單限定安全字元擋掉 argument injection。此為安全邊界，
+            // 勿為「對齊 TS 版」而刪除：TS 改用 cross-spawn 已由結構排除注入，兩邊刻意不同。
+            if (!Regex("""^[\w.-]+$""").matches(slug)) {
+                null
+            } else {
+                // 逾時 / 非 0 結束 / 解析失敗一律回 null：此呼叫端只有一種退路（前端退回敘事順序），
+                // 故 CLI 的失敗分類在這裡沒有用處，全部收斂成同一個「沒有權威順序」。
+                when (val outcome = OpenspecCli.run(listOf("status", "--change", slug, "--json"), repoRoot)) {
+                    is OpenspecCli.Outcome.Completed ->
+                        if (outcome.exitCode == 0) parseOrderFromStatus(outcome.stdout) else null
+                    else -> null
                 }
-            } catch (_: Exception) {
-                result = null
             }
         }
-
-        if (cache.size >= CACHE_MAX) cache.keys.firstOrNull()?.let { cache.remove(it) }
-        cache[key] = CacheEntry(System.currentTimeMillis(), result)
-        result
     }
 
     fun clearCache() = cache.clear()

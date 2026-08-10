@@ -309,3 +309,28 @@ test("countArtifacts: missing change dir is 0", () => {
   const repo = mkRepo();
   assert.equal(countArtifacts(path.join(repo, "nope")), 0);
 });
+
+// The schemas page reports `schemaArtifactCount` (one per declared artifact) and the change page
+// reports these. They are two implementations of one unit, so a glob artifact has to resolve to one
+// on both sides — otherwise a reader moving between the pages sees two numbers for the same thing.
+test("countArtifacts: a specs dir of many files is one artifact, matching a schema's count", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "x\n",
+    "design.md": "x\n",
+    "tasks.md": "- [ ] a\n",
+    // Five delta specs, i.e. what `specs/**/*.md` expands to for this change.
+    "specs/one/spec.md": "x\n",
+    "specs/two/spec.md": "x\n",
+    "specs/three/spec.md": "x\n",
+    "specs/four/spec.md": "x\n",
+    "specs/five/spec.md": "x\n",
+  });
+
+  // Eight files, four artifacts — the same four `spec-driven` declares.
+  assert.equal(countArtifacts(changePath), 4);
+  assert.deepEqual(
+    discoverArtifacts(changePath).map((a) => a.id).sort(),
+    ["design", "proposal", "specs", "tasks"],
+  );
+});

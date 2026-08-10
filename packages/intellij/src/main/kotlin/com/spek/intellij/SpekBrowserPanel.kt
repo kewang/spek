@@ -5,7 +5,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.spek.intellij.core.SchemaOrder
+import com.spek.intellij.core.SpekCaches
 import com.spek.intellij.core.WatchPolling
 import java.io.File
 import java.net.HttpURLConnection
@@ -263,7 +263,7 @@ class SpekBrowserPanel(private val project: Project) : Disposable {
         if (disposed) return
         // 檔案有變動 → 先清掉 schema 順序快取，「再」通知 webview 重新抓取；順序不可顛倒：若先派發
         // spek:fileChanged，webview 的 re-fetch 可能搶在 clearCache 之前打到 server 而拿到舊順序。
-        SchemaOrder.clearCache()
+        SpekCaches.clearAll()
         webview?.executeJavaScript("window.dispatchEvent(new CustomEvent('spek:fileChanged'));")
         onFileChanged?.invoke()
     }

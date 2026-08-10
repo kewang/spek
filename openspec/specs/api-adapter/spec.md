@@ -36,12 +36,24 @@ The web version SHALL use a `FetchAdapter` that calls the Express REST API via H
 ### Requirement: MessageAdapter for VS Code Webview
 The VS Code version SHALL use a `MessageAdapter` that communicates with the extension host via `postMessage`.
 
+A request's timeout SHALL be chosen from what the extension host has to do to answer it. For a
+request the host answers by spawning the `openspec` CLI, the webview's budget SHALL be **derived
+from** the CLI's own ceiling and exceed it, not merely coincide with it. A budget equal to the CLI
+timeout expires at the moment the host stops waiting, so a slow or hung CLI produces a webview
+timeout error in place of the degraded result the host was about to return — making a designed
+degradation path unreachable on that surface alone. The two values SHALL come from one definition,
+so that raising the CLI's ceiling raises the webview's with it.
+
+#### Scenario: A CLI-backed request outlives the CLI's own timeout
+- **WHEN** a request the host answers by spawning the CLI is made and the CLI hangs until it is killed
+- **THEN** the webview is still waiting when the host returns its degraded result, and that result is displayed rather than a timeout error
+
 #### Scenario: Message adapter API call
 - **WHEN** `MessageAdapter.getOverview()` is called
 - **THEN** it sends `{ type: 'request', id: '<unique>', method: 'getOverview' }` via `postMessage` and returns a Promise that resolves when the matching response arrives
 
 #### Scenario: Message adapter timeout
-- **WHEN** a message request does not receive a response within 10 seconds
+- **WHEN** a message request the host answers in-process does not receive a response within 10 seconds
 - **THEN** the adapter rejects the Promise with a timeout error
 
 #### Scenario: Message adapter error response

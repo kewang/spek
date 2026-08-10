@@ -14,6 +14,8 @@ The system SHALL use React Router v7 with `createBrowserRouter` to define the fo
 | `/specs/:topic` | SpecDetail | Layout |
 | `/changes` | ChangeList | Layout |
 | `/changes/:slug` | ChangeDetail | Layout |
+| `/schemas` | SchemaList | Layout |
+| `/schemas/:name` | SchemaDetail | Layout |
 
 #### Scenario: Route to SelectRepo
 - **WHEN** user navigates to `/`
@@ -22,6 +24,14 @@ The system SHALL use React Router v7 with `createBrowserRouter` to define the fo
 #### Scenario: Route to Dashboard with Layout
 - **WHEN** user navigates to `/dashboard`
 - **THEN** the Dashboard page is rendered within the shared Layout (Header + Sidebar + Main)
+
+#### Scenario: Route to the schemas list
+- **WHEN** user navigates to `/schemas`
+- **THEN** the SchemaList page is rendered within the shared Layout
+
+#### Scenario: Route to a schema detail
+- **WHEN** user navigates to `/schemas/spec-driven`
+- **THEN** the SchemaDetail page is rendered within the shared Layout for the schema named `spec-driven`
 
 ### Requirement: RepoContext state management
 The system SHALL provide a React Context (`RepoContext`) that stores the current repo path. All API hooks SHALL read the repo path from this context.

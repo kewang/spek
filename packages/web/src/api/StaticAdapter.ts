@@ -10,6 +10,9 @@ import type {
   DetectData,
   GraphData,
   WorktreeInfo,
+  SchemasResponse,
+  SchemaReadResult,
+  SchemaDefinition,
 } from "@spekjs/core";
 import type { ApiAdapter, AggregationPrefs } from "./types.js";
 import { getAggregatePref, setAggregatePref } from "../utils/aggregatePref.js";
@@ -23,6 +26,10 @@ export interface DemoData {
   changeDetails: Record<string, ChangeDetail>;
   specVersions: Record<string, Record<string, string>>;
   graphData: GraphData;
+  // Captured at build time, so the demo needs no openspec CLI and no filesystem at view time.
+  // Optional: a demo payload built before schema browsing existed still loads.
+  schemas?: SchemasResponse;
+  schemaDetails?: Record<string, SchemaDefinition>;
 }
 
 export class StaticAdapter implements ApiAdapter {
@@ -121,6 +128,27 @@ export class StaticAdapter implements ApiAdapter {
   // which is usually empty.
   getWorktrees(): Promise<WorktreeInfo[]> {
     return Promise.resolve(this.data.changes.worktrees ?? []);
+  }
+
+  getSchemas(): Promise<SchemasResponse> {
+    return Promise.resolve(
+      this.data.schemas ?? {
+        defaultSchema: null,
+        schemas: [],
+        degradedReason: null,
+        unresolved: [],
+      },
+    );
+  }
+
+  // Usage is read back off the embedded catalog rather than embedded a second time beside each
+  // definition — it was already computed there by the same rule the server uses, and two copies of a
+  // count in one payload is one copy too many to keep honest.
+  getSchema(name: string): Promise<SchemaReadResult> {
+    const schema = this.data.schemaDetails?.[name];
+    if (!schema) return Promise.resolve({ ok: false, reason: "not-found" });
+    const usage = this.data.schemas?.schemas.find((s) => s.name === name)?.usage ?? null;
+    return Promise.resolve({ ok: true, schema, usage });
   }
 
   getAggregationPrefs(): Promise<AggregationPrefs> {

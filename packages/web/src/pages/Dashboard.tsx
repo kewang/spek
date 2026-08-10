@@ -5,7 +5,9 @@ import { formatRelativeTime } from "../utils/formatRelativeTime";
 import { daysBetween, todayIso } from "../utils/lifecycle";
 import { WorktreeBadge } from "../components/WorktreeBadge";
 import { SchemaBadge } from "../components/SchemaBadge";
+import { StretchedLink } from "../components/StretchedLink";
 import { changeKey, changeTo } from "../utils/changeLink";
+import { StatCard } from "../components/StatCard";
 
 const STALE_THRESHOLD_DAYS = 30;
 
@@ -67,20 +69,26 @@ export function Dashboard() {
         ) : (
           <div className="space-y-2">
             {activeChanges.map((c) => (
-              <Link
+              // Div + StretchedLink, not a wrapping Link: the schema badge inside is a link of its
+              // own and anchors cannot nest. Same pattern as the Changes list.
+              <div
                 key={changeKey(c)}
-                to={changeTo(c)}
-                className="block bg-bg-secondary border border-border rounded p-4 hover:border-accent transition-colors"
+                className="relative bg-bg-secondary border border-border rounded p-4 hover:border-accent transition-colors"
               >
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-text-primary font-medium truncate">{c.description}</span>
+                    <StretchedLink
+                      to={changeTo(c)}
+                      className="text-text-primary font-medium truncate"
+                    >
+                      {c.description}
+                    </StretchedLink>
                     {showSource && c.source && <WorktreeBadge source={c.source} />}
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
                     <SchemaBadge schema={c.schema} defaultSchema={c.defaultSchema} />
                     {(c.timestamp || c.date) && (
-                      <span className="text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
+                      <span className="relative z-10 text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
                         {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
                       </span>
                     )}
@@ -89,7 +97,7 @@ export function Dashboard() {
                 {c.taskStats && (
                   <TaskProgress completed={c.taskStats.completed} total={c.taskStats.total} />
                 )}
-              </Link>
+              </div>
             ))}
           </div>
         )}
@@ -103,24 +111,25 @@ export function Dashboard() {
         ) : (
           <div className="space-y-1">
             {archivedChanges.map((c) => (
-              <Link
+              <div
                 key={changeKey(c)}
-                to={changeTo(c)}
-                className="flex items-center justify-between gap-4 px-3 py-2 rounded hover:bg-bg-secondary transition-colors"
+                className="relative flex items-center justify-between gap-4 px-3 py-2 rounded hover:bg-bg-secondary transition-colors"
               >
                 <span className="flex items-center gap-2 min-w-0">
-                  <span className="text-text-primary text-sm truncate">{c.description}</span>
+                  <StretchedLink to={changeTo(c)} className="text-text-primary text-sm truncate">
+                    {c.description}
+                  </StretchedLink>
                   {showSource && c.source && <WorktreeBadge source={c.source} />}
                 </span>
                 <span className="flex items-center gap-2 shrink-0">
                   <SchemaBadge schema={c.schema} defaultSchema={c.defaultSchema} />
                   {(c.timestamp || c.date) && (
-                    <span className="text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
+                    <span className="relative z-10 text-text-muted text-xs whitespace-nowrap" title={c.timestamp || undefined}>
                       {c.timestamp ? formatRelativeTime(c.timestamp) : c.date}
                     </span>
                   )}
                 </span>
-              </Link>
+              </div>
             ))}
           </div>
         )}
@@ -147,14 +156,3 @@ export function Dashboard() {
   );
 }
 
-function StatCard({ label, value, delay = 0 }: { label: string; value: string | number; delay?: number }) {
-  return (
-    <div
-      className="bg-bg-secondary border border-border rounded p-4 animate-fade-in-up"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <div className="text-4xl font-bold text-accent">{value}</div>
-      <div className="text-text-secondary text-sm">{label}</div>
-    </div>
-  );
-}

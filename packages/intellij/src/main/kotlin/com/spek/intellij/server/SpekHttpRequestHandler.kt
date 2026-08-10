@@ -8,6 +8,9 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.http.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import org.jetbrains.ide.HttpRequestHandler
 import java.nio.charset.StandardCharsets
 
@@ -68,10 +71,10 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
         try {
             val result = routeRequest(apiPath, projectPath ?: "", params)
             if (!context.channel().isActive) return // client 已斷線
-            if (result != null) {
-                sendJson(context, result)
-            } else {
-                sendError(context, HttpResponseStatus.NOT_FOUND, "Endpoint not found: $apiPath")
+            when (result) {
+                is ApiResult.Json -> sendJson(context, result.body)
+                is ApiResult.NotFound -> sendJson(context, result.body, HttpResponseStatus.NOT_FOUND)
+                null -> sendError(context, HttpResponseStatus.NOT_FOUND, "Endpoint not found: $apiPath")
             }
         } catch (e: Exception) {
             log.error("Error handling request: $path", e)
@@ -81,16 +84,30 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
         }
     }
 
+    /**
+     * What a route produced. `null` from [routeRequest] still means "no such endpoint", which the
+     * caller turns into a generic 404.
+     *
+     * [NotFound] exists because one route needs a 404 that carries a **body**: the shared frontend
+     * reads `reason` off a schema 404 to tell "we could not look" (the CLI is missing) from "it does
+     * not exist". Collapsing those would tell a reader whose CLI is not installed that their schema
+     * is gone.
+     */
+    internal sealed interface ApiResult {
+        data class Json(val body: String) : ApiResult
+        data class NotFound(val body: String) : ApiResult
+    }
+
     // internal 而非 private：路由表本身要能單測。缺 projectPath 的 400 由 process() 的共用檢查負責，
     // 那段需要 Netty channel，不在此層。
     internal fun routeRequest(
         apiPath: String,
         projectPath: String,
         params: Map<String, List<String>>,
-    ): String? {
+    ): ApiResult? {
         // openspec/overview
         if (apiPath == "openspec/overview") {
-            return handleOverview(projectPath)
+            return ApiResult.Json(handleOverview(projectPath))
         }
 
         // openspec/specs/:topic/at/:slug
@@ -98,53 +115,67 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
         if (specAtChangeMatch != null) {
             val topic = specAtChangeMatch.groupValues[1]
             val slug = specAtChangeMatch.groupValues[2]
-            return handleSpecAtChange(projectPath, topic, slug)
+            return handleSpecAtChange(projectPath, topic, slug)?.let(ApiResult::Json)
+                ?: notFound("Spec version not found")
         }
 
         // openspec/specs/:topic
         val specDetailMatch = Regex("""^openspec/specs/([^/]+)$""").find(apiPath)
         if (specDetailMatch != null) {
             val topic = specDetailMatch.groupValues[1]
-            return handleSpecDetail(projectPath, topic)
+            return handleSpecDetail(projectPath, topic)?.let(ApiResult::Json)
+                ?: notFound("Spec not found")
         }
 
         // openspec/specs
         if (apiPath == "openspec/specs") {
-            return handleSpecs(projectPath)
+            return ApiResult.Json(handleSpecs(projectPath))
         }
 
         // openspec/changes/:slug
         val changeDetailMatch = Regex("""^openspec/changes/([^/]+)$""").find(apiPath)
         if (changeDetailMatch != null) {
             val slug = changeDetailMatch.groupValues[1]
-            return handleChangeDetail(projectPath, slug)
+            return handleChangeDetail(projectPath, slug)?.let(ApiResult::Json)
+                ?: notFound("Change not found")
         }
 
         // openspec/changes
         if (apiPath == "openspec/changes") {
-            return handleChanges(projectPath)
+            return ApiResult.Json(handleChanges(projectPath))
         }
 
         // openspec/graph
         if (apiPath == "openspec/graph") {
-            return handleGraph(projectPath)
+            return ApiResult.Json(handleGraph(projectPath))
+        }
+
+        // openspec/schemas/:name — before the bare /schemas route, as the spec routes are ordered.
+        val schemaDetailMatch = Regex("""^openspec/schemas/([^/]+)$""").find(apiPath)
+        if (schemaDetailMatch != null) {
+            return handleSchemaDetail(projectPath, schemaDetailMatch.groupValues[1])
+        }
+
+        // openspec/schemas
+        if (apiPath == "openspec/schemas") {
+            return ApiResult.Json(handleSchemas(projectPath))
         }
 
         // openspec/search
         if (apiPath == "openspec/search") {
             val query = params["q"]?.firstOrNull() ?: ""
-            return handleSearch(projectPath, query)
+            return ApiResult.Json(handleSearch(projectPath, query))
         }
 
         // openspec/resync
         if (apiPath == "openspec/resync") {
-            return handleResync()
+            return ApiResult.Json(handleResync())
         }
 
         // fs/detect
         if (apiPath == "fs/detect") {
             val path = params["path"]?.firstOrNull() ?: projectPath
-            return handleDetect(path)
+            return ApiResult.Json(handleDetect(path))
         }
 
         return null
@@ -162,7 +193,7 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
      * （見 SpekBrowserPanel 的 SchemaOrder.clearCache()）：手動 Refresh 沒有理由失效得比自動刷新少。
      */
     private fun handleResync(): String {
-        SchemaOrder.clearCache()
+        SpekCaches.clearAll()
         return """{"ok":true}"""
     }
 
@@ -215,6 +246,59 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
         return json.encodeToString(data)
     }
 
+    /**
+     * The catalog joined with the active changes using it.
+     *
+     * A CLI failure is a degraded 200, never a 5xx: the catalog is the CLI's alone, so losing it
+     * empties the answer rather than failing the request — an empty list plus a `degradedReason`
+     * the view states, instead of presenting that emptiness as a fact about the project.
+     */
+    private fun handleSchemas(projectPath: String): String {
+        // Independent of each other, so run them together — the web route does the same with
+        // Promise.all. On a cold catalog this overlaps the CLI round trips with the file walk
+        // instead of stacking them.
+        val (catalog, scan) = OpenspecCli.inParallel(
+            listOf<() -> Any>(
+                { SchemaCatalog.listSchemas(projectPath) },
+                { OpenSpecScanner.scan(projectPath) },
+            ),
+        )
+        return json.encodeToString(
+            SchemaCatalog.groupSchemaUsage(catalog as SchemaCatalogResult, (scan as ScanResult).activeChanges),
+        )
+    }
+
+    /**
+     * One schema's definition, or a 404 whose body says **why**.
+     *
+     * "We could not look" and "it does not exist" stay distinct all the way to the view — only one
+     * of them is the reader's to fix, and a missing CLI reported as "no such schema" sends them
+     * hunting for a file that is right where they left it.
+     *
+     * Carries `usage` beside the definition's own fields, as the web route does.
+     */
+    private fun handleSchemaDetail(projectPath: String, name: String): ApiResult {
+        return when (val result = SchemaCatalog.readSchema(projectPath, name)) {
+            is SchemaReadResult.Ok -> {
+                val scan = OpenSpecScanner.scan(projectPath)
+                val usage = SchemaCatalog.countSchemaUsage(scan.activeChanges, name)
+                // Merged as JSON, not via a second data class restating every SchemaDefinition field.
+                val body = JsonObject(
+                    json.encodeToJsonElement(result.schema).jsonObject +
+                        ("usage" to json.encodeToJsonElement(usage)),
+                )
+                ApiResult.Json(json.encodeToString(body))
+            }
+            // Through the serializer like every other body in this file. Interpolating it worked only
+            // because the reason spellings happen to contain nothing needing escaping.
+            is SchemaReadResult.Failed -> notFound("Schema not found", result.reason)
+        }
+    }
+
+    /** A 404 body carrying why, so "we could not look" never reads as "it does not exist". */
+    private fun notFound(message: String, reason: SchemaDegradedReason? = null): ApiResult.NotFound =
+        ApiResult.NotFound(json.encodeToString(ApiErrorBody(message, reason?.wire ?: "not-found")))
+
     private fun handleSearch(projectPath: String, query: String): String {
         val results = SearchService.search(projectPath, query)
         return json.encodeToString(results)
@@ -254,11 +338,15 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
         return true
     }
 
-    private fun sendJson(context: ChannelHandlerContext, jsonStr: String): Boolean {
+    private fun sendJson(
+        context: ChannelHandlerContext,
+        jsonStr: String,
+        status: HttpResponseStatus = HttpResponseStatus.OK,
+    ): Boolean {
         val bytes = jsonStr.toByteArray(StandardCharsets.UTF_8)
         val response = DefaultFullHttpResponse(
             HttpVersion.HTTP_1_1,
-            HttpResponseStatus.OK,
+            status,
             Unpooled.wrappedBuffer(bytes),
         )
         response.headers().apply {

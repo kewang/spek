@@ -13,6 +13,12 @@ The system SHALL display changes grouped into active and archived sections. Acti
 
 The full ISO `createdDate`, `archivedDate`, and git timestamp (when available) SHALL be exposed as tooltip content on hover (the tooltip retains the full labels for clarity).
 
+Where a row's whole card acts as the click target for the change, that target SHALL NOT suppress any
+tooltip or other hover affordance the row carries. A card-wide target is implemented as an overlay
+covering the row, and an overlay intercepts hover as well as clicks — so every element carrying a
+tooltip has to be lifted above it explicitly. Nothing about the row's appearance changes when this
+is missed: the tooltips simply stop appearing, on elements where they previously worked.
+
 #### Scenario: Display active changes
 - **WHEN** user navigates to the ChangeList page and there are active changes
 - **THEN** active changes are listed in an "Active" section with a left accent color border, name, and task progress
@@ -30,6 +36,10 @@ The full ISO `createdDate`, `archivedDate`, and git timestamp (when available) S
 - **WHEN** an archived change has `createdDate: "2026-02-14"` and `archivedDate: "2026-02-22"`
 - **THEN** the row displays `Feb 14 → Feb 22 · 8d`
 - **AND** hovering reveals full ISO `createdDate` and `archivedDate` as tooltip content (with `Created:` / `Archived:` labels)
+
+#### Scenario: Tooltips survive a card-wide click target
+- **WHEN** a row whose whole card opens the change carries a worktree badge, a jj status badge, and a lifecycle indicator, each with tooltip content
+- **THEN** hovering any of them reveals its tooltip, and clicking the row anywhere not covered by them opens the change
 
 #### Scenario: Change without createdDate falls back to timestamp
 - **WHEN** a change has `createdDate: null` but a git timestamp is available

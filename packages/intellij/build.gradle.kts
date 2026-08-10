@@ -24,6 +24,11 @@ dependencies {
     }
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // schema.yaml 需要真正的 YAML parser（巢狀 artifact 清單 + 多行 block scalar），不能沿用
+    // config.yaml 那種單行 regex。**明確宣告**而非仰賴 platform classpath 上碰巧有 SnakeYAML：
+    // JCEF 的教訓（issue #24）是「平台上原本存在的類別會在跨版本間消失」，插件自帶才不會被那樣打斷。
+    implementation("org.yaml:snakeyaml:2.3")
+
     // 純邏輯單元測試（OpenSpecScanner / ChangeReader / WatchPolling 只吃路徑與本機檔案，不依賴 IntelliJ platform）
     // kotlin("test")：WatchPollingTest 用 kotlin.test.* 斷言；junit-jupiter：以 JUnit5 平台執行
     testImplementation(kotlin("test"))
@@ -72,6 +77,26 @@ tasks {
     wrapper {
         gradleVersion = "8.11.1"
     }
+
+    /**
+     * `./gradlew runIde -Pspek.headlessIde` — a sandbox IDE that boots without waiting for a click.
+     *
+     * A fresh sandbox opens on the JetBrains agreement dialog and blocks there forever, which makes
+     * `runIde` unusable for verifying the tool window on a machine with no display (Xvfb supplies the
+     * X server; nothing supplies the click). These two properties are JetBrains' own switches for
+     * that — the same ones their CI images use — and the version marker satisfies the check in
+     * `com.intellij.ide.gdpr.EndUserAgreement`.
+     *
+     * Opt-in, never on by default: it suppresses a consent prompt, which is only appropriate for a
+     * throwaway sandbox you are driving yourself.
+     */
+    runIde {
+        if (providers.gradleProperty("spek.headlessIde").isPresent) {
+            systemProperty("jb.consents.confirmation.enabled", "false")
+            systemProperty("jb.privacy.policy.text", "<!--999.999-->")
+            systemProperty("idea.suppress.statistics.report", "true")
+        }
+    }
     test {
         useJUnitPlatform()
 
@@ -90,6 +115,14 @@ tasks {
         // overridable: a generated scratch corpus replaces the parser's inputs, never the loader's
         // own rules.
         systemProperty("spek.taskParserInvalidCorpus", File(repoCorpus, "invalid").absolutePath)
+
+        // The shared schema.yaml fixture, parsed by SchemaCatalogTest and by
+        // packages/core/src/schemas.test.ts. Same reasoning as the corpus above: resolved from the
+        // Gradle project directory, never the process working directory, and registered as an input
+        // so editing the fixture re-runs the suite instead of leaving it up to date.
+        val schemaFixtures = layout.projectDirectory.dir("../../test-fixtures/schemas").asFile
+        systemProperty("spek.schemaFixtures", schemaFixtures.absolutePath)
+        inputs.dir(schemaFixtures).withPropertyName("schemaFixtures")
         // Without this the task is up to date when only a fixture changed, and the suite silently
         // does not run — a change to test data that appears to pass without having executed.
         // It is not a guard against a wrong path: a directory that exists and is empty passes

@@ -84,6 +84,8 @@ code, pre {
   font-family: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* No `code` background rule here on purpose — each `<code>` sets its own. See CLAUDE.md. */
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

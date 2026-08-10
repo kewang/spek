@@ -201,4 +201,149 @@ export interface GraphData {
   edges: GraphEdge[];
 }
 
+/**
+ * Where a workflow schema was resolved from.
+ *
+ * The OpenSpec resolver searches three places, in precedence order: the repo's own
+ * `openspec/schemas/` (`project`), the machine's global data directory (`user`), then the schemas
+ * shipped inside the openspec package (`package`). A name found earlier shadows the same name
+ * found later.
+ *
+ * `user` was missing here at first, and the cost was not cosmetic: an unrecognised source made the
+ * enumeration drop that schema entirely, so anyone with a machine-level schema would have seen it
+ * silently absent from the list rather than mislabelled.
+ */
+export type SchemaSource = "package" | "user" | "project";
+
+/**
+ * Why package schemas could not be enumerated. A code rather than a sentence, so each surface
+ * writes its own copy and core stays free of host-specific wording.
+ */
+export type SchemaDegradedReason =
+  | "cli-unavailable"
+  | "cli-failed"
+  | "cli-timeout"
+  | "cli-unparsable";
+
+/** One schema as it appears in the list: enough to render a row, never the instruction text. */
+export interface SchemaSummary {
+  name: string;
+  description: string | null;
+  source: SchemaSource;
+  /**
+   * How many artifacts the schema declares — see `schemaArtifactCount`, the one rule for it.
+   * Null only when the enumeration omitted the artifact list.
+   */
+  artifactCount: number | null;
+  /** True when this is the schema named by the repo's openspec/config.yaml. */
+  isDefault: boolean;
+}
+
+/** One artifact (workflow step) declared by a schema. */
+export interface SchemaArtifactDef {
+  id: string;
+  /** The output path or glob this step produces, e.g. `proposal.md` or `specs/**\/*.md`. */
+  generates: string | null;
+  description: string | null;
+  /** Artifact ids that must exist before this one can be written; empty when it declares none. */
+  requires: string[];
+  /** The schema's own guidance for this step, as authored (Markdown). */
+  instruction: string | null;
+}
+
+/** A schema's apply step: when a change authored under it becomes implementable. */
+export interface SchemaApplyDef {
+  requires: string[];
+  /** The file progress is tracked in, e.g. `tasks.md`. */
+  tracks: string | null;
+  instruction: string | null;
+}
+
+/** A same-named schema this one takes precedence over. */
+export interface SchemaShadow {
+  source: SchemaSource;
+  path: string;
+}
+
+/** One schema's full definition, read from its schema.yaml. */
+export interface SchemaDefinition {
+  name: string;
+  version: number | null;
+  description: string | null;
+  source: SchemaSource;
+  /** Directory the schema resolved to (the parent of its schema.yaml). */
+  path: string;
+  /**
+   * The same location written in the terms its source means: relative to the repo for a project
+   * schema, `~`-prefixed for a user one, and stripped of the npm install prefix for a package one.
+   * `path` remains the absolute truth.
+   */
+  displayPath: string;
+  isDefault: boolean;
+  /** Same-named schemas this one shadows; empty when it shadows nothing. */
+  shadows: SchemaShadow[];
+  /** Artifacts in the order the schema declares them — the authoritative sequence. */
+  artifacts: SchemaArtifactDef[];
+  apply: SchemaApplyDef | null;
+}
+
+/** Active changes declaring a schema. Counted from ChangeInfo.schema — no artifact reads. */
+export interface SchemaUsage {
+  count: number;
+  slugs: string[];
+}
+
+/** A schema row as the API serves it: the summary plus who is using it. */
+export interface SchemaSummaryWithUsage extends SchemaSummary {
+  usage: SchemaUsage;
+}
+
+/**
+ * Active changes whose declared schema matched no enumerated schema, grouped by that name (null
+ * groups changes declaring no schema at all). Present so the per-schema counts reconcile against
+ * the Changes page rather than quietly losing changes.
+ */
+export interface UnresolvedSchemaUsage {
+  schema: string | null;
+  count: number;
+  slugs: string[];
+}
+
+/** The `/schemas` response: the catalog joined with change usage. */
+export interface SchemasResponse {
+  defaultSchema: string | null;
+  schemas: SchemaSummaryWithUsage[];
+  degradedReason: SchemaDegradedReason | null;
+  unresolved: UnresolvedSchemaUsage[];
+}
+
+/**
+ * Reading one schema either works or explains why not. "We could not look" (`cli-*`) and "it does
+ * not exist" (`not-found`) are kept apart all the way to the view — only one of them is the user's
+ * to fix.
+ */
+export type SchemaReadResult =
+  | {
+      ok: true;
+      schema: SchemaDefinition;
+      /**
+       * Which active changes declare this schema. Not on `SchemaDefinition`, because a schema.yaml
+       * says nothing about the repo using it. Required-but-nullable so each host states it.
+       */
+      usage: SchemaUsage | null;
+    }
+  | { ok: false; reason: "not-found" | SchemaDegradedReason };
+
+/** The schemas available to a repo, plus why the list may be incomplete. */
+export interface SchemaCatalog {
+  /**
+   * The schema named by openspec/config.yaml, whether or not it resolved to an enumerated schema;
+   * null when the repo declares none.
+   */
+  defaultSchema: string | null;
+  schemas: SchemaSummary[];
+  /** Set when package schemas could not be enumerated; null on a complete enumeration. */
+  degradedReason: SchemaDegradedReason | null;
+}
+
 export type { TaskItem, TaskSection, TaskStats, ParsedTasks } from "./tasks.js";

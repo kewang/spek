@@ -10,6 +10,8 @@ import type {
   DetectData,
   GraphData,
   WorktreeInfo,
+  SchemasResponse,
+  SchemaReadResult,
 } from "@spekjs/core";
 import type { ApiAdapter, AggregationPrefs } from "./types.js";
 import { getAggregatePref, setAggregatePref } from "../utils/aggregatePref.js";
@@ -109,6 +111,30 @@ export class FetchAdapter implements ApiAdapter {
   getWorktrees(includeJj?: boolean): Promise<WorktreeInfo[]> {
     const jj = includeJj === true ? "&jj=true" : "";
     return fetchJson(`${this.baseUrl}/openspec/worktrees?${this.q()}${jj}`);
+  }
+
+  getSchemas(aggregate?: boolean, includeJj?: boolean): Promise<SchemasResponse> {
+    return fetchJson(`${this.baseUrl}/openspec/schemas?${this.q()}${this.agg(aggregate, includeJj)}`);
+  }
+
+  // A 404 here is an answer, not a failure: the body carries whether the schema does not exist or
+  // could not be looked up. Anything else still throws.
+  //
+  // The body carries `usage` alongside the definition's own fields; it is split back out here so the
+  // client type keeps the two apart — one comes from the schema.yaml, the other from the repo.
+  async getSchema(name: string, aggregate?: boolean, includeJj?: boolean): Promise<SchemaReadResult> {
+    const res = await fetch(
+      `${this.baseUrl}/openspec/schemas/${encodeURIComponent(name)}?${this.q()}${this.agg(aggregate, includeJj)}`,
+    );
+    if (res.ok) {
+      const { usage = null, ...schema } = await res.json();
+      return { ok: true, schema, usage };
+    }
+    if (res.status === 404) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, reason: body.reason ?? "not-found" };
+    }
+    throw new Error(`HTTP ${res.status}`);
   }
 
   getAggregationPrefs(): Promise<AggregationPrefs> {

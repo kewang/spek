@@ -9,7 +9,7 @@
     "build:webview": "vite build --config vite.webview.config.ts",
     "build:intellij": "vite build --config vite.intellij.config.ts",
     "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"server/**/*.test.ts\"",
     "lint": "eslint src server --max-warnings 0"
   },
   "dependencies": {

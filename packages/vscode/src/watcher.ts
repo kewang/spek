@@ -13,7 +13,10 @@ import { shouldUsePolling, pollingInterval, withAuthoritativeChokidarEnv } from 
  * 會漏掉其中 `spec.md` 的新建與後續編輯；chokidar 收到新目錄後會重新掃描補發
  * 事件。設定比照 `packages/web/server/routes/openspec.ts`。
  */
-export function watchOpenspecDir(dir: string, onChange: () => void): vscode.Disposable {
+export function watchOpenspecDir(
+  dir: string,
+  onChange: (filePath: string) => void,
+): vscode.Disposable {
   const openspecPath = path.join(dir, "openspec");
 
   // 被監看路徑落在不傳遞原生事件的掛載（9p/drvfs 等，devcontainer/WSL）時改用 polling。

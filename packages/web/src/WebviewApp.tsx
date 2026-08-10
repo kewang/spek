@@ -16,6 +16,8 @@ import { SpecDetail } from "./pages/SpecDetail";
 import { ChangeList } from "./pages/ChangeList";
 import { ChangeDetail } from "./pages/ChangeDetail";
 import { GraphView } from "./pages/GraphView";
+import { SchemaList } from "./pages/SchemaList";
+import { SchemaDetail } from "./pages/SchemaDetail";
 import { TimelinePage } from "./pages/TimelinePage";
 
 // Webview 使用 MemoryRouter（沒有真正的 URL）
@@ -30,6 +32,8 @@ const router = createMemoryRouter([
       { path: "/changes", element: <ChangeList /> },
       { path: "/changes/:slug", element: <ChangeDetail /> },
       { path: "/graph", element: <GraphView /> },
+      { path: "/schemas", element: <SchemaList /> },
+      { path: "/schemas/:name", element: <SchemaDetail /> },
       { path: "/timeline", element: <TimelinePage /> },
     ],
   },

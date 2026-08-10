@@ -90,7 +90,8 @@ function cleanScalar(value: string): string {
 }
 
 // 讀取 repo openspec/config.yaml 的 schema（change 未宣告 schema 時的 fallback）
-function readRepoSchema(repoDir: string): string | null {
+// Exported for schemas.ts, so the repo's active schema is read by this one rule rather than a second copy.
+export function readRepoSchema(repoDir: string): string | null {
   const configPath = path.join(openspecDir(repoDir), "config.yaml");
   if (!fs.existsSync(configPath)) return null;
   const m = fs.readFileSync(configPath, "utf-8").match(/^schema:\s*(.+)$/m);

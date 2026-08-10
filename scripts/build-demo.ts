@@ -2,13 +2,24 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanOpenSpec, readSpec, readChange, readSpecAtChange, buildGraphData } from "../packages/core/dist/index.js";
+import {
+  scanOpenSpec,
+  readSpec,
+  readChange,
+  readSpecAtChange,
+  buildGraphData,
+  listSchemas,
+  readSchema,
+  groupSchemaUsage,
+  shortenSchemaPath,
+} from "../packages/core/dist/index.js";
 import type {
   OverviewData,
   SpecInfo,
   SpecDetail,
   ChangesData,
   ChangeDetail,
+  SchemaDefinition,
 } from "../packages/core/dist/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +36,62 @@ function getArg(flag: string): string | undefined {
 const REPO_DIR = getArg("--repo-dir") ? path.resolve(getArg("--repo-dir")!) : ROOT;
 const OUT_FILE = getArg("--output") ? path.resolve(getArg("--output")!) : path.join(ROOT, "docs", "demo.html");
 const PAGE_TITLE = getArg("--title") || "spek — OpenSpec Viewer Demo";
+
+/**
+ * The schemas the demo may publish: `package` plus this repo's committed ones, i.e. what a clean
+ * checkout has. `listSchemas` otherwise returns whatever is on the build machine, and `docs/` is
+ * uploaded verbatim — so without this the published payload depends on who ran the build.
+ */
+function filterPublishableSchemas<T extends { name: string; source: string }>(schemas: T[]): T[] {
+  const tracked = trackedProjectSchemas();
+  const kept: T[] = [];
+  for (const s of schemas) {
+    if (s.source === "user") {
+      console.log(`  skipping machine-local schema "${s.name}" (source: user)`);
+      continue;
+    }
+    if (s.source === "project" && !tracked.has(s.name)) {
+      console.log(`  skipping untracked project schema "${s.name}" (not committed)`);
+      continue;
+    }
+    kept.push(s);
+  }
+  return kept;
+}
+
+/**
+ * Strip the builder's filesystem out of a definition. `path` is absolute — for a package schema,
+ * wherever npm installed the CLI — and reaches the payload quietly, as a `title` rather than
+ * visible text. `displayPath` says the same thing without the machine.
+ */
+function deLocalise(schema: SchemaDefinition): SchemaDefinition {
+  return {
+    ...schema,
+    path: schema.displayPath,
+    shadows: schema.shadows.map((s) => ({ ...s, path: shortenSchemaPath(s.path, { repoRoot: REPO_DIR }) })),
+  };
+}
+
+/** Project schema names that git actually tracks, by directory under `openspec/schemas/`. */
+function trackedProjectSchemas(): Set<string> {
+  let out: string;
+  try {
+    out = execSync("git ls-files -- openspec/schemas", {
+      cwd: REPO_DIR,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    // No git, so nothing can be verified as committed — publish no project schemas at all.
+    return new Set();
+  }
+  const names = new Set<string>();
+  for (const line of out.split("\n")) {
+    const match = /^openspec\/schemas\/([^/]+)\//.exec(line.trim());
+    if (match) names.add(match[1]);
+  }
+  return names;
+}
 
 async function main() {
   // 1. 收集 openspec 資料
@@ -95,11 +162,39 @@ async function main() {
   // 建立 graph 資料
   const graphData = buildGraphData(REPO_DIR);
 
-  const demoData = { overview, specs, specDetails, changes, changeDetails, specVersions, graphData };
+  // Workflow schemas, captured here so the demo needs neither the openspec CLI nor a filesystem at
+  // view time — the whole point of the static build. The catalog is joined with change usage exactly
+  // as the server routes do, and every enumerated schema's definition is read so the detail page
+  // works offline; a schema that cannot be read is left out rather than embedded half-formed, and
+  // the view's own not-found state covers it.
+  const catalog = await listSchemas(REPO_DIR);
+  const publishable = filterPublishableSchemas(catalog.schemas);
+  const schemas = groupSchemaUsage({ ...catalog, schemas: publishable }, scan.activeChanges);
+  const schemaDetails: Record<string, SchemaDefinition> = {};
+  for (const summary of publishable) {
+    const result = await readSchema(REPO_DIR, summary.name);
+    if (result.ok) schemaDetails[summary.name] = deLocalise(result.schema);
+  }
+
+  const demoData = {
+    overview,
+    specs,
+    specDetails,
+    changes,
+    changeDetails,
+    specVersions,
+    graphData,
+    schemas,
+    schemaDetails,
+  };
   const demoDataJson = JSON.stringify(demoData);
 
   console.log(
     `  ${specs.length} specs, ${changes.active.length} active + ${changes.archived.length} archived changes`,
+  );
+  console.log(
+    `  ${schemas.schemas.length} schemas (${Object.keys(schemaDetails).length} readable)` +
+      (catalog.degradedReason ? `, degraded: ${catalog.degradedReason}` : ""),
   );
 
   // 2. 執行 Vite build
