@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.12.0
+
+**Highlight: spek now shows the workflow itself, not just its output.** A schema decides what a change *is* in OpenSpec — which artifacts exist, what order they come in, what each is supposed to contain, and when the change is ready to implement. Until now it appeared only as a small badge on a change that differed from the project default: a name with nothing behind it.
+
+- **New Schemas page** listing every workflow schema available to the project, with its description, its source (shipped with the `openspec` package, or project-local under `openspec/schemas/`), and how many artifacts it defines. The schema named by `openspec/config.yaml` is marked as the default, and each schema shows how many active changes declare it, with a link through to them. The plugin reads schemas through its own Kotlin implementation, aligned with the same rules. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen)
+- **A schema detail view that reads as a workflow** — its artifacts in authoritative order as a diagram, each showing the file it generates, what it requires before it can be written, and its full instruction text. The `apply` step is drawn as the flow's terminal step
+- **When the OpenSpec CLI cannot answer, the page says so.** If the CLI is missing, exits non-zero, times out, or emits something unparsable, the list comes back empty *with the reason stated*, rather than as an unexplained empty page
+- **Spec content is now ranked by structure rather than by inherited type size.** In a change's Specs tab the spec's own name was smaller than the `ADDED Requirements` label inside it, so a reader scrolled past the boundary between two stacked specs without registering that one occurred. The topic name is now the dominant heading of its section, the operation label is demoted, and an open section is inset with a hairline rule marking where it ends. Reported from this tool window, where a narrow width makes the ranking matter most (issue #42)
+- **Every delta operation is marked, not an arbitrary two.** `REMOVED` and `RENAMED` had no styling of their own, so in prose they read as ordinary words. `REMOVED` deliberately does not take red: red already means "normative" (`MUST` / `SHALL`) here
+
 ## 1.11.0
 
 **Highlight: a spec opens as an outline with substance, instead of a wall of text.** This was reported from this plugin (issue #42): "you are asked to read all these fine details, but you don't even really know the shape of the thing first." A tool window is narrower than a browser window, which made the wall worse here than anywhere else.
