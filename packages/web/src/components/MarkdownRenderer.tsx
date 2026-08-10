@@ -52,6 +52,17 @@ interface MarkdownRendererProps {
    * 只有 spec 形狀的內容該摺疊，其餘靠「沒傳」而不是靠某處的判斷來排除。
    */
   fold?: FoldOptions;
+  /**
+   * 這份內容是 spec 形狀的（spec 本體或 change 的 delta spec）。
+   *
+   * 它描述的是**文件的性質**，不是檢視狀態，所以刻意不從 `fold` 推導 —— 雖然今天兩者的呼叫端
+   * 恰好完全重合。`fold` 是讀者用 FoldControls 切換、還會被持久化的偏好；日後只要多一個代表
+   * 「不要摺疊」的模式，綁在一起就會讓顯示偏好順手改掉文件的排版。
+   *
+   * 影響範圍只有 h2：spec 形狀的文件裡每個 h2 都是結構分隔（`## Purpose`、`## Requirements`、
+   * `## ADDED Requirements`），而 proposal / design 的 h2 是內容標題本身，兩者不能共用一套排版。
+   */
+  specShaped?: boolean;
 }
 
 // BDD 關鍵字樣式對應。
@@ -70,6 +81,10 @@ const BDD_KEYWORDS: Record<string, string> = {
   SHALL: "text-kw-normative",
   ADDED: "bg-orange-500/20 text-badge-added px-1.5 py-0.5 rounded text-xs",
   MODIFIED: "bg-blue-500/20 text-badge-modified px-1.5 py-0.5 rounded text-xs",
+  // REMOVED 不用紅色：紅色在這個 renderer 已經是「規範性」（MUST/SHALL）的意思，
+  // 一個顏色扛兩種意義會讓兩邊都變弱。改用紫與粉，與既有的橘/藍/綠/紅/灰都拉得開。
+  REMOVED: "bg-purple-500/20 text-badge-removed px-1.5 py-0.5 rounded text-xs",
+  RENAMED: "bg-pink-500/20 text-badge-renamed px-1.5 py-0.5 rounded text-xs",
 };
 
 // 只在 `<strong>` 之外套用 —— 見 highlightBddKeywords。
@@ -82,6 +97,8 @@ const BDD_WEIGHTS: Record<string, string> = {
   SHALL: "font-bold",
   ADDED: "font-semibold",
   MODIFIED: "font-semibold",
+  REMOVED: "font-semibold",
+  RENAMED: "font-semibold",
 };
 
 const BDD_PATTERN = new RegExp(
@@ -139,7 +156,15 @@ function processChildren(children: ReactNode, inStrong = false): ReactNode {
   return children;
 }
 
-export function MarkdownRenderer({ content, specTopics, idPrefix, fold }: MarkdownRendererProps) {
+// h2 的兩套排版。差別只在 spec 形狀的文件裡 h2 是結構分隔，不是內容標題 —— 見 `specShaped`。
+//
+// 降級後刻意停在「不低於 h4」：h3 是 text-lg/semibold/primary、h4 是 text-base/semibold/secondary，
+// 這裡與 h4 同級再加上大寫與字距，所以排序是 h3 > h2 ≥ h4。若再往下降成 text-xs muted，h2 就會比
+// 它所統括的 h4 還輕 —— 那正是這次要修的倒置，只是往下挪了一層。
+const H2_CONTENT = "text-xl font-bold mt-6 mb-3 text-text-primary border-b border-border pb-2 scroll-mt-20";
+const H2_STRUCTURAL = "text-base font-semibold uppercase tracking-wide mt-6 mb-3 text-text-secondary scroll-mt-20";
+
+export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShaped }: MarkdownRendererProps) {
   // 順序不可調換：heading id 必須在還是扁平樹時指派，否則 dedup counter 看到的走訪順序會變。
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
     [rehypeSpekHeadingIds, { idPrefix }],
@@ -169,7 +194,7 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold }: Markdo
             return <h1 className="text-2xl font-bold mt-6 mb-4 text-text-primary">{children}</h1>;
           },
           h2({ id, children }) {
-            return <h2 id={id} className="text-xl font-bold mt-6 mb-3 text-text-primary border-b border-border pb-2 scroll-mt-20">{children}</h2>;
+            return <h2 id={id} className={specShaped ? H2_STRUCTURAL : H2_CONTENT}>{children}</h2>;
           },
           h3({ id, children }) {
             return <h3 id={id} className="text-lg font-semibold mt-5 mb-2 text-text-primary scroll-mt-20">{children}</h3>;

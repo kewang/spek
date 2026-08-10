@@ -114,6 +114,7 @@ export function SpecDetail() {
               key={fold.generation}
               content={data.content}
               fold={foldOptionsFor(fold.mode)}
+              specShaped
             />
           )}
 

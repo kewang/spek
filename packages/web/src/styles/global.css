@@ -27,7 +27,19 @@
   --color-kw-normative: #ff6467;
   --color-badge-added: #ff8904;
   --color-badge-modified: #51a2ff;
+  --color-badge-removed: #c27aff;
+  --color-badge-renamed: #fb64b6;
   --color-code-text: #f59e0b;
+
+  /*
+   * 摺疊區塊的範圍線。刻意不用 `--color-border`：那個值是為面板邊緣調的，量出來只有 1.42:1（深色）
+   * 與 1.18:1（淺色），淺色下等於看不見 —— 而 spec 已把「標示區塊範圍」寫成規範性要求，一條沒人
+   * 看得見的線並沒有標示到任何東西。
+   *
+   * 這裡兩個主題**刻意共用同一個中灰**：它比深色底亮、又比淺色底暗，量測為 4.11:1 / 4.55:1，
+   * 雙向都過非文字對比的 3:1。若日後動到任一主題的 bg-primary，請重新量而不是沿用。
+   */
+  --color-fold-rule: #62748e;
 }
 
 /*
@@ -70,7 +82,10 @@
   --color-kw-normative: #c10007;
   --color-badge-added: #9f2d00;
   --color-badge-modified: #1447e6;
+  --color-badge-removed: #6e11b0;
+  --color-badge-renamed: #a3004c;
   --color-code-text: #92400e;
+  /* `--color-fold-rule` 沒有列在這裡：見 @theme 內的說明，同一個中灰在兩個主題都過 3:1。 */
 }
 
 body {
@@ -85,6 +100,27 @@ code, pre {
 }
 
 /* No `code` background rule here on purpose — each `<code>` sets its own. See CLAUDE.md. */
+
+/*
+ * 摺疊區塊的縮排與範圍線。
+ *
+ * 打在 `<details>` 本身而不是替 body 包一層 wrapper：`foldSections.ts` 的分段是純函式，測試斷言
+ * 它輸出的樹形狀，為了樣式去動它等於把呈現塞進整個功能裡唯一承重的地方。線畫在 section 元素上還多
+ * 一個好處 —— 它沿著整段高度延伸，讀起來是一個框住範圍的托架，比單純縮排多講了「這段到哪裡結束」。
+ *
+ * 兩條規則都必須帶 `[open]`。padding/border 只在展開時有意義（收合的區塊沒有範圍可標）；而 summary
+ * 的負 margin 若不跟著收斂，收合中的區塊標題會比展開的兄弟往左偏一格 —— 預設模式正是 requirement
+ * 展開、scenario 收合，那個錯位會是第一眼就看到的東西。
+ */
+.markdown-body details[data-spek-fold][open] {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-fold-rule);
+}
+
+/* 把標題拉回父層的左緣：縮排的是內文，標題仍與區塊外的內容對齊。 */
+.markdown-body details[data-spek-fold][open] > summary {
+  margin-left: -0.75rem;
+}
 
 @keyframes fadeInUp {
   from {

@@ -163,7 +163,12 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
 - **Foldable spec sections** — requirements and scenarios render as collapsible sections
   (requirements open, scenarios closed) so a spec opens as an outline carrying its normative
   sentences rather than as a wall of text; Expand all / Collapse all, remembered across specs and
-  sessions. Applies to spec detail and a change's Specs tab, not to its other artifacts.
+  sessions. Applies to spec detail and a change's Specs tab, not to its other artifacts. An open
+  section is inset with a hairline rule marking its extent, so nesting is carried by position and not
+  by type size alone.
+- **Spec typography** — in spec content a level-2 heading is a structural separator, not a content
+  heading, so it renders as a subordinate label; the delta spec's topic is the dominant header of its
+  section, which matters most in a change's Specs tab where several specs stack in one view.
 - **Changes browser** — active and archived changes; each change renders its disk-discovered
   artifacts as tabs (Proposal / Design / Tasks / Specs and any custom-schema artifacts), with
   user-selectable tab ordering (Last modified / Schema order / A–Z) and a schema badge.
@@ -174,7 +179,8 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   grouping, status filters, and an auto-scaling time axis.
 - **Graph view** — force-directed spec↔change dependency graph, aggregation-aware.
 - **Full-text search** — `Cmd/Ctrl+K`, across specs and changes, with context previews.
-- **BDD syntax highlighting** — WHEN/GIVEN, THEN, AND, MUST/SHALL, ADDED/MODIFIED.
+- **BDD syntax highlighting** — WHEN/GIVEN, THEN, AND, MUST/SHALL, and a badge for each delta
+  operation (ADDED / MODIFIED / REMOVED / RENAMED).
 - **Live reload** — watches `openspec/` and refreshes on change, with an automatic **polling
   fallback** on filesystems that don't deliver native events (9p / drvfs / NFS / CIFS — devcontainer
   / WSL).

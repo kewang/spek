@@ -333,8 +333,13 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   before it reaches the CLI *or* the filesystem, and the same rule is stated in Kotlin with `\A`/`\z`
   anchors (Java's `$` also matches before a trailing newline, so `^…$` would accept `"spec-driven\n"`
   on that side only). The property is unchanged; only the mechanism differs for that one path
-- **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), ADDED/MODIFIED
-  (orange/blue badge). Each hue is a **per-theme token** (`--color-kw-*`, `--color-badge-*`,
+- **BDD highlighting**: WHEN/GIVEN (blue), THEN (green), AND (gray), MUST/SHALL (red), and a badge per
+  delta operation — ADDED orange, MODIFIED blue, REMOVED purple, RENAMED pink. **All four operations are
+  marked**; two of them went unhandled for a long time because the only occurrences in-repo are section
+  headings, and `processChildren` runs on `p` / `li` / `strong` **only** — no heading has ever been
+  keyword-marked, so nothing looked broken. **REMOVED is deliberately not red**: red already means
+  "normative" here, and one colour carrying two meanings weakens both. Each hue is a **per-theme token**
+  (`--color-kw-*`, `--color-badge-*`,
   `--color-code-text`), not a Tailwind palette class — those were shared by both themes, and no 400
   shade in any family clears even 3:1 on the light background, so every mark failed WCAG AA there while
   dark passed and hid it. **Adding a mark means adding both theme's values.** Pill fills stay plain
@@ -350,7 +355,27 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   keyboard and a11y behaviour for free; the elements are **uncontrolled** (React sets only the initial
   `open`), so Expand/Collapse all works by remounting on a generation `key` and `scrollToAnchorId` may
   open ancestors by touching the DOM directly. Folding is **opt-in per call site** (`fold` prop) — the
-  renderer is shared with proposal / design / tasks, which must stay unfolded
+  renderer is shared with proposal / design / tasks, which must stay unfolded.
+  An open section is **inset with a hairline left rule**, done as CSS on `details[data-spek-fold][open]`
+  rather than by wrapping the body in the transform: `foldSections.ts` is a pure function whose tests
+  assert its output shape, and styling is not worth churning the one piece of folding that can silently
+  lose content. **Both selectors carry `[open]`** — the inset and the `> summary` negative margin that
+  pulls the heading back to the parent's edge. Unscoped, the margin shifts *closed* sections one step
+  left of open ones, which the default mode (requirements open, scenarios closed) shows on first render.
+  The rule uses `--color-fold-rule`, **not `--color-border`**: the panel border measures 1.4:1 dark and
+  1.2:1 light, and marking a section's extent is a stated requirement, not decoration. One mid-gray
+  clears 3:1 against both backgrounds, so it is deliberately one value — re-measure if either
+  `bg-primary` moves
+- **Spec typography is declared, not detected**: `MarkdownRenderer`'s `specShaped` prop demotes `h2` to a
+  subordinate label, because in a spec every `h2` is a structural separator (`## Purpose`,
+  `## ADDED Requirements`) while in a proposal or design it is a content heading. It is **deliberately
+  not derived from `fold`**, though today both are passed at exactly the same two call sites: `fold` is a
+  reader-toggled, persisted view state, and spec-shapedness is a fact about the document — tie them
+  together and a future "don't fold" mode restyles headings as a side effect. The demotion stops **at**
+  `h4`'s size and weight, never below: demoting further would rebuild the same inversion one level down.
+  Heading levels and ids are untouched, because levels decide where folded sections end. In the Specs
+  tab the delta spec's topic header is the section's dominant element — it used to be a `text-sm` `h3`
+  *sibling* of the content's `h2`s, so it was terminated by the first one rather than containing them
 - **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
