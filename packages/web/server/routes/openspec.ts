@@ -219,9 +219,11 @@ openspecRouter.get("/schemas", async (req, res) => {
     scanOpenSpecAggregated(dir, { aggregate, includeJj }),
   ]);
 
-  // 200, not 5xx: the CLI is one of two sources, not the operation. Project-local schemas still come
-  // off disk, so losing the CLI is a partial result carrying a `degradedReason`, not a failed
-  // request. Reading a single schema is the case that can genuinely fail; that one 404s (below).
+  // 200, not 5xx: losing the CLI does not fail the request, it empties the answer. The catalog is
+  // the CLI's alone — including for the repo's own openspec/schemas/ — so a degraded read is an
+  // empty list plus a `degradedReason`, which is a statement the view can render rather than an
+  // error it must handle. What it must not do is present that emptiness as a fact about the repo.
+  // Reading a single schema is the case that can genuinely fail; that one 404s (below).
   res.json(groupSchemaUsage(catalog, scan.activeChanges));
 });
 

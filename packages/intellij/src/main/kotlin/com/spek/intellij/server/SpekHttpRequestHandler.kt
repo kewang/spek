@@ -249,8 +249,9 @@ class SpekHttpRequestHandler : HttpRequestHandler() {
     /**
      * The catalog joined with the active changes using it.
      *
-     * A CLI failure is a degraded 200, never a 5xx: the view still has project-local schemas to show
-     * and a `degradedReason` to explain the rest.
+     * A CLI failure is a degraded 200, never a 5xx: the catalog is the CLI's alone, so losing it
+     * empties the answer rather than failing the request — an empty list plus a `degradedReason`
+     * the view states, instead of presenting that emptiness as a fact about the project.
      */
     private fun handleSchemas(projectPath: String): String {
         // Independent of each other, so run them together — the web route does the same with
