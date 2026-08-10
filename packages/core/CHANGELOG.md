@@ -3,6 +3,36 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.8.0
+
+- **New runtime dependency: `yaml`.** Until now the package's only runtime dependency was
+  `cross-spawn`. A `schema.yaml` carries a nested artifact list and multi-line instruction blocks,
+  which the single-line parsing used for `openspec/config.yaml` cannot handle. If your install
+  budget or supply-chain review cares about the dependency set, this is the change to note.
+
+- **Schema enumeration and reading.** `listSchemas(repoRoot)` returns every workflow schema the
+  `openspec` CLI resolves for a repo — `project`, `user` and `package` sources are all reported, each
+  labelled — and `readSchema(repoRoot, name)` parses the definition at the directory the CLI reports.
+
+  **Which schemas exist is only ever asked of the CLI, including for the repo's own
+  `openspec/schemas/`.** A schema is configuration for OpenSpec's resolver, spread across three
+  directories with precedence and shadowing, of which a repo holds one. Reading it yourself answers a
+  question OpenSpec owns, with a more forgiving parser, against a format whose commands are still
+  marked experimental. There is no disk fallback.
+
+  A CLI failure is **not** an exception: you get an empty list plus a `degradedReason`, the same shape
+  `schemaOrder` already degrades to. Callers must handle that case — an empty list does not mean the
+  repo has no schemas.
+
+- **New browser-safe subpath `@spekjs/core/schema-flow`**, alongside the existing `headings` subpath,
+  for consumers that need the `requires`-graph maths without pulling in `child_process`:
+  `computeArtifactLevels`, `applyStepLevel`, `schemaArtifactCount`, `drawableRequires`.
+
+  `drawableRequires` returns the **transitive reduction** — a `requires` entry that a longer path
+  already implies is omitted, because drawing it detours around the very step that implies it.
+
+Additive throughout: no existing signature changes, and nothing is removed.
+
 ## 1.7.0
 
 - **`sortArtifacts` keeps the element type you give it.** It is now generic in the element, so an
