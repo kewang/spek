@@ -99,6 +99,18 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           {step.description && (
             <p className="text-text-secondary mt-1 text-sm">{step.description}</p>
           )}
+          {/* Where the reader meets the derived edge and can act on it: the diagram says *that* the
+              order was derived, this says what from. Stated as spek's own reasoning, and explicit
+              that openspec does not enforce it — the schema's `requires` above is what does. */}
+          {step.incoming.some((edge) => edge.origin === "derived") && (
+            <p className="text-text-muted border-accent/30 mt-2 border-l-2 pl-2 text-xs">
+              spek places this after implementation because it depends on everything the apply step
+              depends on, and the apply step depends on none of it. This schema has no way to state
+              that — an artifact&rsquo;s <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">requires</code>{" "}
+              can name only other artifacts — so the order is spek&rsquo;s reading, not a dependency{" "}
+              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">openspec</code> blocks on.
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -142,24 +154,29 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
 export function SchemaFlow({
   steps,
   levels,
-  selectedId,
+  selectedKey,
   onSelect,
 }: {
   steps: FlowStep[];
   levels: FlowLevel[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** Step *key*, never a declared id — two steps may share an id, and both must be selectable. */
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   if (steps.length === 0) {
     return <p className="text-text-muted">This schema declares no workflow steps.</p>;
   }
+
+  const hasDerivedEdge = steps.some((step) =>
+    step.incoming.some((edge) => edge.origin === "derived"),
+  );
 
   return (
     // Framed, like the Graph and Timeline views. Both wrap their visualisation in this exact
     // surface; ours floated loose on the page background, which is most of why it read as less
     // finished than they do.
     <div className="bg-bg-secondary border-border rounded border p-4">
-      <SchemaGraph levels={levels} selectedId={selectedId} onSelect={onSelect} />
+      <SchemaGraph levels={levels} selectedKey={selectedKey} onSelect={onSelect} />
 
       {/* One row of labels, no prose. Every caveat here was defensible on its own and together
           they had grown into a paragraph nobody would read. What survives is what a reader cannot
@@ -190,8 +207,29 @@ export function SchemaFlow({
           title="openspec blocks a step until its requires exist. A step's instructions may add ordering the graph does not state."
           className="underline decoration-dotted underline-offset-2"
         >
-          arrows = declared requires
+          solid arrows = declared requires
         </span>
+        {/* Only when the diagram actually contains one. A legend entry for a mark that is not on
+            screen teaches a distinction the reader then goes looking for and cannot find — and for
+            13 of the 17 schemas resolvable here, nothing is derived. */}
+        {hasDerivedEdge && (
+          <span
+            title="OpenSpec cannot express an artifact produced after implementation, so schemas that have one point it at the last planning artifact and say the rest in prose. spek places it after the apply step because it depends on everything apply depends on, and apply depends on none of it. openspec does not block on this."
+            className="flex items-center gap-1.5 underline decoration-dotted underline-offset-2"
+          >
+            <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true" className="shrink-0">
+              <path
+                d="M 0 4 H 16"
+                stroke="var(--color-border)"
+                strokeWidth={1.5}
+                strokeDasharray="5 4"
+                fill="none"
+              />
+              <path d="M 16 0.5 L 23 4 L 16 7.5 z" fill="var(--color-border)" />
+            </svg>
+            dashed = order spek derived, not declared
+          </span>
+        )}
       </div>
     </div>
   );

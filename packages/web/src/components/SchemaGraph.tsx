@@ -25,12 +25,13 @@ const TEXT_X = 14;
 
 export function SchemaGraph({
   levels,
-  selectedId,
+  selectedKey,
   onSelect,
 }: {
   levels: FlowLevel[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** Step *key*, never a declared id — two steps may share an id, and both must be selectable. */
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   // Hover now does one thing only: brighten the node's own outline, so a clickable thing looks
   // clickable. It no longer touches edges or other nodes.
@@ -48,7 +49,7 @@ export function SchemaGraph({
   // already about. Driving it from hover meant the diagram lit up and went dark again as the
   // cursor crossed it, and the highlight was never there while you actually read the step.
   const isConnected = (edge: { from: string; to: string }) =>
-    selectedId !== null && (edge.from === selectedId || edge.to === selectedId);
+    selectedKey !== null && (edge.from === selectedKey || edge.to === selectedKey);
 
   return (
     <div>
@@ -105,6 +106,13 @@ export function SchemaGraph({
         <g>
           {edges.map((edge) => {
             const connected = isConnected(edge);
+            // A derived edge is an ordering spek worked out, not one the CLI blocks on, so it must
+            // never render as a declared one. Dashed rather than a second hue: colour here already
+            // means selection, and the whole palette rule of this diagram is that the accent is
+            // spent once. A dash also survives a greyscale print and a colour-blind reader, which a
+            // hue swap does not — and it is the same "not what the schema declares" vocabulary the
+            // archive node already uses, one level down from a node to a connection.
+            const derived = edge.origin === "derived";
             return (
               <path
                 key={`${edge.from}->${edge.to}`}
@@ -112,34 +120,43 @@ export function SchemaGraph({
                 fill="none"
                 stroke={connected ? "var(--color-accent)" : "var(--color-border)"}
                 strokeWidth={connected ? 2 : 1.5}
+                strokeDasharray={derived ? "5 4" : undefined}
                 markerEnd={connected ? "url(#schema-arrow-active)" : "url(#schema-arrow)"}
-              />
+              >
+                {derived && (
+                  <title>
+                    Not declared by this schema. spek placed this step after implementation because
+                    it depends on everything the apply step depends on, and the apply step does not
+                    depend on it. openspec does not block on this.
+                  </title>
+                )}
+              </path>
             );
           })}
         </g>
 
         {nodes.map(({ step, x, y }) => {
-          const selected = step.id === selectedId;
-          const isHovered = step.id === hovered;
+          const selected = step.key === selectedKey;
+          const isHovered = step.key === hovered;
           const labelWidth = NODE_W - TEXT_X - 12 - (step.isApply ? 14 : 0);
           return (
             <g
-              key={step.id}
+              key={step.key}
               transform={`translate(${x},${y})`}
               role="button"
               tabIndex={0}
               aria-pressed={selected}
               className="cursor-pointer outline-none"
-              onClick={() => onSelect(step.id)}
+              onClick={() => onSelect(step.key)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  onSelect(step.id);
+                  onSelect(step.key);
                 }
               }}
-              onMouseEnter={() => setHovered(step.id)}
+              onMouseEnter={() => setHovered(step.key)}
               onMouseLeave={() => setHovered(null)}
-              onFocus={() => setHovered(step.id)}
+              onFocus={() => setHovered(step.key)}
               onBlur={() => setHovered(null)}
             >
               <title>

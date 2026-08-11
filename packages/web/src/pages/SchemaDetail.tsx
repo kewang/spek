@@ -16,7 +16,9 @@ import { plural } from "../utils/plural";
 
 export function SchemaDetail() {
   const { name = "" } = useParams<{ name: string }>();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Held as a step *key*, not a declared id: a schema may declare an artifact named `apply`
+  // alongside the apply phase, and an id would select whichever came first for both.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // One request: `usage` rides along on the result rather than costing a second fetch of the whole
   // catalog, which a deep link, a reload or a post-refresh cache miss would each pay in full.
   const { data, loading, error } = useSchema(name);
@@ -74,7 +76,7 @@ export function SchemaDetail() {
   // Excludes the archive step: it is a stage of every OpenSpec workflow, not one this schema
   // declares, and counting it would inflate every schema by the same 1.
   const { artifactCount, steps, levels } = model;
-  const selected = steps.find((s) => s.id === selectedId) ?? null;
+  const selected = steps.find((s) => s.key === selectedKey) ?? null;
 
   return (
     // space-y-6 like SpecDetail (the other detail page); stat cards borrowed from the Dashboard,
@@ -174,15 +176,15 @@ export function SchemaDetail() {
           <SchemaFlow
             steps={steps}
             levels={levels}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId(id === selectedId ? null : id)}
+            selectedKey={selectedKey}
+            onSelect={(key) => setSelectedKey(key === selectedKey ? null : key)}
           />
         </section>
 
         <section className="mt-6 xl:mt-0">
           <h2 className="mb-3 text-lg font-semibold">{selected ? "Step" : "Steps"}</h2>
           {selected ? (
-            <SchemaStepDetail step={selected} onClose={() => setSelectedId(null)} />
+            <SchemaStepDetail step={selected} onClose={() => setSelectedKey(null)} />
           ) : (
             // A detail pane waiting for a selection. Given real height so it reads as a pane rather
             // than a stray strip, but nothing is relocated here to fill it.

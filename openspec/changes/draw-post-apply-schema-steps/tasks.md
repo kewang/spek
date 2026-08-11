@@ -27,10 +27,12 @@
 
 ## 3. Rendering the derived edge
 
-- [ ] 3.1 Render the derived connection in `packages/web/src/components/SchemaFlow.tsx` visually distinct from a declared one
-- [ ] 3.2 Name the derived form in the diagram legend, alongside the existing distinction for the archive step
-- [ ] 3.3 State what the derived edge was derived from where the reader meets it, without asserting the CLI blocks on it
-- [ ] 3.4 Verify the distinction holds in both themes and carries a non-colour cue, so it does not depend on hue alone
+- [x] 3.1 Render the derived connection in `packages/web/src/components/SchemaFlow.tsx` visually distinct from a declared one
+- [x] 3.2 Name the derived form in the diagram legend, alongside the existing distinction for the archive step
+- [x] 3.3 State what the derived edge was derived from where the reader meets it, without asserting the CLI blocks on it
+- [x] 3.4 Verify the distinction holds in both themes and carries a non-colour cue, so it does not depend on hue alone
+  - Verified by screenshot in both themes across `superpowers-bridge`, `anvil`, `superspec`, `spec-super` and `spec-driven`. The cue is a dash pattern, not a hue, so it survives selection (the edge keeps its dash while lighting up in the accent), greyscale, and a colour-blind reader.
+  - Consequence worth noting: selection was moved from step id to step key in `SchemaDetail` / `SchemaFlow` / `SchemaGraph` as part of 3.1, since a schema with two steps sharing an id could otherwise select only one of them.
 
 ## 4. Verification against real schemas
 
