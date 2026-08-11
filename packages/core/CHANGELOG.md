@@ -3,6 +3,24 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.9.0
+
+- **New: `specHeadingLabel(text)`**, exported from the package root and from the browser-safe
+  `@spekjs/core/headings` subpath beside `extractHeadings` / `slugifyHeading`. Given a spec heading's
+  text it returns what a host should *display* for it: a leading OpenSpec format keyword
+  (`Requirement:` / `Scenario:`) removed, anything else returned unchanged. Matching is
+  case-sensitive and anchored, and a heading whose entire content is the keyword is returned as-is.
+
+- **Nothing else changes, deliberately.** `extractHeadings` does not call it: `Heading.text` remains
+  the text as authored and `Heading.slug` remains derived from that text, so every anchor a consumer
+  has already minted still resolves. The label is a third value that nothing is derived from —
+  deriving a slug from it would silently invalidate existing links.
+
+- **Pass the whole heading text.** The decision of whether a keyword is present, and whether anything
+  survives its removal, is only correct over the complete heading: a requirement named after a code
+  span begins with a text run that is exactly `Requirement: `, and judging that fragment alone
+  concludes there is nothing left and keeps the keyword.
+
 ## 1.8.0
 
 - **New runtime dependency: `yaml`.** Until now the package's only runtime dependency was
