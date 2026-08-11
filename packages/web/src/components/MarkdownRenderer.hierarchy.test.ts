@@ -132,21 +132,28 @@ test("the section inset and its summary offset are both scoped to [open]", () =>
   assert.match(summaryRule[2], /margin-left:\s*-/, "expected a negative offset");
   assert.match(summaryRule[1], /\[open\]/, "summary offset is not scoped to [open]");
 
-  const sectionRule = /\.markdown-body details\[data-spek-fold\]([^{>]*)\{([^}]*)\}/.exec(css);
+  // 這條抓的是第一個「後面既沒有 `>` 也沒有 `::` 就進 `{`」的區塊，也就是縮排那條。留白（padding-top）
+  // 刻意宣告在更下面那個無 `[open]` 的區塊裡；擺到這條前面的話，失敗訊息會指著留白說它沒有 `[open]`，
+  // 而照著訊息加上 `[open]` 正好是規範禁止的事（開合會改變標題位置）。
+  const sectionRule = /\.markdown-body details\[data-spek-fold\]([^{>:]*)\{([^}]*)\}/.exec(css);
   assert.ok(sectionRule, "expected a rule insetting the section");
   assert.match(sectionRule[1], /\[open\]/, "section inset is not scoped to [open]");
-  assert.match(sectionRule[2], /border-left/, "expected the extent rule");
+  assert.match(sectionRule[2], /padding-left/, "expected the inset rule");
 });
 
 test("the extent rule does not use the panel border colour", () => {
   // `--color-border` measures 1.42:1 dark and 1.18:1 light — below the 3:1 the spec now requires.
+  // 範圍線畫在偽元素上（border 從 border box 頂端起筆，會把區塊之間的分隔填掉），所以守衛跟著搬過去：
+  // 這是規範那條 3:1 背後唯一的自動檢查。
   const css = readFileSync(
     fileURLToPath(new URL("../styles/global.css", import.meta.url)),
     "utf8"
   );
-  const rule = /\.markdown-body details\[data-spek-fold\]\[open\]\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+  const rule = /\.markdown-body details\[data-spek-fold\]\[open\]::before\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
   assert.match(rule, /var\(--color-fold-rule\)/);
   assert.ok(!rule.includes("--color-border"), "the extent rule fell back to the panel border colour");
+  // background 在 forced-colors 模式會被丟掉，border 會被強制成 CanvasText 而留下來。
+  assert.match(rule, /border-left:/, "the mark must be painted as a border, not a background");
 });
 
 // 摺疊本身的行為由 MarkdownRenderer.fold.test.ts 涵蓋；這裡只確認降級沒有動到分段邊界。

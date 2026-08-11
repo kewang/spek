@@ -79,9 +79,9 @@ const css = (): string =>
   readFileSync(fileURLToPath(new URL("../styles/global.css", import.meta.url)), "utf8");
 
 test("a nested open section draws no mark of its own", () => {
-  const rule = /details\[data-spek-fold\]\[open\] details\[data-spek-fold\]\[open\]\s*\{([^}]*)\}/.exec(css())?.[1];
+  const rule = /details\[data-spek-fold\]\[open\] details\[data-spek-fold\]\[open\]::before\s*\{([^}]*)\}/.exec(css())?.[1];
   assert.ok(rule, "expected a rule silencing the nested extent mark");
-  assert.match(rule, /border-left-color:\s*transparent/);
+  assert.match(rule, /content:\s*none/);
 });
 
 test("the summary offset cancels the inset exactly", () => {
@@ -99,6 +99,74 @@ test("the disclosure marker clears the mark in both open states", () => {
   const rule = /\.markdown-body details\[data-spek-fold\] > summary\s*\{([^}]*)\}/.exec(css())?.[1];
   assert.ok(rule, "expected an unscoped rule offsetting the summary content");
   assert.match(rule, /padding-left:/);
+});
+
+test("the fold lead still restates the heading margins it replaced", () => {
+  // 摺疊標題自己的 `mt-*` 被歸零，那段留白改由區塊的 `--color-fold-lead` 提供 —— 於是同一個距離寫在兩
+  // 個地方，而 CSS 讀不到元件的 class，沒有機制能像線的起點那樣把它收成一個來源。把 h3 改成 `mt-6`，
+  // 未摺疊的內容會動、摺疊的規格不會，而且不會有任何東西失敗。這條測試就是那個會失敗的東西。
+  const tsx = readFileSync(
+    fileURLToPath(new URL("./MarkdownRenderer.tsx", import.meta.url)),
+    "utf8"
+  );
+  // Tailwind 的間距刻度是 0.25rem 一格。
+  const headingLead = (tag: string): number | undefined => {
+    const cls = new RegExp(`<${tag}\\b[^>]*className="([^"]*)"`).exec(tsx)?.[1];
+    const step = cls && /\bmt-(\d+)\b/.exec(cls)?.[1];
+    return step ? Number(step) * 0.25 : undefined;
+  };
+  const declared = (selector: RegExp): number | undefined => {
+    const rem = selector.exec(css())?.[1];
+    return rem ? Number(rem) : undefined;
+  };
+
+  assert.equal(
+    declared(/\.markdown-body details\[data-spek-fold\]\s*\{[^}]*--color-fold-lead:\s*([\d.]+)rem/),
+    headingLead("h3"),
+    "the section's leading space no longer matches the requirement heading's own margin"
+  );
+  assert.equal(
+    declared(/details\[data-spek-fold\] details\[data-spek-fold\]\s*\{[^}]*--color-fold-lead:\s*([\d.]+)rem/),
+    headingLead("h4"),
+    "the nested leading space no longer matches the scenario heading's own margin"
+  );
+});
+
+test("the fold trail still restates the content margin it clears", () => {
+  // 線的底端讓開的是內文最後一段的下邊距。它跟 lead 一樣是「寫在兩個地方的同一個距離」—— 段落的
+  // `mb-4` 改了而這裡沒改，線就會重新長出那一截，或反過來短一截，兩種都沒有東西會失敗。
+  const tsx = readFileSync(
+    fileURLToPath(new URL("./MarkdownRenderer.tsx", import.meta.url)),
+    "utf8"
+  );
+  const trailing = (tag: string): number | undefined => {
+    const cls = new RegExp(`<${tag}\\b[^>]*className="([^"]*)"`).exec(tsx)?.[1];
+    const step = cls && /\bmb-(\d+)\b/.exec(cls)?.[1];
+    return step ? Number(step) * 0.25 : undefined;
+  };
+  const declared = /--color-fold-trail:\s*([\d.]+)rem/.exec(css())?.[1];
+  assert.ok(declared, "expected the trailing space the mark clears to be declared");
+  assert.equal(Number(declared), trailing("p"), "the mark's end no longer clears a paragraph's trailing margin");
+  // 段落與清單刻意同值；不同的話「內文結尾」就不是一個距離，這條規則本身要重想。
+  assert.equal(trailing("ul"), trailing("p"), "list and paragraph trailing margins have diverged");
+});
+
+test("the mark starts where the leading space ends", () => {
+  // 線的起點與它必須讓開的那段留白是同一個值的兩次使用。這裡不比對兩個數字，而是要求兩邊讀同一個自訂
+  // 屬性 —— 數字相等只是當下成立，共用一個來源才是改不到一半。
+  const text = css();
+  const lead = /\.markdown-body details\[data-spek-fold\]\s*\{[^}]*padding-top:\s*var\((--[\w-]+)\)/.exec(text)?.[1];
+  const start = /\.markdown-body details\[data-spek-fold\]\[open\]::before\s*\{[^}]*top:\s*var\((--[\w-]+)\)/.exec(text)?.[1];
+  assert.ok(lead && start, "expected both the leading space and the mark's start to read a custom property");
+  assert.equal(start, lead, "the mark's start no longer reads the property that holds the leading space");
+});
+
+test("the leading space is not scoped to open state", () => {
+  // 收合的區塊沒有範圍可標，但一樣有標題。只有展開才留這段空間的話，讀者一開合，標題自己就會上下跳
+  // —— 預設模式（requirement 展開、scenario 收合）第一眼就看得到。
+  const rule = /\.markdown-body details\[data-spek-fold\]\s*\{([^}]*)\}/.exec(css())?.[1];
+  assert.ok(rule, "expected an unscoped rule holding the leading space");
+  assert.match(rule, /padding-top:/);
 });
 
 test("sibling sections are separated, and the separation does not depend on open state", () => {

@@ -108,12 +108,43 @@ code, pre {
  * 它輸出的樹形狀，為了樣式去動它等於把呈現塞進整個功能裡唯一承重的地方。線畫在 section 元素上還多
  * 一個好處 —— 它沿著整段高度延伸，讀起來是一個框住範圍的托架，比單純縮排多講了「這段到哪裡結束」。
  *
- * 兩條規則都必須帶 `[open]`。padding/border 只在展開時有意義（收合的區塊沒有範圍可標）；而 summary
+ * 兩條規則都必須帶 `[open]`。縮排與範圍線只在展開時有意義（收合的區塊沒有範圍可標）；而 summary
  * 的負 margin 若不跟著收斂，收合中的區塊標題會比展開的兄弟往左偏一格 —— 預設模式正是 requirement
  * 展開、scenario 收合，那個錯位會是第一眼就看到的東西。
+ *
+ * `position: relative` 是給下一條規則的偽元素定位用的。範圍線從 `border-left` 換成偽元素之後，區塊
+ * 內的所有東西往左移了 1px（原本被 border 佔著）：展開與收合的標題、揭露箭頭因此真正對齊在同一條左
+ * 緣上 —— 規範要求的「收合的箭頭與展開的在同一左緣」在這之前差的就是這 1px。代價是箭頭與線的間隙從
+ * 4px 變成 3px，那是同一個 1px 的另一面，不是兩件可以分開調的事。
  */
 .markdown-body details[data-spek-fold][open] {
+  position: relative;
   padding-left: 1rem;
+}
+
+/*
+ * 範圍線。畫成偽元素而不是區塊的 `border-left`：border 一定從 border box 的頂端開始，也就是從標題上
+ * 方那段留白開始畫 —— 而那段留白同時是它與前一個區塊的分隔，線畫過去等於把分隔填掉（issue #42：量到
+ * 的是兩個 requirement 之間 28px 裡有 20px 是線）。偽元素則直接講得出「從哪裡開始、到哪裡結束」。
+ *
+ * 用 `border-left` + `width: 0` 上色，不用 background：forced-colors 模式會丟掉 background，border
+ * 則會被強制成 `CanvasText` 而留下來。規範要求這條線在任何佈景下都看得見，而 VS Code webview 到得了
+ * 那個模式；列印時關掉背景圖形也是同一個洞。
+ *
+ * `top` 與區塊的 `padding-top` 讀同一個變數：線的起點與它必須讓開的那段留白是同一個值的兩次使用，
+ * 不可能只改到一邊。
+ *
+ * `bottom` 是同一件事的另一頭。區塊是 BFC，內文最後一段的下邊距（`mb-4`）因此收在盒子裡面，線畫到
+ * 盒底就會比它框住的內容多出那一段 —— 量到的是四段線各多 20px，最後一個 scenario 底下看得最清楚。
+ * 讓開它之後，線的兩端講的都是「內容從哪裡開始、到哪裡結束」，而不是盒子的邊界。
+ */
+.markdown-body details[data-spek-fold][open]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: var(--color-fold-lead);
+  bottom: var(--color-fold-trail);
+  width: 0;
   border-left: 1px solid var(--color-fold-rule);
 }
 
@@ -134,17 +165,30 @@ code, pre {
 }
 
 /*
+ * 標題上方的留白改由區塊自己持有（見下面的 `--color-fold-lead`），所以摺疊標題自己的上邊距要歸零。
+ *
+ * 選擇器必須是後代而不是子代：renderer 把標題包在 summary 裡的一層 flex `<span>`，其他 fold 規則慣用的
+ * `> summary >` 在這裡一條都選不到 —— 而且選不到不會報錯，只是整條規則靜靜地沒有作用。
+ *
+ * 只歸零 `margin-top`：`margin-bottom` 是標題與它自己內文之間的距離，不屬於任何一段要保持不變的分隔。
+ * 這條規則不進 `@layer`，靠的就是無層級規則勝過任何有層級規則，才蓋得掉 Tailwind 的 `mt-5`。
+ */
+.markdown-body details[data-spek-fold] > summary :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: 0;
+}
+
+/*
  * 巢狀區塊只縮排、不再畫第二條線。
  *
  * 兩條同粗同色的線並排，讀起來是「同一個裝飾重複了一次」而不是「兩層巢狀的托架」；巢狀區塊的範圍本來
- * 就被外層那條線框住了，深度也還有縮排在講。用 transparent 而不是 `border-left: none`：邊框留著才能維持
- * 那 1px 的內縮，讓巢狀標題與外層標題仍對齊在同一條左緣上。
+ * 就被外層那條線框住了，深度也還有縮排在講。線改成偽元素之後直接 `content: none` 不生成 —— 原本用
+ * transparent 是為了留住 border 那 1px 的內縮，現在誰都沒有 border，對齊自然一致。
  *
  * 條件寫「摺疊區塊裡面的摺疊區塊」而不是 `[data-spek-fold="4"]`：哪些層級會摺疊是呼叫端傳進來的，
  * 綁層級數字的話，哪天多一層會無聲地失效。
  */
-.markdown-body details[data-spek-fold][open] details[data-spek-fold][open] {
-  border-left-color: transparent;
+.markdown-body details[data-spek-fold][open] details[data-spek-fold][open]::before {
+  content: none;
 }
 
 /*
@@ -166,15 +210,38 @@ code, pre {
    * 展開時 16px，等於展開一個 scenario 就把後面的區塊多推 8px，而規範寫的是開合不得改變周圍間距。
    */
   display: flow-root;
+  /*
+   * 標題上方的留白。放在區塊身上而不是標題身上，範圍線才畫得出「從標題起筆」—— 留在標題身上時它落在
+   * 區塊盒子裡面，border 一定會從它上面開始畫。
+   *
+   * 用 padding 不用 margin：相鄰兄弟的 margin 會合併，區塊間距與這段留白會塌成「取大值的同一個宣告」
+   * 而不是相加的兩段。量過的後果是 operation 標題到第一個 requirement 從 32px 無聲縮成 28px，而且沒有
+   * 任何單一 margin 值能同時給出 28 / 32 這兩段。
+   *
+   * 開合都要給：收合的區塊沒有範圍可標，但一樣有標題；只有展開才留這段空間的話，讀者一開合，標題自己
+   * 就會上下跳。
+   */
+  --color-fold-lead: 1.25rem;
+  /*
+   * 內文最後一段的下邊距（段落與清單都是 `mb-4`）。它收在區塊裡面，是範圍線底端必須讓開的那一段 ——
+   * 只有線讀它，區塊本身的間距不受影響，所以這裡不動 padding。
+   */
+  --color-fold-trail: 1rem;
+  padding-top: var(--color-fold-lead);
   margin-bottom: 0.5rem;
 }
 
 /*
  * 巢狀區塊不要這個間距。它沒有線可以斷，卻會疊加在外層的間距上 —— 量到的是：預設模式（scenario 收合）
  * 區塊之間 8px，全部展開後變成 16px。也就是展開一個 scenario 會把後面的區塊往下推，而「開合不得改變
- * 周圍區塊的間距」是規範寫死的。scenario 之間的節奏維持既有的（標題自己的上邊距）。
+ * 周圍區塊的間距」是規範寫死的。scenario 之間的節奏維持既有的 16px，現在由這裡的 lead 提供。
+ *
+ * 條件同樣是「摺疊區塊裡面的摺疊區塊」而不是層級數字，理由與範圍線的抑制一樣。代價是規範裡寫明的那一
+ * 條：沒有前置 requirement 的 scenario 是 top-level 區塊，因此拿到 1.25rem 而不是 1rem，往下移 4px。
+ * 那是規則照著它自己的條件運作，不是漏掉。
  */
 .markdown-body details[data-spek-fold] details[data-spek-fold] {
+  --color-fold-lead: 1rem;
   margin-bottom: 0;
 }
 
