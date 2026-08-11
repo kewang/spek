@@ -101,14 +101,21 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           )}
           {/* Where the reader meets the derived edge and can act on it: the diagram says *that* the
               order was derived, this says what from. Stated as spek's own reasoning, and explicit
-              that openspec does not enforce it — the schema's `requires` above is what does. */}
+              that openspec does not enforce it — the schema's `requires` above is what does.
+
+              No chip follows a possessive here. A chip's `px-1.5` padding stacks on the word space,
+              and after a possessive — which ends tight — the pair reads as a double space even
+              though only one space is there. Each chip sits after a dash or a plain word instead,
+              where the extra air looks deliberate. The chip utilities are the app's shared
+              vocabulary and are not the thing to adjust. */}
           {step.incoming.some((edge) => edge.origin === "derived") && (
             <p className="text-text-muted border-accent/30 mt-2 border-l-2 pl-2 text-xs">
-              spek places this after implementation because it depends on everything the apply step
-              depends on, and the apply step depends on none of it. This schema has no way to state
-              that — an artifact&rsquo;s <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">requires</code>{" "}
-              can name only other artifacts — so the order is spek&rsquo;s reading, not a dependency{" "}
-              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">openspec</code> blocks on.
+              spek places this after implementation: it depends on everything the apply step depends
+              on, and apply depends on none of it. The schema cannot say so —{" "}
+              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">requires</code> can
+              name only other artifacts — so this order is spek&rsquo;s reading, not something{" "}
+              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">openspec</code>{" "}
+              blocks on.
             </p>
           )}
         </div>
