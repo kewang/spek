@@ -169,11 +169,13 @@ nothing in this change can prevent it.
 ## Migration Plan
 
 No data, storage, or API shape changes; the affected surfaces render from the same responses. The
-change is additive on `@spekjs/core` (one new export plus a widened return on
-`computeArtifactLevels`), so the core line takes a minor bump recorded at release time. Rollback is
-reverting the commit — nothing persists.
+change is additive on `@spekjs/core` (new exports, no signature changed), so the core line takes a
+minor bump recorded at release time. Rollback is reverting the commit — nothing persists.
 
-Verification uses schemas installed on this machine rather than fixtures alone: `superpowers-bridge`
-(project) and `anvil` for genuine post-implementation steps, `superspec` for the id collision,
-`spec-super` for the most-starred false positive, and `spec-driven` / `nanopm` / `e2e-runbooks` as
-no-op controls.
+Verification runs against real published schemas rather than fixtures alone, since the rule is a
+claim about what schema authors actually write. Which schemas resolve depends on what the CLI is
+configured with, so the artifacts name the *roles* to cover rather than a machine's inventory:
+`superpowers-bridge` (in this repo) and `anvil` for genuine post-implementation steps, `superspec`
+for an artifact whose id collides with the apply phase, `spec-super` for a known false positive, and
+`spec-driven` plus any two other unaffected schemas as no-op controls. All are installable from the
+community catalog.

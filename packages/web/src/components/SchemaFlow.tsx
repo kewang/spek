@@ -217,8 +217,8 @@ export function SchemaFlow({
           solid arrows = declared requires
         </span>
         {/* Only when the diagram actually contains one. A legend entry for a mark that is not on
-            screen teaches a distinction the reader then goes looking for and cannot find — and for
-            13 of the 17 schemas resolvable here, nothing is derived. */}
+            screen teaches a distinction the reader then goes looking for and cannot find, and most
+            schemas declare nothing after implementation, so most diagrams have no dashed edge. */}
         {hasDerivedEdge && (
           <span
             title="OpenSpec cannot express an artifact produced after implementation, so schemas that have one point it at the last planning artifact and say the rest in prose. spek places it after the apply step because it depends on everything apply depends on, and apply depends on none of it. openspec does not block on this."
