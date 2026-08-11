@@ -36,10 +36,18 @@
 
 ## 4. Verification against real schemas
 
-- [ ] 4.1 Run `npm run type-check`, `npm run lint`, and `npm test`
-- [ ] 4.2 Check `/schemas/superpowers-bridge` and `/schemas/anvil` in the running app: apply precedes `verify`, the connection into `verify` is the derived one and is the only one, and archive waits on the tail
-- [ ] 4.3 Check `/schemas/superspec`: the declared `apply` artifact and the apply step both appear, both selectable, with connections landing on the intended step
-- [ ] 4.4 Check `/schemas/spec-super`: `blackbox-test` is a known false positive, so confirm the derived marking reads as an inference rather than as a declared dependency
-- [ ] 4.5 Check `/schemas/spec-driven`, `/schemas/nanopm`, and `/schemas/e2e-runbooks` render exactly as before
-- [ ] 4.6 Confirm the schemas list still costs one CLI call and no page gained a request, since the rule needs `requires` that only the detail read holds
+- [x] 4.1 Run `npm run type-check`, `npm run lint`, and `npm test`
+- [x] 4.2 Check `/schemas/superpowers-bridge` and `/schemas/anvil` in the running app: apply precedes `verify`, the connection into `verify` is the derived one and is the only one, and archive waits on the tail
+  - `superpowers-bridge`: brainstorm → proposal → design → specs → tasks → plan → **apply → verify** → retrospective → archive; 9 solid edges and exactly 1 dashed. `anvil`: … → tasks → **apply → verify** → archive; 7 solid, 1 dashed. Archive waits on the post-implementation tail in both.
+- [x] 4.3 Check `/schemas/superspec`: the declared `apply` artifact and the apply step both appear, both selectable, with connections landing on the intended step
+  - `superspec`: both `apply` steps render (… → plan → apply → apply → verify → finalize → archive), each selectable, connections landing on the intended one. Keyed by declared id alone, one silently replaced the other.
+- [x] 4.4 Check `/schemas/spec-super`: `blackbox-test` is a known false positive, so confirm the derived marking reads as an inference rather than as a declared dependency
+  - `spec-super`: apply → blackbox-test, drawn dashed and explained as spek's reading. The known false positive reads as an inference the reader can reject, which is what the derived marking is for.
+- [x] 4.5 Check `/schemas/spec-driven`, `/schemas/nanopm`, and `/schemas/e2e-runbooks` render exactly as before
+  - `spec-driven`, `nanopm`, `e2e-runbooks`: 0 dashed edges and unchanged order (`proposal → specs → design → tasks → apply → archive` for the first two). 13 of the 17 schemas resolvable here are no-ops.
+- [x] 4.6 Confirm the schemas list still costs one CLI call and no page gained a request, since the rule needs `requires` that only the detail read holds
+  - Measured with a logging shim ahead of the real binary on PATH, not inferred: the schemas list costs **1** `openspec schemas --json` for 17 schemas, and each detail page costs **1** `openspec schema which <name> --json`. Unchanged. No page gained a network request either — the branch adds no `fetch`, adapter call, effect or EventSource anywhere (checked against the diff).
 - [ ] 4.7 Verify the VS Code webview rendering of the derived edge against the real host, since the host injects its own stylesheet and this class of problem cannot reproduce in a browser
+  - **Outstanding — needs a human at the VS Code UI.** The extension is built from this branch and installed (`kewang.spek-vscode@1.12.0`), but this session runs as the *remote* half of an SSH session, so the Electron app is on the user's machine and unreachable from here.
+  - Machine-verifiable half done: both inline `<code>` elements added by this change carry all four chip utilities (`bg-bg-tertiary text-accent px-1.5 py-0.5`), and no bare `<code>` was added — that is the specific rule the host stylesheet breaks. The dashed edge itself is an SVG `stroke-dasharray`, which a host stylesheet cannot reach.
+  - What still needs eyes: the three chips in the derived-order callout rendering as chips rather than picking up the host's `code` styling.
