@@ -69,7 +69,7 @@ directory not a jj repo, the jj helpers resolve to `[]` and results are identica
 ## Subpath exports
 
 ```js
-import { extractHeadings, slugifyHeading } from '@spekjs/core/headings'
+import { extractHeadings, slugifyHeading, specHeadingLabel } from '@spekjs/core/headings'
 import {
   DEFAULT_ORDER,
   defaultRank,
@@ -80,6 +80,11 @@ import {
 
 These subpaths are kept separate so browser bundles can import the utilities without pulling in
 server-only modules.
+
+`specHeadingLabel(text)` returns what a host should *display* for a spec heading: the leading OpenSpec
+format keyword (`Requirement:` / `Scenario:`) removed, anything else returned unchanged. Pass the whole
+heading text. It is display-only — `Heading.text` and `Heading.slug` stay as authored, and nothing is
+derived from the label, least of all a slug: slugs are the anchors every link resolves against.
 
 `sortArtifacts(artifacts, mode, schemaOrder?)` orders a change's artifacts by one of
 `ARTIFACT_SORT_MODES` — `modified` (the order given), `schema` (the authoritative sequence, falling

@@ -285,7 +285,12 @@ export function ChangeDetail() {
       </div>
       {showToc && (
         <aside className="hidden xl:block xl:pt-2">
-          <SpecToc key={activeTab} headings={currentHeadings} />
+          {/* specs tab 才是 spec 形狀的內容；proposal / design 的標題照原文顯示。 */}
+          <SpecToc
+            key={activeTab}
+            headings={currentHeadings}
+            specShaped={activeArtifact?.kind === "specs"}
+          />
         </aside>
       )}
     </div>

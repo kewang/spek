@@ -169,6 +169,10 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
 - **Spec typography** — in spec content a level-2 heading is a structural separator, not a content
   heading, so it renders as a subordinate label; the delta spec's topic is the dominant header of its
   section, which matters most in a change's Specs tab where several specs stack in one view.
+  Requirement and scenario headings drop their `Requirement:` / `Scenario:` keyword, which position
+  already carries — in the rendered content, in both tables of contents and in the VS Code sidebar, so
+  the surfaces agree on what a heading is called. Presentation only: the file, the heading ids and every
+  anchor are unchanged.
 - **Changes browser** — active and archived changes; each change renders its disk-discovered
   artifacts as tabs (Proposal / Design / Tasks / Specs and any custom-schema artifacts), with
   user-selectable tab ordering (Last modified / Schema order / A–Z) and a schema badge.

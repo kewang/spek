@@ -1,13 +1,20 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import type { Heading } from "@spekjs/core/headings";
+import { specHeadingLabel, type Heading } from "@spekjs/core/headings";
 import { useScrollspy } from "../hooks/useScrollspy";
 import { scrollToAnchorId } from "../utils/scrollOffset";
 
 interface SpecTocProps {
   headings: Heading[];
+  /**
+   * 這些 heading 來自 spec 形狀的內容，entry 要跟內文一樣不重複格式關鍵字。
+   *
+   * 由呼叫端宣告而不是在這裡看文字判斷：同一個元件也服務 change 的 proposal / design tab，那些不是
+   * spec，其中剛好叫 `Requirement: …` 的標題不該被剝 —— 「不得以內容文字推斷 spec 形狀」是既有規範。
+   */
+  specShaped?: boolean;
 }
 
-export function SpecToc({ headings }: SpecTocProps) {
+export function SpecToc({ headings, specShaped }: SpecTocProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const ids = headings.map((h) => h.slug);
@@ -41,7 +48,8 @@ export function SpecToc({ headings }: SpecTocProps) {
                 onClick={(e) => handleClick(e, h.slug)}
                 className={`block py-1 ${indentClass} transition-colors ${activeClass}`}
               >
-                {h.text}
+                {/* 只有 label 變，錨點仍是原文推導出來的 slug。 */}
+                {specShaped ? specHeadingLabel(h.text) : h.text}
               </a>
             </li>
           );

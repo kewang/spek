@@ -44,7 +44,7 @@ export {
   setOpenspecRunner,
 } from "./schemas.js";
 export type { OpenspecRunner, CliResult } from "./schemas.js";
-export { extractHeadings, slugifyHeading } from "./headings.js";
+export { extractHeadings, slugifyHeading, specHeadingLabel } from "./headings.js";
 export type { Heading } from "./headings.js";
 // 同時由 ./graph-node-id subpath 匯出（node-free），供 browser bundle / 宿主 main process 使用。
 export { changeNodeSlug } from "./graph-node-id.js";

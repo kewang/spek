@@ -178,7 +178,7 @@ export function SpecDetail() {
 
         {showToc && (
           <aside className="hidden xl:block">
-            <SpecToc headings={headings} />
+            <SpecToc headings={headings} specShaped />
           </aside>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extractHeadings, slugifyHeading } from "./headings.js";
+import { extractHeadings, slugifyHeading, specHeadingLabel } from "./headings.js";
 
 test("slugifyHeading: lowercase and dash", () => {
   assert.equal(
@@ -86,5 +86,68 @@ test("extractHeadings: skips headings whose slug would be empty", () => {
   const content = `## ???\n\n## Real\n`;
   assert.deepEqual(extractHeadings(content), [
     { level: 2, text: "Real", slug: "real" },
+  ]);
+});
+
+// --- specHeadingLabel ---
+
+test("specHeadingLabel: elides the requirement keyword", () => {
+  assert.equal(
+    specHeadingLabel("Requirement: Single YAML manifest as source of truth"),
+    "Single YAML manifest as source of truth",
+  );
+});
+
+test("specHeadingLabel: elides the scenario keyword", () => {
+  assert.equal(
+    specHeadingLabel("Scenario: manifest declares both channels"),
+    "manifest declares both channels",
+  );
+});
+
+test("specHeadingLabel: text carrying no keyword is unchanged", () => {
+  assert.equal(specHeadingLabel("ADDED Requirements"), "ADDED Requirements");
+  assert.equal(specHeadingLabel("Purpose"), "Purpose");
+});
+
+test("specHeadingLabel: a keyword-only heading is unchanged", () => {
+  // 剝完沒有別的名字可顯示，寧可留著關鍵字也不要顯示空白。
+  assert.equal(specHeadingLabel("Requirement:"), "Requirement:");
+  assert.equal(specHeadingLabel("Requirement:   "), "Requirement:   ");
+});
+
+test("specHeadingLabel: a case variant is unchanged", () => {
+  // OpenSpec 自己的 parser 不接受的寫法，這裡也不該悄悄正規化。
+  assert.equal(
+    specHeadingLabel("requirement: lowercase keyword"),
+    "requirement: lowercase keyword",
+  );
+});
+
+test("specHeadingLabel: a keyword that is not at the start is unchanged", () => {
+  assert.equal(
+    specHeadingLabel("Optional Requirement: something"),
+    "Optional Requirement: something",
+  );
+});
+
+test("specHeadingLabel: a name beginning with inline markup still elides", () => {
+  // 這一段的第一個純文字節點剛好就是 `Requirement: `。只看那一段會誤判成「剝完就空了」，
+  // 於是內文留著關鍵字、而讀整行的 TOC 剝掉 —— 兩個介面對同一個標題講不同的話。
+  assert.equal(
+    specHeadingLabel("Requirement: `@spekjs/ui` package exports reusable components"),
+    "`@spekjs/ui` package exports reusable components",
+  );
+});
+
+test("specHeadingLabel: trailing whitespace survives", () => {
+  // 標題會繼續接到 label 帶不走的 markup 上；這個空格被 trim 掉，code span 就會黏住前一個字。
+  assert.equal(specHeadingLabel("Requirement: The "), "The ");
+});
+
+test("extractHeadings: text and slug keep the format keyword", () => {
+  // 守衛：display label 沒有被接進 extraction。slug 是所有錨點的依據，一旦改掉，既有深連結全數失效。
+  assert.deepEqual(extractHeadings("### Requirement: Foo\n"), [
+    { level: 3, text: "Requirement: Foo", slug: "requirement-foo" },
   ]);
 });

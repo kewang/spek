@@ -113,13 +113,69 @@ code, pre {
  * 展開、scenario 收合，那個錯位會是第一眼就看到的東西。
  */
 .markdown-body details[data-spek-fold][open] {
-  padding-left: 0.75rem;
+  padding-left: 1rem;
   border-left: 1px solid var(--color-fold-rule);
 }
 
 /* 把標題拉回父層的左緣：縮排的是內文，標題仍與區塊外的內容對齊。 */
 .markdown-body details[data-spek-fold][open] > summary {
-  margin-left: -0.75rem;
+  margin-left: -1rem;
+}
+
+/*
+ * 讓揭露箭頭離開範圍線。負 margin 把 summary 整個拉回區塊外緣，箭頭因此貼著框線，而內文離線有一整個
+ * 縮排 —— 線緊貼箭頭卻遠離文字，兩邊講的距離不一樣。
+ *
+ * 不加 `[open]`：收合中的區塊沒有 padding 也沒有負 margin，位移若只給展開的，兩種狀態的標題就會差一格。
+ * 預設模式正是 requirement 展開、scenario 收合，那個錯位第一眼就看得到。
+ */
+.markdown-body details[data-spek-fold] > summary {
+  padding-left: 0.25rem;
+}
+
+/*
+ * 巢狀區塊只縮排、不再畫第二條線。
+ *
+ * 兩條同粗同色的線並排，讀起來是「同一個裝飾重複了一次」而不是「兩層巢狀的托架」；巢狀區塊的範圍本來
+ * 就被外層那條線框住了，深度也還有縮排在講。用 transparent 而不是 `border-left: none`：邊框留著才能維持
+ * 那 1px 的內縮，讓巢狀標題與外層標題仍對齊在同一條左緣上。
+ *
+ * 條件寫「摺疊區塊裡面的摺疊區塊」而不是 `[data-spek-fold="4"]`：哪些層級會摺疊是呼叫端傳進來的，
+ * 綁層級數字的話，哪天多一層會無聲地失效。
+ */
+.markdown-body details[data-spek-fold][open] details[data-spek-fold][open] {
+  border-left-color: transparent;
+}
+
+/*
+ * 相鄰區塊之間留一個缺口，讓線停在區塊結束的地方。
+ *
+ * 沒有缺口時相鄰的兩條線首尾相接，畫出一條貫穿整個 operation 區段的直線 —— 那等於在宣告「底下全部是
+ * 同一個 section」，正好是這個標記存在的目的的反面。
+ *
+ * 間距只能下在區塊自己身上：`<summary>` 是 flex container，區塊第一個標題的 `mt-5` 因此收不出去、
+ * 算在區塊的範圍裡面，調整標題邊距永遠分不開兩個區塊。用 margin-bottom 而不是 margin-top，是為了不動
+ * 「operation 標題到第一個 requirement」的既有間距。
+ *
+ * 不加 `[open]`：收合中的區塊同樣要有這個間距，否則展開／收合一個 scenario 會讓周圍的區塊上下跳動。
+ */
+.markdown-body details[data-spek-fold] {
+  /*
+   * `flow-root` 讓區塊自己成為一個 BFC，內文的下邊距因此收在區塊裡面，不會跑出來跟這個 margin 取
+   * 最大值。沒有它的話，區塊之間的距離會取決於「最後一個可見元素是什麼」—— 量到的是收合時 8px、
+   * 展開時 16px，等於展開一個 scenario 就把後面的區塊多推 8px，而規範寫的是開合不得改變周圍間距。
+   */
+  display: flow-root;
+  margin-bottom: 0.5rem;
+}
+
+/*
+ * 巢狀區塊不要這個間距。它沒有線可以斷，卻會疊加在外層的間距上 —— 量到的是：預設模式（scenario 收合）
+ * 區塊之間 8px，全部展開後變成 16px。也就是展開一個 scenario 會把後面的區塊往下推，而「開合不得改變
+ * 周圍區塊的間距」是規範寫死的。scenario 之間的節奏維持既有的（標題自己的上邊距）。
+ */
+.markdown-body details[data-spek-fold] details[data-spek-fold] {
+  margin-bottom: 0;
 }
 
 @keyframes fadeInUp {

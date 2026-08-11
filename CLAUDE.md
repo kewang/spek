@@ -162,7 +162,15 @@ behavior lives in `openspec/specs/`; the key entry points:
   `spek.aggregateWorktrees`; both driven by the header scope control). `WorktreeInfo.vcs` and
   `ChangeInfo.isCurrent` / `.conflictsWith` carry the jj metadata
 - `extractHeadings` / `slugifyHeading` (h2/h3 → stable slugs for the spec TOC and VS Code sidebar; **import from the
-  `@spekjs/core/headings` subpath** so the webview bundle doesn't pull in server-only modules)
+  `@spekjs/core/headings` subpath** so the webview bundle doesn't pull in server-only modules) and
+  `specHeadingLabel` beside them — the one rule for what a spec heading *displays*, i.e. without its
+  `Requirement:` / `Scenario:` keyword. **Display only, and nothing is derived from it**: `text` is what
+  the file says, `slug` comes from `text`, and a slug built from the label would silently unmake every
+  existing anchor. Four surfaces call it (rendered content, both TOCs, the VS Code tree) and each was one
+  regex away from disagreeing with the others about what a heading is called. Pass the **whole** heading
+  text: a requirement named after a code span opens with a text run that is exactly `Requirement: `, and
+  judging that run alone keeps the keyword in the content while the TOC — reading the file's line —
+  drops it
 - `ChangeDetail.artifacts: ChangeArtifact[]` is the contract across core / API / frontends, driving both tabs and TOC
   (markdown / specs have a TOC, tasks doesn't)
 
@@ -359,13 +367,29 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   An open section is **inset with a hairline left rule**, done as CSS on `details[data-spek-fold][open]`
   rather than by wrapping the body in the transform: `foldSections.ts` is a pure function whose tests
   assert its output shape, and styling is not worth churning the one piece of folding that can silently
-  lose content. **Both selectors carry `[open]`** — the inset and the `> summary` negative margin that
-  pulls the heading back to the parent's edge. Unscoped, the margin shifts *closed* sections one step
-  left of open ones, which the default mode (requirements open, scenarios closed) shows on first render.
+  lose content. **Which selectors carry `[open]` is the whole design, in both directions:**
+  - **`[open]`-scoped** — the inset and the `> summary` negative margin that cancels it. Unscoped, that
+    margin shifts *closed* sections one step left of open ones, which the default mode (requirements
+    open, scenarios closed) shows on first render. The two values must stay equal, or headings drift;
+    there is a test for exactly that.
+  - **Deliberately unscoped** — the `margin-bottom` separating sibling sections, the `display: flow-root`
+    that keeps interior margins interior, and the `> summary` padding that stops the disclosure marker
+    being drawn against the rule. Anything here keyed to `[open]` moves the page as a reader toggles a
+    section, which is the defect these rules exist to prevent.
+
+  Only the **outermost** open section draws a rule (`[open] [open]` resets `border-left-color` to
+  transparent, keeping the 1px so nesting stays aligned): two rules of equal weight in parallel read as
+  one ornament repeated. The condition is *a fold inside a fold*, never `data-spek-fold="4"` — fold
+  levels come from the caller. `flow-root` is load-bearing and non-obvious: without it the body's last
+  margin collapses **out** of the section, so the gap between sections became whichever was larger and
+  opening a scenario pushed everything below it down by another 8px.
   The rule uses `--color-fold-rule`, **not `--color-border`**: the panel border measures 1.4:1 dark and
   1.2:1 light, and marking a section's extent is a stated requirement, not decoration. One mid-gray
   clears 3:1 against both backgrounds, so it is deliberately one value — re-measure if either
-  `bg-primary` moves
+  `bg-primary` moves.
+  **This is CSS geometry, so jsdom cannot see it** — the tests assert the *shape* of these rules as text
+  against `global.css`, and the geometry itself was settled by rendering the real component with the
+  real built stylesheet in headless Chrome and scanning the rule's pixel column
 - **Spec typography is declared, not detected**: `MarkdownRenderer`'s `specShaped` prop demotes `h2` to a
   subordinate label, because in a spec every `h2` is a structural separator (`## Purpose`,
   `## ADDED Requirements`) while in a proposal or design it is a content heading. It is **deliberately

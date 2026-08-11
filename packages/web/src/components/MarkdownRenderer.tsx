@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
 import { type ReactNode } from "react";
-import { slugifyHeading } from "@spekjs/core/headings";
+import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
 import {
   rehypeSpekFoldSections,
   type FoldOptions,
@@ -34,6 +34,44 @@ function rehypeSpekHeadingIds(options?: { idPrefix?: string }) {
           const dedup = n === 0 ? base : `${base}-${n + 1}`;
           node.properties = node.properties ?? {};
           node.properties.id = `${prefix}${dedup}`;
+        }
+      }
+      if (node.children) for (const child of node.children) walk(child);
+    };
+    walk(tree);
+  };
+}
+
+const HEADING_TAG_RE = /^h[1-6]$/;
+
+/**
+ * rehype plugin：spec 標題不重複格式關鍵字（`Requirement:` / `Scenario:`）。
+ *
+ * 判斷一律用**整個標題**的文字，而不是「開頭那一段純文字」。`### Requirement: \`@spekjs/ui\` package
+ * exports …`（本 repo 的 ui-package spec 就有兩個）第一個 text node 恰好是 `"Requirement: "`，單看它會
+ * 判定「剝完就空了」而放棄，於是內文留著關鍵字、讀整行的 TOC 卻剝掉 —— 兩個介面對同一個標題講不同的話。
+ * 所以這裡沿用 id plugin 已經在用的 `hastToText`，決定好之後才從第一個 text node 砍掉等量的字元。
+ *
+ * 關鍵字沒有完整落在第一個 text node 裡（例如標題以 markup 開頭）就整個不動 —— 跨 markup 去剝等於刪掉
+ * 作者寫的結構。
+ *
+ * 不看 heading level：決定一個標題是不是 requirement 的是關鍵字，不是層級。而且各介面顯示的層級並不
+ * 一致（內文全部顯示，`extractHeadings` 只回 h2/h3），一旦按層級 gate，`## Requirement: X` 就會在側欄
+ * 被剝、在內文留著。
+ */
+function rehypeSpekElideHeadingKeyword() {
+  return (tree: HastNode) => {
+    const walk = (node: HastNode) => {
+      if (node.type === "element" && node.tagName && HEADING_TAG_RE.test(node.tagName)) {
+        const full = hastToText(node);
+        const label = specHeadingLabel(full);
+        if (label !== full) {
+          const drop = full.length - label.length;
+          const first = node.children?.[0];
+          // `<` 而非 `<=`：整個 text node 剛好就是關鍵字（後面接 code span）是合法的，砍成空字串即可。
+          if (first && first.type === "text" && (first.value ?? "").length >= drop) {
+            first.value = (first.value ?? "").slice(drop);
+          }
         }
       }
       if (node.children) for (const child of node.children) walk(child);
@@ -165,10 +203,16 @@ const H2_CONTENT = "text-xl font-bold mt-6 mb-3 text-text-primary border-b borde
 const H2_STRUCTURAL = "text-base font-semibold uppercase tracking-wide mt-6 mb-3 text-text-secondary scroll-mt-20";
 
 export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShaped }: MarkdownRendererProps) {
-  // 順序不可調換：heading id 必須在還是扁平樹時指派，否則 dedup counter 看到的走訪順序會變。
+  // 順序不可調換，而且有兩個理由：
+  //
+  // 1. heading id 必須在還是扁平樹時指派，否則 dedup counter 看到的走訪順序會變。
+  // 2. id 是從 heading 的文字算出來的，所以關鍵字**必須**在 id 指派之後才剝。反過來的話，每個
+  //    requirement 的 id 都會變，而走 `extractHeadings`（直接解析原始 markdown）的 TOC 與 VS Code
+  //    側欄仍然產出原本的 slug —— 兩邊從此指向不同的錨點，畫面上完全看不出來，只是連結再也跳不到。
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
     [rehypeSpekHeadingIds, { idPrefix }],
   ];
+  if (specShaped) rehypePlugins.push([rehypeSpekElideHeadingKeyword]);
   if (fold) rehypePlugins.push([rehypeSpekFoldSections, fold]);
 
   return (

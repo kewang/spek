@@ -1,5 +1,11 @@
 import * as vscode from "vscode";
-import { scanOpenSpec, scanOpenSpecAggregated, readSpec, extractHeadings } from "@spekjs/core";
+import {
+  scanOpenSpec,
+  scanOpenSpecAggregated,
+  readSpec,
+  extractHeadings,
+  specHeadingLabel,
+} from "@spekjs/core";
 import type { SpecInfo, ChangeInfo, Heading } from "@spekjs/core";
 import { formatTreeItemDescription } from "./lifecycle";
 
@@ -70,7 +76,10 @@ class SpecTreeItem extends vscode.TreeItem {
 class SpecHeadingItem extends vscode.TreeItem {
   constructor(topic: string, heading: Heading) {
     // h3 用 description 欄位顯示層級標記，並配合不同 icon 以視覺區分 h2/h3
-    super(heading.text, vscode.TreeItemCollapsibleState.None);
+    //
+    // label 與內文一致，不重複 `Requirement:` / `Scenario:`；tooltip 保留原文 —— 這個欄位本來就在，
+    // 原文因此在這個 host 免費留得住。跳轉仍用 heading.slug（由原文推導），不受影響。
+    super(specHeadingLabel(heading.text), vscode.TreeItemCollapsibleState.None);
     this.tooltip = heading.text;
     this.iconPath = new vscode.ThemeIcon(
       heading.level === 2 ? "symbol-string" : "symbol-field",
