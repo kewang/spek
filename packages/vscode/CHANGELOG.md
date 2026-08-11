@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.13.0
+
+**Highlight: a requirement is now called what it is named.** Every requirement heading in a spec opened with the word `Requirement:` and every scenario with `Scenario:` — the same twelve characters at the front of every heading in the document, taken from exactly where a reader scans for what distinguishes one from the next (issue #42).
+
+- **Requirement and scenario headings drop their format keyword**, in the rendered spec, in the table of contents, and in the sidebar's Specs tree — so the panel and the sidebar agree on what a heading is called. Presentation only: your files, every heading id and every deep link are untouched, and a sidebar heading keeps the authored text in its tooltip, so the format stays one hover away
+- **The rule beside an open section now marks that section.** Consecutive requirements drew rules that met, forming a single unbroken line down the whole page: a bracket around everything says the same as no bracket at all. Each requirement now carries its own, ending where the requirement ends. A nested open scenario no longer draws a second rule of equal weight beside its parent's
+- **Expanding a scenario no longer nudges the rest of the page.** The gap between sections depended on what the last visible element inside one happened to be, so opening a scenario pushed every requirement below it down by a further 8px
+- **A little more room around the fold** — the body sits further from the rule, and the disclosure arrow is no longer drawn against it
+
 ## 1.12.0
 
 **Highlight: spek now shows the workflow itself, not just its output.** A schema decides what a change *is* in OpenSpec — which artifacts exist, what order they come in, what each is supposed to contain, and when the change is ready to implement. Until now it appeared only as a small badge on a change that differed from the workspace default: a name with nothing behind it.

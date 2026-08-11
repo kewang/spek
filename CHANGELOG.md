@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.0
+
+**Highlight: a requirement is now called what it is named.** Every requirement heading in a spec opened with the word `Requirement:` and every scenario with `Scenario:` — the same twelve characters at the front of every heading in the document, taken from exactly where a reader scans for what distinguishes one from the next. Suggested from the IntelliJ tool window (issue #42), where a few hundred pixels of width makes the cost plainest.
+
+- **Requirement and scenario headings drop their format keyword**, in the rendered spec, in both tables of contents, and in the VS Code sidebar's spec tree — so the surfaces agree on what a heading is called. This became removable only in 1.12.0: before the `ADDED Requirements` label was restored to visibility, the keyword was the only thing naming what these sections were. Presentation only — your files, every heading id and every deep link are untouched, and the VS Code tree keeps the authored text in its tooltip
+- **The rule beside an open section now marks that section.** Consecutive requirements drew rules that met, forming a single unbroken line down the whole page: a bracket around everything says the same as no bracket at all. Each requirement now carries its own, ending where the requirement ends. A nested open scenario no longer draws a second rule of equal weight beside its parent's — the doubling read as one ornament repeated rather than as two levels
+- **Expanding a scenario no longer nudges the rest of the page.** The gap between sections depended on what the last visible element inside one happened to be, so opening a scenario pushed every requirement below it down by a further 8px
+- **A little more room around the fold** — the body sits further from the rule, and the disclosure arrow is no longer drawn against it
+- *Internal:* `@spekjs/core` 1.9.0 adds `specHeadingLabel`, the single rule behind the heading text every surface displays
+
 ## 1.12.0
 
 **Highlight: spek now shows the workflow itself, not just its output.** A schema decides what a change *is* in OpenSpec — which artifacts exist, what order they come in, what each is supposed to contain, and when the change is ready to implement. spek has always rendered the products of that process and never the process. Until now the schema appeared only as a small badge on a change that differed from the repo default: a name with nothing behind it.
