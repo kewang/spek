@@ -1,13 +1,15 @@
 ## 1. Core: cyclicity and the detection rule
 
-- [ ] 1.1 Widen `computeArtifactLevels` in `packages/core/src/schema-flow.ts` to report whether it fell back to positional levels, keeping the levels map available to every existing caller
-- [ ] 1.2 Update `packages/web/src/utils/schemaView.ts` and any other caller for the widened return, so the change is compile-verified rather than assumed
-- [ ] 1.3 Add `postApplyArtifacts` to `schema-flow.ts` implementing the closure rule: apply declared, at least one resolvable id in `apply.requires`, acyclic graph, step outside `closure(apply.requires)`, and `closure(step)` covering every resolvable id in `apply.requires`
-- [ ] 1.4 Put the closure rule behind a resolver that answers, per step, its ordering relative to implementation *and* the source that ordering came from, taking the apply step as a parameter rather than matching the literal id `"apply"`. Today it has one branch; a declared source is added as a branch that returns early, so precedence is per step and needs no mode switch
-- [ ] 1.5 Export both from the `@spekjs/core/schema-flow` subpath and the package index, keeping the module free of any server-only import so the webview bundle is unaffected
-- [ ] 1.6 Unit-test the rule against the corpus shapes: `superpowers-bridge` (`verify`, `retrospective`), `anvil` (`verify`), and no-ops for `spec-driven`, `nanopm`, `e2e-runbooks`, `propose-spec-verify`
-- [ ] 1.7 Unit-test each guard with the input that motivated it: `apply.requires` resolving to nothing must flag nothing (empty-set superset trap), a cyclic graph must flag nothing, an artifact inside apply's closure is never flagged, and a side `research → adr` chain that ties apply's level is not flagged
-- [ ] 1.8 Run `npm run build:core` so the web package's tests exercise the new code rather than the previous build
+- [x] 1.1 Widen `computeArtifactLevels` in `packages/core/src/schema-flow.ts` to report whether it fell back to positional levels, keeping the levels map available to every existing caller
+  - Deviation: done additively instead of by widening. `computeArtifactLevels` is exported from `packages/core/src/index.ts`, so changing its return type would break `@spekjs/core` consumers — contradicting the proposal's "additive, so a minor bump". A new `levelArtifacts` returns `{ levels, cyclic }` and `computeArtifactLevels` delegates to it, so there is still one traversal and one answer.
+- [x] 1.2 Update `packages/web/src/utils/schemaView.ts` and any other caller for the widened return, so the change is compile-verified rather than assumed
+  - Deviation: no caller needed updating, because 1.1 left the signature unchanged. The compile-verification this task was buying is instead covered by 1.3's caller of `levelArtifacts` and by `npm run type-check` in 4.1.
+- [x] 1.3 Add `postApplyArtifacts` to `schema-flow.ts` implementing the closure rule: apply declared, at least one resolvable id in `apply.requires`, acyclic graph, step outside `closure(apply.requires)`, and `closure(step)` covering every resolvable id in `apply.requires`
+- [x] 1.4 Put the closure rule behind a resolver that answers, per step, its ordering relative to implementation *and* the source that ordering came from, taking the apply step as a parameter rather than matching the literal id `"apply"`. Today it has one branch; a declared source is added as a branch that returns early, so precedence is per step and needs no mode switch
+- [x] 1.5 Export both from the `@spekjs/core/schema-flow` subpath and the package index, keeping the module free of any server-only import so the webview bundle is unaffected
+- [x] 1.6 Unit-test the rule against the corpus shapes: `superpowers-bridge` (`verify`, `retrospective`), `anvil` (`verify`), and no-ops for `spec-driven`, `nanopm`, `e2e-runbooks`, `propose-spec-verify`
+- [x] 1.7 Unit-test each guard with the input that motivated it: `apply.requires` resolving to nothing must flag nothing (empty-set superset trap), a cyclic graph must flag nothing, an artifact inside apply's closure is never flagged, and a side `research → adr` chain that ties apply's level is not flagged
+- [x] 1.8 Run `npm run build:core` so the web package's tests exercise the new code rather than the previous build
 
 ## 2. Step identity and apply as a graph node
 

@@ -94,9 +94,13 @@ export type {
 
 export {
   computeArtifactLevels,
+  levelArtifacts,
+  postApplyArtifacts,
+  resolveImplementationOrdering,
   applyStepLevel,
   schemaArtifactCount,
 } from "./schema-flow.js";
+export type { ArtifactLevelling, OrderingSource } from "./schema-flow.js";
 
 // Also on the `@spekjs/core/cli-budget` subpath, for clients that must not pull in the index.
 export { CLI_TIMEOUT_MS, CLI_CACHE_TTL_MS } from "./cli-budget.js";
