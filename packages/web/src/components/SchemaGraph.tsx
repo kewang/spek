@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import type { FlowLevel } from "../utils/schemaView";
-import { ARROW_LEN, fitLabel, layoutGraph, NODE_H, NODE_W } from "../utils/schemaLayout";
+import { DERIVED_EDGE_MEANING, type FlowLevel } from "../utils/schemaView";
+import { ARROW_LEN, DERIVED_DASH, fitLabel, layoutGraph, NODE_H, NODE_W } from "../utils/schemaLayout";
 
 /**
  * The schema workflow as a real diagram: nodes for steps, edges for `requires`.
@@ -106,12 +106,9 @@ export function SchemaGraph({
         <g>
           {edges.map((edge) => {
             const connected = isConnected(edge);
-            // A derived edge is an ordering spek worked out, not one the CLI blocks on, so it must
-            // never render as a declared one. Dashed rather than a second hue: colour here already
-            // means selection, and the whole palette rule of this diagram is that the accent is
-            // spent once. A dash also survives a greyscale print and a colour-blind reader, which a
-            // hue swap does not — and it is the same "not what the schema declares" vocabulary the
-            // archive node already uses, one level down from a node to a connection.
+            // Dashed, not a second hue: colour here already means selection, and a dash survives
+            // greyscale and colour-blindness. Same vocabulary the archive node uses for "not
+            // declared by this schema", one level down from a node to a connection.
             const derived = edge.origin === "derived";
             return (
               <path
@@ -120,16 +117,10 @@ export function SchemaGraph({
                 fill="none"
                 stroke={connected ? "var(--color-accent)" : "var(--color-border)"}
                 strokeWidth={connected ? 2 : 1.5}
-                strokeDasharray={derived ? "5 4" : undefined}
+                strokeDasharray={derived ? DERIVED_DASH : undefined}
                 markerEnd={connected ? "url(#schema-arrow-active)" : "url(#schema-arrow)"}
               >
-                {derived && (
-                  <title>
-                    Not declared by this schema. spek placed this step after implementation because
-                    it depends on everything the apply step depends on, and the apply step does not
-                    depend on it. openspec does not block on this.
-                  </title>
-                )}
+                {derived && <title>{DERIVED_EDGE_MEANING}</title>}
               </path>
             );
           })}

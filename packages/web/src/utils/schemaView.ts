@@ -8,7 +8,8 @@ import type {
 // geometry. Imported from the `/schema-flow` subpath, not the root: this file is bundled into the
 // browser and the root entry reaches for child_process.
 import {
-  drawableRequires,
+  applyStepLevel,
+  drawableEdges,
   levelArtifacts,
   resolveImplementationOrdering,
   type OrderingSource,
@@ -69,26 +70,33 @@ export interface FlowStep {
   isArchive: boolean;
 }
 
+/**
+ * What a derived connection means, in one place.
+ *
+ * Three surfaces state it — the edge, the legend, and the selected step's detail — and the same
+ * centralising reason applies as for `sourceTitle` below: spelled out per call site, one copy goes
+ * stale. Expect this to need editing if OpenSpec ever makes the derivation conditional (#1456).
+ */
+export const DERIVED_EDGE_MEANING =
+  "Not declared by this schema. spek places this step after implementation because it depends on " +
+  "everything the apply step depends on, and the apply step depends on none of it. openspec does " +
+  "not block on this.";
+
 /** The id a schema would use if it could name the apply phase in a `requires`. */
 const APPLY_ID = "apply";
 
 /**
- * Hands out step keys, giving each step its declared id unless something already holds it.
+ * A step's key: its declared id where that is free, `id#2` where a later step claims a taken name.
  *
- * So for every schema without a collision the key *is* the id, and the diagram's graph reads in the
- * schema's own vocabulary. Only where two steps genuinely claim one name does a key diverge —
- * `superspec` declares an artifact called `apply` alongside its apply phase — and then the later
- * claimant is suffixed rather than either being dropped. Prefixing every key by kind would also
- * work and would make every id in the graph a translation of the schema's.
+ * So for a schema without a collision the key *is* the id and the drawn graph reads in the schema's
+ * own vocabulary. Only `superspec`, which declares an artifact named `apply` beside the apply phase,
+ * needs the suffix.
  */
-function keyAllocator(): (preferred: string) => string {
-  const taken = new Set<string>();
-  return (preferred) => {
-    let key = preferred;
-    for (let n = 2; taken.has(key); n++) key = `${preferred}#${n}`;
-    taken.add(key);
-    return key;
-  };
+function uniqueKey(preferred: string, taken: Set<string>): string {
+  let key = preferred;
+  for (let n = 2; taken.has(key); n++) key = `${preferred}#${n}`;
+  taken.add(key);
+  return key;
 }
 
 /**
@@ -114,21 +122,25 @@ export function buildFlowSteps(
     apply ? { id: APPLY_ID, requires: apply.requires } : null,
   );
 
-  const nextKey = keyAllocator();
+  const taken = new Set<string>();
   // Declared id to step key. First claimant wins, which is what a `requires` naming it would mean.
+  // Two artifacts sharing an id therefore share an ordering and resolve to the first of them.
   const keyOf = new Map<string, string>();
   const artifactKeys = artifacts.map((artifact) => {
-    const key = nextKey(artifact.id);
+    const key = uniqueKey(artifact.id, taken);
     if (!keyOf.has(artifact.id)) keyOf.set(artifact.id, key);
     return key;
   });
-  const applyKey = apply ? nextKey(APPLY_ID) : null;
+  const applyKey = apply ? uniqueKey(APPLY_ID, taken) : null;
+
+  const declaredEdges = (requires: readonly string[]): FlowEdge[] =>
+    requires.flatMap((id) => {
+      const from = keyOf.get(id);
+      return from ? [{ from, origin: "declared" as const }] : [];
+    });
 
   const steps: FlowStep[] = artifacts.map((artifact, i) => {
-    const incoming: FlowEdge[] = artifact.requires
-      .map((id) => keyOf.get(id))
-      .filter((key): key is string => key !== undefined)
-      .map((key) => ({ from: key, origin: "declared" as const }));
+    const incoming: FlowEdge[] = declaredEdges(artifact.requires);
 
     const source = ordering.get(artifact.id);
     if (source && applyKey) incoming.push({ from: applyKey, origin: source });
@@ -157,47 +169,43 @@ export function buildFlowSteps(
         ? `Implement the change. Progress is tracked in ${apply.tracks}.`
         : "Implement the change.",
       requires: apply.requires,
-      incoming: apply.requires
-        .map((id) => keyOf.get(id))
-        .filter((key): key is string => key !== undefined)
-        .map((key) => ({ from: key, origin: "declared" as const })),
+      incoming: declaredEdges(apply.requires),
       instruction: apply.instruction,
       isApply: true,
       isArchive: false,
     });
   }
 
-  const { levels } = levelArtifacts(
-    steps.map((step) => ({ id: step.key, requires: step.incoming.map((edge) => edge.from) })),
-  );
+  const graph = steps.map((step) => ({ id: step.key, requires: step.incoming.map((e) => e.from) }));
+  const { levels } = levelArtifacts(graph);
   for (const step of steps) step.level = levels.get(step.key) ?? 1;
 
-  // Levelled from the full graph above; only now is a derived edge dropped where a longer path
-  // already entails it. `resolveImplementationOrdering` reports every step that follows
-  // implementation, and in `superpowers-bridge` that is `verify` *and* `retrospective` — but
-  // retrospective follows apply only by way of verify, so an apply-to-retrospective edge states
-  // nothing the graph does not already say. Declared edges are left whole: a schema's own claim is
-  // carried faithfully and the view reduces it for drawing. A derived edge is spek's claim, and
-  // spek should not claim what is already entailed — it is the difference between one dashed edge
-  // and a fan of them, and between explaining the inference once and repeating it on every step
-  // downstream of it.
-  const drawable = drawableRequires(
-    steps.map((step) => ({ id: step.key, requires: step.incoming.map((edge) => edge.from) })),
-  );
-  for (const step of steps) {
-    const surviving = drawable.get(step.key) ?? [];
-    step.incoming = step.incoming.filter(
-      (edge) => edge.origin !== "derived" || surviving.includes(edge.from),
-    );
+  // Levelled from the full graph first, so the levels stay a guarantee rather than a coincidence.
+  // Only derived edges are dropped here: `superpowers-bridge`'s `retrospective` reaches apply
+  // through `verify`, so a second derived edge would state nothing new — and would repeat the whole
+  // "spek placed this here" explanation on a step whose position is `verify`'s doing. Declared
+  // edges stay whole; the view reduces those for drawing (see `drawableEdges`).
+  if (ordering.size > 0) {
+    // Keyed by `key`, not `id` — they differ exactly where two steps share a declared id, which is
+    // the case this whole indirection exists for.
+    const drawable = drawableEdges(steps.map((s) => ({ id: s.key, incoming: s.incoming })));
+    for (const step of steps) {
+      const surviving = drawable.get(step.key) ?? [];
+      step.incoming = step.incoming.filter(
+        (edge) => edge.origin !== "derived" || surviving.some((e) => e.from === edge.from),
+      );
+    }
   }
 
-  // Apply requiring nothing the schema declares has no dependency to place it by, so it goes after
-  // every artifact rather than sharing the first level with the roots. Skipped when something
-  // depends on apply, which would otherwise be ranked above the step it follows.
+  // Apply requiring nothing the schema declares has no dependency to place it by, so it goes last.
+  // Skipped when something depends on apply, which would then rank above the step it follows.
   const applyStep = steps.find((step) => step.isApply);
-  const hasDependent = steps.some((step) => step.incoming.some((e) => e.from === applyKey));
-  if (applyStep && !hasDependent && !apply?.requires.some((id) => keyOf.has(id))) {
-    applyStep.level = Math.max(0, ...steps.filter((s) => !s.isApply).map((s) => s.level)) + 1;
+  if (applyStep && !steps.some((s) => s.incoming.some((e) => e.from === applyKey))) {
+    applyStep.level =
+      applyStepLevel(
+        new Map(steps.filter((s) => !s.isApply).map((s) => [s.id, s.level])),
+        apply,
+      ) ?? applyStep.level;
   }
 
   return steps;
@@ -211,36 +219,31 @@ export function buildFlowSteps(
  * for it. It is a property of OpenSpec itself, so it is composed on rather than parsed out, and the
  * view marks it as distinct from the steps the schema does declare.
  *
- * It depends on every *leaf* — each step nothing else requires. That is the honest dependency: a
- * change is archived once everything it declares is finished. In `spec-driven` that is `apply`
- * alone. In `superpowers-bridge` it is `retrospective` alone, because `verify` follows apply, so
- * apply is no longer a step nothing else requires — a consequence of the leaf rule rather than a
- * change to it.
+ * It depends on every *leaf* — each step nothing else requires — because a change is archived once
+ * everything it declares is finished. In `spec-driven` that is apply alone; in `superpowers-bridge`
+ * it is `retrospective` alone, since `verify` follows apply and apply is therefore no longer a leaf.
  *
- * Leaves are found through the drawn connections rather than through declared `requires`, so an
- * ordering spek derived counts exactly as a declared one does. Its own edges are `declared`: the
- * archive step is already marked as spek's rather than the schema's, and "everything is finished"
- * is definitional, not an inference about the author that could turn out wrong.
+ * Leaves come from the drawn connections, so a derived ordering counts as a declared one does. Its
+ * own edges are `declared`: archive is already marked as spek's rather than the schema's, and
+ * "everything is finished" is definitional, not an inference that could be wrong (see `FlowEdge`).
  */
 export function withArchiveStep(steps: FlowStep[]): FlowStep[] {
   if (steps.length === 0) return steps;
 
-  const leaves = steps.filter(
-    (step) => !steps.some((other) => other.incoming.some((edge) => edge.from === step.key)),
-  );
-
-  const nextKey = keyAllocator();
-  for (const step of steps) nextKey(step.key);
+  const feeds = new Set(steps.flatMap((step) => step.incoming.map((edge) => edge.from)));
+  const leaves = steps.filter((step) => !feeds.has(step.key));
 
   return [
     ...steps,
     {
-      key: nextKey("archive"),
+      key: uniqueKey("archive", new Set(steps.map((s) => s.key))),
       id: "archive",
       level: Math.max(...steps.map((s) => s.level)) + 1,
       generates: null,
       description:
         "Folds the change's delta specs into openspec/specs/ and moves the change under archive/.",
+      // Display only, and read back from the edges rather than rebuilt in declared-id space — two
+      // steps can share an id, so a leaf's id does not always name the step the edge points at.
       requires: leaves.map((s) => s.id),
       incoming: leaves.map((s) => ({ from: s.key, origin: "declared" as const })),
       instruction: null,

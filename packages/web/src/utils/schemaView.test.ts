@@ -31,6 +31,15 @@ function artifact(id: string, over: Partial<SchemaArtifactDef> = {}): SchemaArti
   };
 }
 
+// The shape four tests share: two steps that follow implementation, chained. `superpowers-bridge`.
+const POST_IMPL: SchemaArtifactDef[] = [
+  artifact("tasks"),
+  artifact("plan", { requires: ["tasks"] }),
+  artifact("verify", { requires: ["plan"] }),
+  artifact("retrospective", { requires: ["verify"] }),
+];
+const APPLY_AFTER_PLAN: SchemaApplyDef = { requires: ["plan"], tracks: "tasks.md", instruction: null };
+
 const APPLY: SchemaApplyDef = {
   requires: ["tasks"],
   tracks: "tasks.md",
@@ -131,13 +140,8 @@ test("buildFlowSteps: apply is levelled one past what it requires", () => {
 // arrangement superpowers-bridge's runtime precheck exists to stop a reader acting on.
 test("buildFlowSteps: post-implementation steps are levelled after apply, not beside it", () => {
   const steps = buildFlowSteps(
-    [
-      artifact("tasks"),
-      artifact("plan", { requires: ["tasks"] }),
-      artifact("verify", { requires: ["plan"] }),
-      artifact("retrospective", { requires: ["verify"] }),
-    ],
-    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+    POST_IMPL,
+    APPLY_AFTER_PLAN,
   );
   const level = (id: string) => steps.find((s) => s.id === id)?.level;
 
@@ -168,18 +172,9 @@ test("buildFlowSteps: the edge from apply to a post-implementation step is marke
 });
 
 test("buildFlowSteps: a derived edge is not repeated down a chain that already implies it", () => {
-  // superpowers-bridge. Both `verify` and `retrospective` follow implementation, but retrospective
-  // gets there through verify, so an apply-to-retrospective edge states nothing new. Keeping it
-  // drew a second dashed edge and repeated the "spek placed this here" explanation on a step whose
-  // position is a consequence of verify's, not an inference of its own.
   const steps = buildFlowSteps(
-    [
-      artifact("tasks"),
-      artifact("plan", { requires: ["tasks"] }),
-      artifact("verify", { requires: ["plan"] }),
-      artifact("retrospective", { requires: ["verify"] }),
-    ],
-    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+    POST_IMPL,
+    APPLY_AFTER_PLAN,
   );
   const derivedFrom = (id: string) =>
     steps.find((s) => s.id === id)?.incoming.filter((e) => e.origin === "derived") ?? [];
@@ -697,11 +692,7 @@ const SINGLE_COLUMN_WITH_SHORTCUTS: SchemaArtifactDef[] = [
  * eleven community schemas surveyed was one of these.
  */
 test("layoutGraph: a derived edge does not suppress a declared one", () => {
-  // The reduction is information-preserving over facts, and a derived edge is not a fact. This is
-  // the `spec-super` shape, where the derivation is a known false positive: `blackbox-test` really
-  // does declare `requires: [tasks]`, and letting `tasks → apply ⇢ blackbox-test` imply it away
-  // left a node whose only incoming line was dashed and captioned as something openspec does not
-  // enforce, while the dependency it does enforce was drawn nowhere.
+  // The `spec-super` shape, where the derivation is a known false positive.
   const { edges } = layoutGraph(
     groupIntoLevels(
       buildFlowSteps(
@@ -721,8 +712,6 @@ test("layoutGraph: a derived edge does not suppress a declared one", () => {
 });
 
 test("layoutGraph: a derived edge another path implies is still dropped", () => {
-  // The other half of the asymmetry. `retrospective` reaches apply through `verify`, so a second
-  // derived edge would state nothing new — spek must not claim what the drawn graph entails.
   const { edges } = layoutGraph(
     groupIntoLevels(
       buildFlowSteps(
@@ -865,13 +854,8 @@ test("withArchiveStep: a step derived to follow apply makes apply no longer a le
   // consequence of the leaf rule rather than a change to it.
   const steps = withArchiveStep(
     buildFlowSteps(
-      [
-        artifact("tasks"),
-        artifact("plan", { requires: ["tasks"] }),
-        artifact("verify", { requires: ["plan"] }),
-        artifact("retrospective", { requires: ["verify"] }),
-      ],
-      { requires: ["plan"], tracks: "tasks.md", instruction: null },
+      POST_IMPL,
+      APPLY_AFTER_PLAN,
     ),
   );
   const archive = steps.find((s) => s.id === "archive");

@@ -1,6 +1,7 @@
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { SchemaGraph } from "./SchemaGraph";
-import { isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
+import { DERIVED_EDGE_MEANING, isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
+import { ARROW_LEN, DERIVED_DASH } from "../utils/schemaLayout";
 
 /**
  * The schema workflow: a diagram of the steps and their dependencies, with the selected step's
@@ -99,15 +100,7 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           {step.description && (
             <p className="text-text-secondary mt-1 text-sm">{step.description}</p>
           )}
-          {/* Where the reader meets the derived edge and can act on it: the diagram says *that* the
-              order was derived, this says what from. Stated as spek's own reasoning, and explicit
-              that openspec does not enforce it — the schema's `requires` above is what does.
-
-              No chip follows a possessive here. A chip's `px-1.5` padding stacks on the word space,
-              and after a possessive — which ends tight — the pair reads as a double space even
-              though only one space is there. Each chip sits after a dash or a plain word instead,
-              where the extra air looks deliberate. The chip utilities are the app's shared
-              vocabulary and are not the thing to adjust. */}
+          {/* No chip after a possessive: `px-1.5` plus the word space reads as a double space. */}
           {step.incoming.some((edge) => edge.origin === "derived") && (
             <p className="text-text-muted border-accent/30 mt-2 border-l-2 pl-2 text-xs">
               spek places this after implementation: it depends on everything the apply step depends
@@ -221,18 +214,18 @@ export function SchemaFlow({
             schemas declare nothing after implementation, so most diagrams have no dashed edge. */}
         {hasDerivedEdge && (
           <span
-            title="OpenSpec cannot express an artifact produced after implementation, so schemas that have one point it at the last planning artifact and say the rest in prose. spek places it after the apply step because it depends on everything apply depends on, and apply depends on none of it. openspec does not block on this."
+            title={DERIVED_EDGE_MEANING}
             className="flex items-center gap-1.5 underline decoration-dotted underline-offset-2"
           >
             <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true" className="shrink-0">
               <path
-                d="M 0 4 H 16"
+                d={`M 0 4 H ${24 - ARROW_LEN}`}
                 stroke="var(--color-border)"
                 strokeWidth={1.5}
-                strokeDasharray="5 4"
+                strokeDasharray={DERIVED_DASH}
                 fill="none"
               />
-              <path d="M 16 0.5 L 23 4 L 16 7.5 z" fill="var(--color-border)" />
+              <path d={`M ${24 - ARROW_LEN} 0.5 L 24 4 L ${24 - ARROW_LEN} 7.5 z`} fill="var(--color-border)" />
             </svg>
             dashed = order spek derived, not declared
           </span>

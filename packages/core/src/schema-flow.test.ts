@@ -91,10 +91,6 @@ test("computeArtifactLevels: no artifacts yields no levels", () => {
 
 // --- levelArtifacts ---
 
-// The levels map alone cannot say whether it was read off the graph or fell back to declaration
-// order: a chain and a cycle can produce the same numbers. Anything deriving an ordering from the
-// graph has to know which it got, so the fallback is reported rather than inferred by the caller.
-
 test("levelArtifacts: reports a DAG as not cyclic, with the same levels as computeArtifactLevels", () => {
   const artifacts = [artifact("proposal"), artifact("specs", ["proposal"])];
   const result = levelArtifacts(artifacts);
@@ -129,11 +125,6 @@ test("levelArtifacts: no artifacts is not cyclic", () => {
 });
 
 // --- postApplyArtifacts ---
-
-// The rule is a bound, not a reading of intent: an artifact outside apply's transitive closure whose
-// own closure covers everything apply requires cannot become available before apply does, and apply
-// does not require it. Both real cases in the wild are shaped that way, and the guards below are
-// each here because an input in the surveyed corpus needed them.
 
 test("postApplyArtifacts: superpowers-bridge's verify and retrospective follow apply", () => {
   const artifacts = [
@@ -263,10 +254,6 @@ test("postApplyArtifacts: results keep the schema's declared order", () => {
 });
 
 // --- resolveImplementationOrdering ---
-
-// The seam that keeps a later format from being a rewrite. Ordering is a resolved property carrying
-// the source it came from, so adopting a declared source is a branch that returns early rather than
-// a change to the graph, the edge model, or the view.
 
 const applyStep = (requires: string[]) => ({ id: "apply", requires });
 

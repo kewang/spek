@@ -107,55 +107,44 @@ function closureOf(seeds: readonly string[], requiresOf: Map<string, readonly st
   return seen;
 }
 
+/** Apply's own prerequisites, resolved and closed over. Shared so the two rules cannot disagree. */
+function applyContext(artifacts: SchemaArtifactDef[], applyRequires: readonly string[]) {
+  const requiresOf = new Map<string, readonly string[]>(artifacts.map((a) => [a.id, a.requires]));
+  const resolved = applyRequires.filter((id) => requiresOf.has(id));
+  return { requiresOf, resolved, beforeApply: closureOf(resolved, requiresOf) };
+}
+
 /**
  * The artifacts a schema produces only after implementation, in declared order.
  *
- * OpenSpec cannot express this. An artifact's `requires` may name only other artifacts — the CLI's
- * build-order pass dereferences each entry as a declared artifact, so `requires: [apply]` throws
- * rather than parsing — and there is no post-apply concept anywhere in its model: `status` treats
- * every artifact as a planning artifact and tells you to run apply once *all* of them exist. So
- * authors point such an artifact at the last planning artifact and state the real ordering in
- * prose: `superpowers-bridge`'s `verify` declares `requires: [plan]` while its instruction says the
- * step must run on a completed implementation, and `anvil`'s opens "Produced AFTER apply completes."
+ * OpenSpec cannot express this: an artifact's `requires` may name only other artifacts, so authors
+ * point such an artifact at the last planning artifact and state the ordering in prose instead.
  *
- * An artifact qualifies when it is **outside** the transitive closure of `apply.requires` and its
- * own closure **covers** everything apply requires. Together: it cannot become available before
- * apply does, and apply does not need it. That is a bound on when it can happen, not a reading of
- * the author's intent — which is why the caller must present the resulting edge as derived. Over
- * the 88 schemas discoverable on GitHub the rule is a no-op on every built-in, correct on all three
- * artifacts it flags across the official catalog, and about 82% precise overall; it misreads
- * planning artifacts that happen to depend on everything apply requires, and schemas that model
- * implementation as an ordinary artifact instead of through `apply`. Nothing declared separates
- * those from a genuine post-implementation step — `tracks` and `generates` look identical across
- * both — so there is no filter to add here, only honesty in how the edge is drawn.
+ * An artifact qualifies when it is **outside** the closure of `apply.requires` and its own closure
+ * **covers** all of it — it cannot become available before apply, and apply does not need it. That
+ * is a bound on when it can happen, not a reading of intent, so the caller must present the edge as
+ * derived; see `design.md` for the survey behind that (~82% precise, two classes it misreads).
  *
- * Two guards, each for an input the survey produced rather than for tidiness:
- * - **A resolvable requirement.** The superset test is vacuously true against an empty set, so a
- *   schema whose `apply.requires` names only undeclared artifacts would report every artifact.
- * - **An acyclic graph.** Levels are declaration order under a cycle, so there is no graph ordering
- *   to derive against, and layering one over the fallback would reason about the wrong thing.
+ * Two guards, each for an input a real schema produced:
+ * - **A resolvable requirement**, or the superset test is vacuously true and flags everything.
+ * - **An acyclic graph**, or levels are declaration order and there is no ordering to derive from.
  *
- * Not detected, and not detectable: a post-implementation artifact declaring `requires: []`. The
- * schema links it to nothing, so nothing follows from it — and it levels first, so it never reads
- * as apply's peer in the first place.
+ * Undetectable by construction: a post-implementation artifact declaring `requires: []`. Nothing
+ * links it to the flow — and it levels first, so it never reads as apply's peer anyway.
  */
 export function postApplyArtifacts(
   artifacts: SchemaArtifactDef[],
   apply: { requires: readonly string[] } | null,
 ): string[] {
   if (!apply) return [];
+  const { requiresOf, resolved, beforeApply } = applyContext(artifacts, apply.requires);
+  if (resolved.length === 0 || levelArtifacts(artifacts).cyclic) return [];
 
-  const requiresOf = new Map<string, readonly string[]>(artifacts.map((a) => [a.id, a.requires]));
-  const applyRequires = apply.requires.filter((id) => requiresOf.has(id));
-  if (applyRequires.length === 0) return [];
-  if (levelArtifacts(artifacts).cyclic) return [];
-
-  const beforeApply = closureOf(applyRequires, requiresOf);
   return artifacts
     .filter((a) => {
       if (beforeApply.has(a.id)) return false;
       const needs = closureOf([a.id], requiresOf);
-      return applyRequires.every((id) => needs.has(id));
+      return resolved.every((id) => needs.has(id));
     })
     .map((a) => a.id);
 }
@@ -166,24 +155,17 @@ export type OrderingSource = "declared" | "derived";
 /**
  * Which steps follow implementation, and on whose authority.
  *
- * The single seam between "what is this schema's shape" and "how did we work that out". Callers ask
- * here and branch on the source, never on which step an edge happens to connect — so an ordering
- * that arrives declared renders as an ordinary edge with no further change.
- *
- * **Precedence is per step.** A schema stating the ordering for one artifact and leaving another
- * implicit is served without a mode switch: the stated one is `declared` and the rest go to the
- * derivation. That matters because the format is expected to gain a way to say this (OpenSpec #1456
- * is deciding where phase configuration lives), and adoption should be a branch here rather than a
- * rework of the graph, the edge model, or the view.
+ * The single seam between "what is this schema's shape" and "how did we work that out". Callers
+ * branch on the source, never on which step an edge connects, so an ordering that arrives declared
+ * renders as an ordinary edge with no further change. **Precedence is per step**, so a schema that
+ * states the ordering for one artifact and leaves another implicit needs no mode switch — which is
+ * what makes adopting a declared source (OpenSpec #1456) a branch here rather than a rework.
  *
  * Today the only thing a schema can state is a `requires` entry naming the apply step. The CLI
- * rejects that — its build-order pass dereferences every entry as a declared artifact — so nothing
- * in the wild uses it, but it is the shape a legalised declaration would take, and reading it costs
- * one lookup.
+ * rejects that, so nothing in the wild uses it, but it is the shape a legalised declaration takes.
  *
  * The apply step is a **parameter**, not the literal id `"apply"`: a schema may declare an artifact
- * of that name (`superspec` does, as an implementation receipt), and matching on the string would
- * confuse the two.
+ * of that name (`superspec` does), and matching on the string would confuse the two.
  */
 export function resolveImplementationOrdering(
   artifacts: SchemaArtifactDef[],
@@ -192,23 +174,13 @@ export function resolveImplementationOrdering(
   const ordering = new Map<string, OrderingSource>();
   if (!applyStep) return ordering;
 
-  // Only when no artifact claims that id. `superspec` declares an artifact called `apply`, so there
-  // a `requires: [apply]` names that artifact — which the schema *does* declare and the CLI *does*
-  // resolve — and reading it as the phase would invent an edge the author did not write. The
-  // declared-artifact reading wins because it is the one OpenSpec itself would take.
-  const claimedByArtifact = artifacts.some((a) => a.id === applyStep.id);
-  if (!claimedByArtifact) {
-    // Never for something apply itself waits on. A schema can name the apply phase in the `requires`
-    // of an artifact apply already depends on — the CLI rejects that, but spek parses `schema.yaml`
-    // directly, so it arrives here — and taking it at face value builds a cycle through apply. That
-    // is not a harmless one: `levelArtifacts` then falls back to positional levels for the *whole*
-    // schema, so every step gets its own row and one edge is drawn running backwards up the
-    // diagram. The same exclusion `postApplyArtifacts` applies for the same reason.
-    const requiresOf = new Map<string, readonly string[]>(artifacts.map((a) => [a.id, a.requires]));
-    const beforeApply = closureOf(
-      applyStep.requires.filter((id) => requiresOf.has(id)),
-      requiresOf,
-    );
+  // Skipped when an artifact claims that id: there the declared-artifact reading is the one
+  // OpenSpec itself takes, so reading it as the phase would invent an edge the author never wrote.
+  if (!artifacts.some((a) => a.id === applyStep.id)) {
+    // And never for a step apply already waits on. The CLI rejects such a schema but spek parses
+    // `schema.yaml` directly, so it arrives here, and at face value it is a cycle through apply —
+    // which drops the *whole* schema to positional levels and draws one edge running backwards.
+    const { beforeApply } = applyContext(artifacts, applyStep.requires);
     for (const a of artifacts) {
       if (a.requires.includes(applyStep.id) && !beforeApply.has(a.id)) {
         ordering.set(a.id, "declared");
@@ -250,6 +222,72 @@ export function schemaArtifactCount(artifacts: SchemaArtifactDef[]): number {
 export interface RequiresNode {
   id: string;
   requires: readonly string[];
+}
+
+/** One connection into a step, and whose authority it rests on. */
+export interface OriginEdge {
+  from: string;
+  origin: OrderingSource;
+}
+
+/** The shape this module needs of a step whose edges carry provenance. */
+export interface OriginNode {
+  id: string;
+  incoming: readonly OriginEdge[];
+}
+
+/**
+ * `drawableRequires` for a graph whose edges carry provenance: the edges worth drawing, per step.
+ *
+ * One rule with a parameter, not two. An edge is redundant iff some other path implies it **whose
+ * weakest edge is at least as authoritative as the edge itself**, ordering `declared > derived`.
+ * That yields both halves: a declared edge survives unless an all-declared path implies it, and a
+ * derived edge falls to any implying path at all.
+ *
+ * The asymmetry is the point. A reduction is information-preserving over *facts*, and a derived
+ * edge is spek's inference rather than a fact — so letting one stand in as an implying hop lets the
+ * inference erase what the schema states, and it does so exactly where the inference is wrong. In
+ * `spec-super`, `blackbox-test` declares `requires: [tasks]` and apply also requires `tasks`, so
+ * `tasks → apply ⇢ blackbox-test` implied the declared edge away and left a node whose only
+ * incoming line was dashed and captioned as something the CLI does not enforce.
+ */
+export function drawableEdges(steps: readonly OriginNode[]): Map<string, OriginEdge[]> {
+  const declared = new Set(steps.map((s) => s.id));
+  const childrenOf = new Map<string, OriginEdge[]>();
+  for (const step of steps) {
+    for (const edge of step.incoming) {
+      if (!declared.has(edge.from)) continue;
+      childrenOf.set(edge.from, [
+        ...(childrenOf.get(edge.from) ?? []),
+        { from: step.id, origin: edge.origin },
+      ]);
+    }
+  }
+
+  // Reachable from `from` without the direct hop, using only edges at least as authoritative?
+  const impliedBy = (from: string, to: string, minDeclared: boolean): boolean => {
+    const seen = new Set<string>();
+    const usable = (e: OriginEdge) => !minDeclared || e.origin === "declared";
+    const stack = (childrenOf.get(from) ?? []).filter((e) => usable(e) && e.from !== to);
+    while (stack.length > 0) {
+      const current = stack.pop() as OriginEdge;
+      if (current.from === to) return true;
+      if (seen.has(current.from)) continue;
+      seen.add(current.from);
+      stack.push(...(childrenOf.get(current.from) ?? []).filter(usable));
+    }
+    return false;
+  };
+
+  return new Map(
+    steps.map((step) => [
+      step.id,
+      step.incoming.filter(
+        (edge) =>
+          declared.has(edge.from) && !impliedBy(edge.from, step.id, edge.origin === "declared"),
+      ),
+    ]),
+  );
 }
 
 /**

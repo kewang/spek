@@ -1,4 +1,4 @@
-import { drawableRequires, type OrderingSource } from "@spekjs/core/schema-flow";
+import { drawableEdges, type OrderingSource } from "@spekjs/core/schema-flow";
 import type { FlowLevel, FlowStep } from "./schemaView";
 
 /**
@@ -29,6 +29,9 @@ const PAD = 8;
  * node and centring a marker there draws the line straight through the triangle.
  */
 export const ARROW_LEN = 9;
+
+/** Dash of a derived connection, shared with the legend swatch that has to match it. */
+export const DERIVED_DASH = "5 4";
 
 /** Smallest clearance between a bypassing curve and the nodes it passes. */
 const LANE_MIN = 20;
@@ -249,6 +252,13 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     return out;
   };
 
+  // Which edges to draw is a graph fact, so it is settled once here rather than inside `buildEdges`,
+  // which runs twice (once to measure the bows, once to draw). Core owns the rule — including why a
+  // derived edge may not imply a declared one away.
+  const drawable = drawableEdges(
+    levels.flatMap((l) => l.steps).map((step) => ({ id: step.key, incoming: step.incoming })),
+  );
+
   const passedBy = (nodes: LayoutNode[], fromLevel: number, toLevel: number): LayoutNode[] =>
     nodes.filter((n) => {
       const l = levelOf.get(n.step.key) ?? 0;
@@ -266,30 +276,9 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
   const buildEdges = (nodes: LayoutNode[]) => {
     const byKey = new Map(nodes.map((n) => [n.step.key, n]));
 
-    // What each step really adds, from core: an entry a longer path already implies is not drawn.
-    //
-    // **A declared edge is reduced only against other declared edges.** The transitive reduction is
-    // information-preserving over facts, and a derived edge is not a fact — so letting one stand in
-    // as an implying hop lets spek's inference erase the schema's own statement. It happens on
-    // exactly the schemas where the inference is *wrong*: in `spec-super`, `blackbox-test` declares
-    // `requires: [tasks]` and apply also requires `tasks`, so `tasks → blackbox-test` was implied
-    // by `tasks → apply ⇢ blackbox-test` and dropped, leaving a node whose only incoming line was
-    // dashed and captioned "openspec does not block on this" while the dependency openspec really
-    // does block on was drawn nowhere.
-    //
-    // Derived edges are reduced against everything, and were already reduced when the steps were
-    // built — spek should not claim what any drawn path entails.
-    const declaredOnly = nodes.map((n) => ({
-      id: n.step.key,
-      requires: n.step.incoming.filter((e) => e.origin === "declared").map((e) => e.from),
-    }));
-    const drawableDeclared = drawableRequires(declaredOnly);
-
     const pairs: Array<{ parent: LayoutNode; child: LayoutNode; origin: OrderingSource }> = [];
     for (const node of nodes) {
-      const survives = new Set(drawableDeclared.get(node.step.key) ?? []);
-      for (const edge of node.step.incoming) {
-        if (edge.origin === "declared" && !survives.has(edge.from)) continue;
+      for (const edge of drawable.get(node.step.key) ?? []) {
         const parent = byKey.get(edge.from);
         if (parent) pairs.push({ parent, child: node, origin: edge.origin });
       }
