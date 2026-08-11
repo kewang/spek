@@ -291,6 +291,11 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
      * other — `specs` and `design` both arriving at `tasks` looked like a single smudged arrow.
      * Slots are ordered by the other end's position so the fan does not cross itself.
      *
+     * Ties are broken by **how far away the other end is, nearest first**. Two ends in the same
+     * column say nothing about left and right, so the order was whatever the edge list happened to
+     * hold — which put the long way round on the inside slot and crossed it over the short one. A
+     * distant end is the one that has to travel around whatever sits between, so it takes the outer
+     * slot and its detour stays outside the direct edge instead of cutting through it.
      */
     const anchor = (
       key: (p: { parent: LayoutNode; child: LayoutNode }) => LayoutNode,
@@ -303,7 +308,10 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
       }
       const at = new Map<string, number>();
       for (const [, group] of groups) {
-        const sorted = [...group].sort((a, b) => other(a).x - other(b).x);
+        const base = levelOf.get(key(group[0]).step.key) ?? 0;
+        const span = (p: { parent: LayoutNode; child: LayoutNode }) =>
+          Math.abs((levelOf.get(other(p).step.key) ?? 0) - base);
+        const sorted = [...group].sort((a, b) => other(a).x - other(b).x || span(a) - span(b));
         sorted.forEach((pair, i) => {
           at.set(
             `${pair.parent.step.key}->${pair.child.step.key}`,

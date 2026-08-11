@@ -758,6 +758,30 @@ test("layoutGraph: a level-skipping edge with no implying path is kept", () => {
   assert.ok(drawn.includes("design->tasks"), `expected design->tasks in ${drawn.join(", ")}`);
 });
 
+test("layoutGraph: the further parent takes the outer slot, and its detour clears what it passes", () => {
+  // Two parents in the same column say nothing about left and right, so slot order used to fall to
+  // whatever the edge list held — which put the long way round on the inside and crossed it over the
+  // short one. Worse, the bypass then had to swing so wide that the bow search gave up and drew
+  // through `apply`. Nearest-first ordering puts the detour outside the direct edge.
+  const steps = withArchiveStep(buildFlowSteps(POST_IMPL, APPLY_AFTER_PLAN));
+  const { nodes, edges } = layoutGraph(groupIntoLevels(steps));
+  const at = (from: string) => sampleCubicPath(edges.find((e) => e.from === from && e.to === "verify")!.path);
+
+  const viaApply = at("apply");
+  const viaPlan = at("plan");
+  assert.ok(
+    viaPlan.at(-1)![0] > viaApply.at(-1)![0],
+    "the further parent (plan, two levels up) must arrive right of the nearer one (apply)",
+  );
+
+  const apply = nodes.find((n) => n.step.key === "apply")!;
+  const clipping = viaPlan.filter(
+    ([x, y]) =>
+      x > apply.x - 2 && x < apply.x + NODE_W + 2 && y > apply.y - 2 && y < apply.y + NODE_H + 2,
+  );
+  assert.deepEqual(clipping, [], "the detour must not be drawn through the node it goes around");
+});
+
 test("layoutGraph: edges converging on one node meet it at different points", () => {
   const { nodes, edges } = layoutGraph(groupIntoLevels(buildFlowSteps(BRIDGE_SHAPE, null)));
   const tasks = nodes.find((n) => n.step.id === "tasks");
