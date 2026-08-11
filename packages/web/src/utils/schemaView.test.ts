@@ -696,6 +696,51 @@ const SINGLE_COLUMN_WITH_SHORTCUTS: SchemaArtifactDef[] = [
  * that implies it, and produced the tangle this fixture is named for. Every bypass curve across the
  * eleven community schemas surveyed was one of these.
  */
+test("layoutGraph: a derived edge does not suppress a declared one", () => {
+  // The reduction is information-preserving over facts, and a derived edge is not a fact. This is
+  // the `spec-super` shape, where the derivation is a known false positive: `blackbox-test` really
+  // does declare `requires: [tasks]`, and letting `tasks → apply ⇢ blackbox-test` imply it away
+  // left a node whose only incoming line was dashed and captioned as something openspec does not
+  // enforce, while the dependency it does enforce was drawn nowhere.
+  const { edges } = layoutGraph(
+    groupIntoLevels(
+      buildFlowSteps(
+        [
+          artifact("proposal"),
+          artifact("specs", { requires: ["proposal"] }),
+          artifact("tasks", { requires: ["specs"] }),
+          artifact("blackbox-test", { requires: ["tasks"] }),
+        ],
+        { requires: ["tasks"], tracks: "tasks.md", instruction: null },
+      ),
+    ),
+  );
+  const into = (id: string) => edges.filter((e) => e.to === id).map((e) => `${e.from}:${e.origin}`).sort();
+
+  assert.deepEqual(into("blackbox-test"), ["apply:derived", "tasks:declared"]);
+});
+
+test("layoutGraph: a derived edge another path implies is still dropped", () => {
+  // The other half of the asymmetry. `retrospective` reaches apply through `verify`, so a second
+  // derived edge would state nothing new — spek must not claim what the drawn graph entails.
+  const { edges } = layoutGraph(
+    groupIntoLevels(
+      buildFlowSteps(
+        [
+          artifact("tasks"),
+          artifact("plan", { requires: ["tasks"] }),
+          artifact("verify", { requires: ["plan"] }),
+          artifact("retrospective", { requires: ["verify"] }),
+        ],
+        { requires: ["plan"], tracks: "tasks.md", instruction: null },
+      ),
+    ),
+  );
+  const derived = edges.filter((e) => e.origin === "derived").map((e) => `${e.from}->${e.to}`);
+
+  assert.deepEqual(derived, ["apply->verify"]);
+});
+
 test("layoutGraph: a requires already implied by a longer path is not drawn", () => {
   const steps = buildFlowSteps(SINGLE_COLUMN_WITH_SHORTCUTS, APPLY);
   const { edges } = layoutGraph(groupIntoLevels(steps));

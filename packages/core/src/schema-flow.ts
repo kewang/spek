@@ -198,8 +198,21 @@ export function resolveImplementationOrdering(
   // declared-artifact reading wins because it is the one OpenSpec itself would take.
   const claimedByArtifact = artifacts.some((a) => a.id === applyStep.id);
   if (!claimedByArtifact) {
+    // Never for something apply itself waits on. A schema can name the apply phase in the `requires`
+    // of an artifact apply already depends on — the CLI rejects that, but spek parses `schema.yaml`
+    // directly, so it arrives here — and taking it at face value builds a cycle through apply. That
+    // is not a harmless one: `levelArtifacts` then falls back to positional levels for the *whole*
+    // schema, so every step gets its own row and one edge is drawn running backwards up the
+    // diagram. The same exclusion `postApplyArtifacts` applies for the same reason.
+    const requiresOf = new Map<string, readonly string[]>(artifacts.map((a) => [a.id, a.requires]));
+    const beforeApply = closureOf(
+      applyStep.requires.filter((id) => requiresOf.has(id)),
+      requiresOf,
+    );
     for (const a of artifacts) {
-      if (a.requires.includes(applyStep.id)) ordering.set(a.id, "declared");
+      if (a.requires.includes(applyStep.id) && !beforeApply.has(a.id)) {
+        ordering.set(a.id, "declared");
+      }
     }
   }
 

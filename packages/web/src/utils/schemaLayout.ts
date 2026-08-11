@@ -267,19 +267,31 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     const byKey = new Map(nodes.map((n) => [n.step.key, n]));
 
     // What each step really adds, from core: an entry a longer path already implies is not drawn.
-    // Fed with step *keys*, so it reduces the graph the diagram draws — which includes any ordering
-    // spek derived. That is what removes the declared `plan → verify` edge once `verify` follows
-    // apply and apply already requires `plan`: the longer path carries it, so `verify` keeps one
-    // incoming connection rather than two saying the same thing.
-    const drawable = drawableRequires(
-      nodes.map((n) => ({ id: n.step.key, requires: n.step.incoming.map((e) => e.from) })),
-    );
+    //
+    // **A declared edge is reduced only against other declared edges.** The transitive reduction is
+    // information-preserving over facts, and a derived edge is not a fact — so letting one stand in
+    // as an implying hop lets spek's inference erase the schema's own statement. It happens on
+    // exactly the schemas where the inference is *wrong*: in `spec-super`, `blackbox-test` declares
+    // `requires: [tasks]` and apply also requires `tasks`, so `tasks → blackbox-test` was implied
+    // by `tasks → apply ⇢ blackbox-test` and dropped, leaving a node whose only incoming line was
+    // dashed and captioned "openspec does not block on this" while the dependency openspec really
+    // does block on was drawn nowhere.
+    //
+    // Derived edges are reduced against everything, and were already reduced when the steps were
+    // built — spek should not claim what any drawn path entails.
+    const declaredOnly = nodes.map((n) => ({
+      id: n.step.key,
+      requires: n.step.incoming.filter((e) => e.origin === "declared").map((e) => e.from),
+    }));
+    const drawableDeclared = drawableRequires(declaredOnly);
+
     const pairs: Array<{ parent: LayoutNode; child: LayoutNode; origin: OrderingSource }> = [];
     for (const node of nodes) {
-      for (const parentKey of drawable.get(node.step.key) ?? []) {
-        const parent = byKey.get(parentKey);
-        const edge = node.step.incoming.find((e) => e.from === parentKey);
-        if (parent && edge) pairs.push({ parent, child: node, origin: edge.origin });
+      const survives = new Set(drawableDeclared.get(node.step.key) ?? []);
+      for (const edge of node.step.incoming) {
+        if (edge.origin === "declared" && !survives.has(edge.from)) continue;
+        const parent = byKey.get(edge.from);
+        if (parent) pairs.push({ parent, child: node, origin: edge.origin });
       }
     }
 

@@ -357,6 +357,16 @@ test("resolveImplementationOrdering: an artifact of the same name claims the id"
   );
 });
 
+test("resolveImplementationOrdering: a step apply waits on is never given a declared edge back", () => {
+  // The CLI rejects a `requires` naming the apply phase, but spek parses schema.yaml directly, so
+  // one reaches here. Taken at face value it builds a cycle through apply — and not a contained
+  // one: levelling then falls back to positional for the *whole* schema and an edge is drawn
+  // running backwards up the diagram. Same exclusion `postApplyArtifacts` already applies.
+  const artifacts = [artifact("proposal"), artifact("tasks", ["proposal", "apply"])];
+
+  assert.deepEqual([...resolveImplementationOrdering(artifacts, applyStep(["tasks"]))], []);
+});
+
 test("resolveImplementationOrdering: no apply step means no ordering to resolve", () => {
   assert.deepEqual([...resolveImplementationOrdering([artifact("a")], null)], []);
 });
