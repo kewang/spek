@@ -167,6 +167,49 @@ test("buildFlowSteps: the edge from apply to a post-implementation step is marke
   assert.deepEqual(verify?.requires, ["plan"]);
 });
 
+test("buildFlowSteps: a derived edge is not repeated down a chain that already implies it", () => {
+  // superpowers-bridge. Both `verify` and `retrospective` follow implementation, but retrospective
+  // gets there through verify, so an apply-to-retrospective edge states nothing new. Keeping it
+  // drew a second dashed edge and repeated the "spek placed this here" explanation on a step whose
+  // position is a consequence of verify's, not an inference of its own.
+  const steps = buildFlowSteps(
+    [
+      artifact("tasks"),
+      artifact("plan", { requires: ["tasks"] }),
+      artifact("verify", { requires: ["plan"] }),
+      artifact("retrospective", { requires: ["verify"] }),
+    ],
+    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+  );
+  const derivedFrom = (id: string) =>
+    steps.find((s) => s.id === id)?.incoming.filter((e) => e.origin === "derived") ?? [];
+
+  assert.deepEqual(derivedFrom("verify"), [{ from: "apply", origin: "derived" }]);
+  assert.deepEqual(derivedFrom("retrospective"), [], "already reached through verify");
+  // Still after implementation — the edge went, the ordering did not.
+  const level = (id: string) => steps.find((s) => s.id === id)?.level ?? 0;
+  assert.ok(level("retrospective") > level("verify") && level("verify") > level("apply"));
+});
+
+test("buildFlowSteps: two steps that independently follow apply each keep their edge", () => {
+  // The other side of the rule. Neither `verify` nor `audit` reaches apply through the other, so
+  // each states something the graph does not otherwise say and each is drawn and explained.
+  const steps = buildFlowSteps(
+    [
+      artifact("tasks"),
+      artifact("plan", { requires: ["tasks"] }),
+      artifact("verify", { requires: ["plan"] }),
+      artifact("audit", { requires: ["plan"] }),
+    ],
+    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+  );
+  const derivedFrom = (id: string) =>
+    steps.find((s) => s.id === id)?.incoming.filter((e) => e.origin === "derived") ?? [];
+
+  assert.deepEqual(derivedFrom("verify"), [{ from: "apply", origin: "derived" }]);
+  assert.deepEqual(derivedFrom("audit"), [{ from: "apply", origin: "derived" }]);
+});
+
 // The forward path. OpenSpec is deciding where phase configuration lives (#1456); if a schema gains
 // a way to state this ordering, it must arrive as an ordinary declared edge — no derived marking,
 // no closure rule consulted. This is the assertion that catches it if the two ever get coupled.

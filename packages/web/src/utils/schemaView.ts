@@ -8,6 +8,7 @@ import type {
 // geometry. Imported from the `/schema-flow` subpath, not the root: this file is bundled into the
 // browser and the root entry reaches for child_process.
 import {
+  drawableRequires,
   levelArtifacts,
   resolveImplementationOrdering,
   type OrderingSource,
@@ -170,6 +171,25 @@ export function buildFlowSteps(
     steps.map((step) => ({ id: step.key, requires: step.incoming.map((edge) => edge.from) })),
   );
   for (const step of steps) step.level = levels.get(step.key) ?? 1;
+
+  // Levelled from the full graph above; only now is a derived edge dropped where a longer path
+  // already entails it. `resolveImplementationOrdering` reports every step that follows
+  // implementation, and in `superpowers-bridge` that is `verify` *and* `retrospective` — but
+  // retrospective follows apply only by way of verify, so an apply-to-retrospective edge states
+  // nothing the graph does not already say. Declared edges are left whole: a schema's own claim is
+  // carried faithfully and the view reduces it for drawing. A derived edge is spek's claim, and
+  // spek should not claim what is already entailed — it is the difference between one dashed edge
+  // and a fan of them, and between explaining the inference once and repeating it on every step
+  // downstream of it.
+  const drawable = drawableRequires(
+    steps.map((step) => ({ id: step.key, requires: step.incoming.map((edge) => edge.from) })),
+  );
+  for (const step of steps) {
+    const surviving = drawable.get(step.key) ?? [];
+    step.incoming = step.incoming.filter(
+      (edge) => edge.origin !== "derived" || surviving.includes(edge.from),
+    );
+  }
 
   // Apply requiring nothing the schema declares has no dependency to place it by, so it goes after
   // every artifact rather than sharing the first level with the roots. Skipped when something
