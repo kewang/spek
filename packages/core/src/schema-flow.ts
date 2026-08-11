@@ -27,7 +27,7 @@ export interface ArtifactLevelling {
  * cyclic" would be free to disagree with the one that decided the levels, and the disagreement
  * would surface as an ordering that contradicts the layout it is drawn on.
  */
-export function levelArtifacts(artifacts: SchemaArtifactDef[]): ArtifactLevelling {
+export function levelArtifacts(artifacts: readonly RequiresNode[]): ArtifactLevelling {
   const byId = new Map(artifacts.map((a) => [a.id, a]));
   const levels = new Map<string, number>();
   const visiting = new Set<string>();
@@ -70,7 +70,7 @@ export function levelArtifacts(artifacts: SchemaArtifactDef[]): ArtifactLevellin
  * benefit of one in-repo caller. `levelArtifacts` carries the extra fact, and this delegates to it
  * so there is one traversal and one answer.
  */
-export function computeArtifactLevels(artifacts: SchemaArtifactDef[]): Map<string, number> {
+export function computeArtifactLevels(artifacts: readonly RequiresNode[]): Map<string, number> {
   return levelArtifacts(artifacts).levels;
 }
 
@@ -192,8 +192,15 @@ export function resolveImplementationOrdering(
   const ordering = new Map<string, OrderingSource>();
   if (!applyStep) return ordering;
 
-  for (const a of artifacts) {
-    if (a.requires.includes(applyStep.id)) ordering.set(a.id, "declared");
+  // Only when no artifact claims that id. `superspec` declares an artifact called `apply`, so there
+  // a `requires: [apply]` names that artifact — which the schema *does* declare and the CLI *does*
+  // resolve — and reading it as the phase would invent an edge the author did not write. The
+  // declared-artifact reading wins because it is the one OpenSpec itself would take.
+  const claimedByArtifact = artifacts.some((a) => a.id === applyStep.id);
+  if (!claimedByArtifact) {
+    for (const a of artifacts) {
+      if (a.requires.includes(applyStep.id)) ordering.set(a.id, "declared");
+    }
   }
 
   for (const id of postApplyArtifacts(artifacts, applyStep)) {

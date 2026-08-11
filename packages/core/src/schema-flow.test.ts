@@ -339,6 +339,24 @@ test("resolveImplementationOrdering: the apply step is matched by identity, not 
   );
 });
 
+test("resolveImplementationOrdering: an artifact of the same name claims the id", () => {
+  // superspec's shape: it declares an artifact called `apply`, so `verify.requires: [apply]` names
+  // that artifact — a dependency the CLI itself resolves — not the phase. Reading it as the phase
+  // would invent an edge the author never wrote, and would do it on the schema most likely to hit
+  // this. `verify` still follows implementation here, but by derivation rather than by declaration.
+  const artifacts = [
+    artifact("tasks"),
+    artifact("plan", ["tasks"]),
+    artifact("apply", ["plan"]),
+    artifact("verify", ["apply"]),
+  ];
+
+  assert.deepEqual(
+    Object.fromEntries(resolveImplementationOrdering(artifacts, applyStep(["plan"]))),
+    { apply: "derived", verify: "derived" },
+  );
+});
+
 test("resolveImplementationOrdering: no apply step means no ordering to resolve", () => {
   assert.deepEqual([...resolveImplementationOrdering([artifact("a")], null)], []);
 });

@@ -125,10 +125,11 @@ test("buildFlowSteps: apply is levelled one past what it requires", () => {
   assert.equal(apply.instruction, "Work through the tasks.");
 });
 
-// The bug this replaced: apply was forced to deepestOverall + 1, pinning it last no matter what it
-// required. superpowers-bridge runs verify and retrospective AFTER implementation, so that pushed
-// apply past steps that genuinely come after it.
-test("buildFlowSteps: apply is not forced last — post-implementation steps stay after it", () => {
+// Two bugs, one shape. Apply was first forced to deepestOverall + 1, pinning it last whatever it
+// required, which pushed it past steps that genuinely come after it. Levelling it from its own
+// `requires` fixed that but left `verify` *beside* apply, reading as its peer — which is the
+// arrangement superpowers-bridge's runtime precheck exists to stop a reader acting on.
+test("buildFlowSteps: post-implementation steps are levelled after apply, not beside it", () => {
   const steps = buildFlowSteps(
     [
       artifact("tasks"),
@@ -142,12 +143,79 @@ test("buildFlowSteps: apply is not forced last — post-implementation steps sta
 
   assert.equal(level("plan"), 2);
   assert.equal(level("apply"), 3, "apply follows plan, which is all it requires");
-  assert.equal(level("verify"), 3);
-  assert.equal(level("retrospective"), 4, "retrospective stays after implementation");
+  assert.equal(level("verify"), 4, "verify needs everything apply needs, and apply needs none of it");
+  assert.equal(level("retrospective"), 5);
   assert.ok(
-    (level("apply") ?? 0) < (level("retrospective") ?? 0),
-    "apply must not be pinned past steps that come after it",
+    (level("apply") ?? 0) < (level("verify") ?? 0),
+    "apply must not be pinned past steps that come after it, nor share their level",
   );
+});
+
+test("buildFlowSteps: the edge from apply to a post-implementation step is marked derived", () => {
+  const steps = buildFlowSteps(
+    [artifact("tasks"), artifact("plan", { requires: ["tasks"] }), artifact("verify", { requires: ["plan"] })],
+    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+  );
+  const verify = steps.find((s) => s.id === "verify");
+
+  assert.deepEqual(verify?.incoming, [
+    { from: "plan", origin: "declared" },
+    { from: "apply", origin: "derived" },
+  ]);
+  // The declared `requires` is untouched — it is what the schema says, and the detail region and
+  // tooltip name it. Only the drawn graph gained the connection.
+  assert.deepEqual(verify?.requires, ["plan"]);
+});
+
+// The forward path. OpenSpec is deciding where phase configuration lives (#1456); if a schema gains
+// a way to state this ordering, it must arrive as an ordinary declared edge — no derived marking,
+// no closure rule consulted. This is the assertion that catches it if the two ever get coupled.
+test("buildFlowSteps: an ordering the schema states is drawn as declared, not derived", () => {
+  const steps = buildFlowSteps(
+    [
+      artifact("tasks"),
+      // Names the apply phase directly — the shape a legalised declaration would take. The closure
+      // rule would not find this one: `verify` requires nothing apply requires.
+      artifact("verify", { requires: ["apply"] }),
+    ],
+    { requires: ["tasks"], tracks: "tasks.md", instruction: null },
+  );
+  const verify = steps.find((s) => s.id === "verify");
+  const apply = steps.find((s) => s.isApply);
+
+  assert.deepEqual(verify?.incoming, [{ from: "apply", origin: "declared" }]);
+  assert.ok((verify?.level ?? 0) > (apply?.level ?? 0), "declared or derived, it still follows apply");
+});
+
+test("buildFlowSteps: a schema declaring an artifact named apply keeps both steps", () => {
+  // superspec's shape. Keyed by declared id alone, one silently replaced the other.
+  const steps = buildFlowSteps(
+    [artifact("plan"), artifact("apply", { requires: ["plan"] })],
+    { requires: ["plan"], tracks: "tasks.md", instruction: null },
+  );
+
+  assert.equal(steps.length, 3, "two declared artifacts plus the apply phase");
+  assert.equal(new Set(steps.map((s) => s.key)).size, 3, "every step has its own key");
+  assert.deepEqual(
+    steps.filter((s) => s.id === "apply").map((s) => s.isApply),
+    [false, true],
+    "the declared artifact and the phase are distinct steps sharing a displayed id",
+  );
+
+  // The declared artifact keeps the plain key, because it claimed it first.
+  const declaredApply = steps.find((s) => s.id === "apply" && !s.isApply);
+  const phase = steps.find((s) => s.isApply);
+  assert.equal(declaredApply?.key, "apply");
+  assert.notEqual(phase?.key, "apply");
+
+  // And it is itself derived to follow the phase, which is right: in superspec the declared `apply`
+  // artifact is an implementation receipt, written once the phase has run. The edge points at the
+  // phase's key, so the artifact does not end up depending on itself.
+  assert.deepEqual(declaredApply?.incoming, [
+    { from: "plan", origin: "declared" },
+    { from: phase?.key, origin: "derived" },
+  ]);
+  assert.ok((declaredApply?.level ?? 0) > (phase?.level ?? 0));
 });
 
 test("buildFlowSteps: apply requiring nothing the schema declares goes last", () => {
@@ -690,8 +758,23 @@ test("withArchiveStep: appends a terminal stage past everything else", () => {
 });
 
 test("withArchiveStep: depends on every leaf, not just the last step", () => {
-  // superpowers-bridge ends at two leaves — `apply` and `retrospective` — and neither feeds the
-  // other, so a change is only archivable once both are done.
+  // Two leaves that do not feed each other: `glossary` is unconstrained and nothing requires it, so
+  // a change is only archivable once both it and the apply step are done.
+  const steps = withArchiveStep(
+    buildFlowSteps(
+      [artifact("tasks"), artifact("glossary")],
+      { requires: ["tasks"], tracks: "tasks.md", instruction: null },
+    ),
+  );
+  const archive = steps.find((s) => s.id === "archive");
+  assert.ok(archive);
+  assert.deepEqual([...archive.requires].sort(), ["apply", "glossary"]);
+});
+
+test("withArchiveStep: a step derived to follow apply makes apply no longer a leaf", () => {
+  // superpowers-bridge's shape. Archive used to depend on `apply` *and* `retrospective`, because
+  // nothing required apply. Once `verify` follows it, apply feeds something and drops out — a
+  // consequence of the leaf rule rather than a change to it.
   const steps = withArchiveStep(
     buildFlowSteps(
       [
@@ -705,7 +788,7 @@ test("withArchiveStep: depends on every leaf, not just the last step", () => {
   );
   const archive = steps.find((s) => s.id === "archive");
   assert.ok(archive);
-  assert.deepEqual([...archive.requires].sort(), ["apply", "retrospective"]);
+  assert.deepEqual(archive.requires, ["retrospective"]);
 });
 
 test("withArchiveStep: carries no schema content, because a schema declares none", () => {

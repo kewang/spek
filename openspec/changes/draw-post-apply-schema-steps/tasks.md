@@ -13,15 +13,17 @@
 
 ## 2. Step identity and apply as a graph node
 
-- [ ] 2.1 Give `FlowStep` a key distinct from its declared id in `schemaView.ts`, keeping the declared id as the display and `requires`-resolution value for artifacts
-- [ ] 2.2 Key the node map in `packages/web/src/utils/schemaLayout.ts` by that step key instead of `step.id`, so two steps sharing a declared id no longer collapse
-- [ ] 2.3 Rework `buildFlowSteps` to level artifacts and apply as one graph, with a derived edge from apply into each step `postApplyArtifacts` identifies, levelling from the full declared `requires`
-- [ ] 2.4 Give every edge an origin of `declared` or `derived`, set where the edge is produced, and have the view branch on that field rather than on which steps it connects — so an ordering that later arrives declared renders as an ordinary edge with no view change. Confirm `drawableRequires` drops the declared edge the derived one implies
-- [ ] 2.5 Cover the forward path with a test that feeds the resolver a step whose ordering is already known: it returns `declared`, the closure rule does not run for that step, and the edge renders unmarked — the assertion that adopting a declared source is a branch rather than a rework
-- [ ] 2.6 Correct the `buildFlowSteps` doc comment that claims post-implementation steps already stay after apply — it describes the intended behavior, not the behavior before this change
-- [ ] 2.7 Update the existing assertion in `packages/web/src/utils/schemaView.test.ts` that `verify` shares apply's level, which encodes the behavior being replaced
-- [ ] 2.8 Update the existing `withArchiveStep` assertion that archive depends on both `apply` and `retrospective`, since apply stops being a leaf once it has a dependent
-- [ ] 2.9 Add tests for step-key independence: a schema declaring an artifact named `apply` keeps both steps addressable, with connections resolving to the intended one, and counts the declared artifact in its artifact count
+- [x] 2.1 Give `FlowStep` a key distinct from its declared id in `schemaView.ts`, keeping the declared id as the display and `requires`-resolution value for artifacts
+- [x] 2.2 Key the node map in `packages/web/src/utils/schemaLayout.ts` by that step key instead of `step.id`, so two steps sharing a declared id no longer collapse
+- [x] 2.3 Rework `buildFlowSteps` to level artifacts and apply as one graph, with a derived edge from apply into each step `postApplyArtifacts` identifies, levelling from the full declared `requires`
+- [x] 2.4 Give every edge an origin of `declared` or `derived`, set where the edge is produced, and have the view branch on that field rather than on which steps it connects — so an ordering that later arrives declared renders as an ordinary edge with no view change. Confirm `drawableRequires` drops the declared edge the derived one implies
+- [x] 2.5 Cover the forward path with a test that feeds the resolver a step whose ordering is already known: it returns `declared`, the closure rule does not run for that step, and the edge renders unmarked — the assertion that adopting a declared source is a branch rather than a rework
+- [x] 2.6 Correct the `buildFlowSteps` doc comment that claims post-implementation steps already stay after apply — it describes the intended behavior, not the behavior before this change
+- [x] 2.7 Update the existing assertion in `packages/web/src/utils/schemaView.test.ts` that `verify` shares apply's level, which encodes the behavior being replaced
+- [x] 2.8 Update the existing `withArchiveStep` assertion that archive depends on both `apply` and `retrospective`, since apply stops being a leaf once it has a dependent
+- [x] 2.9 Add tests for step-key independence: a schema declaring an artifact named `apply` keeps both steps addressable, with connections resolving to the intended one, and counts the declared artifact in its artifact count
+  - Deviation: keys are allocated as "declared id unless already claimed" rather than prefixed by kind, so for every schema without a collision the key *is* the id and the diagram's graph reads in the schema's own vocabulary. Prefixing would have rewritten 11 passing layout assertions into a translated id space for no behavioural gain.
+  - Found while implementing: `resolveImplementationOrdering`'s declared branch had to stop firing when an artifact claims the phase's id. In `superspec`, `verify.requires: [apply]` names the declared artifact — a dependency the CLI itself resolves — so reading it as the phase would have invented an edge the author never wrote, on the one schema most likely to hit it. Covered by a core test.
 
 ## 3. Rendering the derived edge
 

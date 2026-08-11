@@ -7,7 +7,11 @@ import type {
 // The levelling lives in core as facts about the `requires` graph, kept apart from this file's
 // geometry. Imported from the `/schema-flow` subpath, not the root: this file is bundled into the
 // browser and the root entry reaches for child_process.
-import { applyStepLevel, computeArtifactLevels } from "@spekjs/core/schema-flow";
+import {
+  levelArtifacts,
+  resolveImplementationOrdering,
+  type OrderingSource,
+} from "@spekjs/core/schema-flow";
 import { plural } from "./plural";
 
 /**
@@ -15,9 +19,32 @@ import { plural } from "./plural";
  * DOM — the same split the rest of this package uses.
  */
 
+/**
+ * One connection into a step, and whose authority it rests on.
+ *
+ * `derived` means spek worked the ordering out because the schema had no way to state it, and the
+ * view must draw it so a reader can tell. `declared` covers both an ordering the schema states and
+ * one that follows definitionally — archiving waits for every leaf whatever the schema says, and
+ * that cannot be wrong in the way an inference about intent can.
+ */
+export interface FlowEdge {
+  /** `key` of the step this edge comes from — never a declared id. */
+  from: string;
+  origin: OrderingSource;
+}
+
 /** One rendered step of a schema's workflow. */
 export interface FlowStep {
-  /** Artifact id, or "apply" for the implementation step. */
+  /**
+   * Unique within the flow, and **not** the declared id.
+   *
+   * A schema may declare an artifact named `apply` — `superspec` does, as an implementation
+   * receipt — which is a different step from the phase declared under the schema's `apply:` key.
+   * Identifying steps by declared id alone let one silently replace the other in every map that
+   * keyed by it, so connections resolved to whichever won.
+   */
+  key: string;
+  /** Artifact id as declared, or "apply" / "archive". What the reader sees. */
   id: string;
   /**
    * Dependency level, 1-based — **not** the position in the list.
@@ -30,7 +57,10 @@ export interface FlowStep {
   level: number;
   generates: string | null;
   description: string | null;
+  /** Declared `requires`, as authored — what the tooltip and detail region name. */
   requires: string[];
+  /** Connections into this step, by step key. The graph the diagram actually draws. */
+  incoming: FlowEdge[];
   instruction: string | null;
   /** The apply step, which is styled as implementation rather than an authored artifact. */
   isApply: boolean;
@@ -38,42 +68,116 @@ export interface FlowStep {
   isArchive: boolean;
 }
 
+/** The id a schema would use if it could name the apply phase in a `requires`. */
+const APPLY_ID = "apply";
+
+/**
+ * Hands out step keys, giving each step its declared id unless something already holds it.
+ *
+ * So for every schema without a collision the key *is* the id, and the diagram's graph reads in the
+ * schema's own vocabulary. Only where two steps genuinely claim one name does a key diverge —
+ * `superspec` declares an artifact called `apply` alongside its apply phase — and then the later
+ * claimant is suffixed rather than either being dropped. Prefixing every key by kind would also
+ * work and would make every id in the graph a translation of the schema's.
+ */
+function keyAllocator(): (preferred: string) => string {
+  const taken = new Set<string>();
+  return (preferred) => {
+    let key = preferred;
+    for (let n = 2; taken.has(key); n++) key = `${preferred}#${n}`;
+    taken.add(key);
+    return key;
+  };
+}
+
 /**
  * Every step of a schema's workflow — its artifacts plus the apply step — each carrying the
- * dependency level it sits at. Apply is levelled from its own `requires` like anything else, so a
- * schema with post-implementation steps (verify, retrospective) shows them after it.
+ * dependency level it sits at and the connections into it.
+ *
+ * **Apply is levelled as a node of the graph**, not placed once the artifacts are levelled. That is
+ * what lets a step depend on it: OpenSpec cannot express an artifact produced after implementation,
+ * so a schema that has one points it at the last planning artifact and says the rest in prose, and
+ * spek recovers the ordering from the graph (`resolveImplementationOrdering`). Levelling apply
+ * afterwards could only ever put such a step beside it.
+ *
+ * Levelling uses the **full** set of connections, not the transitive reduction the diagram draws.
+ * Dropping an implied edge never shortens the longest path, so the levels are the same either way —
+ * but computing them from the reduction would make that a coincidence rather than a guarantee.
  */
 export function buildFlowSteps(
   artifacts: SchemaArtifactDef[],
   apply: SchemaApplyDef | null,
 ): FlowStep[] {
-  const levels = computeArtifactLevels(artifacts);
+  const ordering = resolveImplementationOrdering(
+    artifacts,
+    apply ? { id: APPLY_ID, requires: apply.requires } : null,
+  );
 
-  const steps: FlowStep[] = artifacts.map((artifact) => ({
-    id: artifact.id,
-    level: levels.get(artifact.id) ?? 1,
-    generates: artifact.generates,
-    description: artifact.description,
-    requires: artifact.requires,
-    instruction: artifact.instruction,
-    isApply: false,
-    isArchive: false,
-  }));
+  const nextKey = keyAllocator();
+  // Declared id to step key. First claimant wins, which is what a `requires` naming it would mean.
+  const keyOf = new Map<string, string>();
+  const artifactKeys = artifacts.map((artifact) => {
+    const key = nextKey(artifact.id);
+    if (!keyOf.has(artifact.id)) keyOf.set(artifact.id, key);
+    return key;
+  });
+  const applyKey = apply ? nextKey(APPLY_ID) : null;
 
-  if (apply) {
+  const steps: FlowStep[] = artifacts.map((artifact, i) => {
+    const incoming: FlowEdge[] = artifact.requires
+      .map((id) => keyOf.get(id))
+      .filter((key): key is string => key !== undefined)
+      .map((key) => ({ from: key, origin: "declared" as const }));
+
+    const source = ordering.get(artifact.id);
+    if (source && applyKey) incoming.push({ from: applyKey, origin: source });
+
+    return {
+      key: artifactKeys[i],
+      id: artifact.id,
+      level: 1,
+      generates: artifact.generates,
+      description: artifact.description,
+      requires: artifact.requires,
+      incoming,
+      instruction: artifact.instruction,
+      isApply: false,
+      isArchive: false,
+    };
+  });
+
+  if (apply && applyKey) {
     steps.push({
-      id: "apply",
-      // Levelled by its own `requires` — see applyStepLevel. Never pinned last.
-      level: applyStepLevel(levels, apply) ?? 1,
+      key: applyKey,
+      id: APPLY_ID,
+      level: 1,
       generates: apply.tracks,
       description: apply.tracks
         ? `Implement the change. Progress is tracked in ${apply.tracks}.`
         : "Implement the change.",
       requires: apply.requires,
+      incoming: apply.requires
+        .map((id) => keyOf.get(id))
+        .filter((key): key is string => key !== undefined)
+        .map((key) => ({ from: key, origin: "declared" as const })),
       instruction: apply.instruction,
       isApply: true,
       isArchive: false,
     });
+  }
+
+  const { levels } = levelArtifacts(
+    steps.map((step) => ({ id: step.key, requires: step.incoming.map((edge) => edge.from) })),
+  );
+  for (const step of steps) step.level = levels.get(step.key) ?? 1;
+
+  // Apply requiring nothing the schema declares has no dependency to place it by, so it goes after
+  // every artifact rather than sharing the first level with the roots. Skipped when something
+  // depends on apply, which would otherwise be ranked above the step it follows.
+  const applyStep = steps.find((step) => step.isApply);
+  const hasDependent = steps.some((step) => step.incoming.some((e) => e.from === applyKey));
+  if (applyStep && !hasDependent && !apply?.requires.some((id) => keyOf.has(id))) {
+    applyStep.level = Math.max(0, ...steps.filter((s) => !s.isApply).map((s) => s.level)) + 1;
   }
 
   return steps;
@@ -89,23 +193,36 @@ export function buildFlowSteps(
  *
  * It depends on every *leaf* — each step nothing else requires. That is the honest dependency: a
  * change is archived once everything it declares is finished. In `spec-driven` that is `apply`
- * alone; in `superpowers-bridge` it is `apply` and `retrospective` both, since neither feeds
- * anything else.
+ * alone. In `superpowers-bridge` it is `retrospective` alone, because `verify` follows apply, so
+ * apply is no longer a step nothing else requires — a consequence of the leaf rule rather than a
+ * change to it.
+ *
+ * Leaves are found through the drawn connections rather than through declared `requires`, so an
+ * ordering spek derived counts exactly as a declared one does. Its own edges are `declared`: the
+ * archive step is already marked as spek's rather than the schema's, and "everything is finished"
+ * is definitional, not an inference about the author that could turn out wrong.
  */
 export function withArchiveStep(steps: FlowStep[]): FlowStep[] {
   if (steps.length === 0) return steps;
 
-  const leaves = steps.filter((step) => !steps.some((other) => other.requires.includes(step.id)));
+  const leaves = steps.filter(
+    (step) => !steps.some((other) => other.incoming.some((edge) => edge.from === step.key)),
+  );
+
+  const nextKey = keyAllocator();
+  for (const step of steps) nextKey(step.key);
 
   return [
     ...steps,
     {
+      key: nextKey("archive"),
       id: "archive",
       level: Math.max(...steps.map((s) => s.level)) + 1,
       generates: null,
       description:
         "Folds the change's delta specs into openspec/specs/ and moves the change under archive/.",
       requires: leaves.map((s) => s.id),
+      incoming: leaves.map((s) => ({ from: s.key, origin: "declared" as const })),
       instruction: null,
       isApply: false,
       isArchive: true,
