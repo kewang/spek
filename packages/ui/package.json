@@ -38,8 +38,8 @@
     "./styles.css": "./dist/styles.css"
   },
   "scripts": {
-    "build": "rm -rf dist && tsc && npm run build:css",
-    "build:css": "cp src/styles.css dist/styles.css",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc && npm run build:css",
+    "build:css": "node -e \"require('fs').copyFileSync('src/styles.css','dist/styles.css')\"",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch",
     "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
