@@ -691,8 +691,11 @@ const SINGLE_COLUMN_WITH_SHORTCUTS: SchemaArtifactDef[] = [
  * that implies it, and produced the tangle this fixture is named for. Every bypass curve across the
  * eleven community schemas surveyed was one of these.
  */
-test("layoutGraph: a derived edge does not suppress a declared one", () => {
-  // The `spec-super` shape, where the derivation is a known false positive.
+test("layoutGraph: a redundant declared edge is reduced away by the derived path", () => {
+  // `verify`/`blackbox-test` shape: the step declares `requires: [tasks]` and is derived to follow
+  // apply, which already requires `tasks`. The path `tasks → apply ⇢ step` carries the declared
+  // dependency, so the direct `tasks → step` edge is dropped and the step draws one incoming edge,
+  // from apply. This is the proposal's rule: the derived edge is reduced like a declared one.
   const { edges } = layoutGraph(
     groupIntoLevels(
       buildFlowSteps(
@@ -708,7 +711,7 @@ test("layoutGraph: a derived edge does not suppress a declared one", () => {
   );
   const into = (id: string) => edges.filter((e) => e.to === id).map((e) => `${e.from}:${e.origin}`).sort();
 
-  assert.deepEqual(into("blackbox-test"), ["apply:derived", "tasks:declared"]);
+  assert.deepEqual(into("blackbox-test"), ["apply:derived"]);
 });
 
 test("layoutGraph: a derived edge another path implies is still dropped", () => {
@@ -756,30 +759,6 @@ test("layoutGraph: a level-skipping edge with no implying path is kept", () => {
   const { edges } = layoutGraph(groupIntoLevels(buildFlowSteps(BRIDGE_SHAPE, null)));
   const drawn = edges.map((e) => `${e.from}->${e.to}`);
   assert.ok(drawn.includes("design->tasks"), `expected design->tasks in ${drawn.join(", ")}`);
-});
-
-test("layoutGraph: the further parent takes the outer slot, and its detour clears what it passes", () => {
-  // Two parents in the same column say nothing about left and right, so slot order used to fall to
-  // whatever the edge list held — which put the long way round on the inside and crossed it over the
-  // short one. Worse, the bypass then had to swing so wide that the bow search gave up and drew
-  // through `apply`. Nearest-first ordering puts the detour outside the direct edge.
-  const steps = withArchiveStep(buildFlowSteps(POST_IMPL, APPLY_AFTER_PLAN));
-  const { nodes, edges } = layoutGraph(groupIntoLevels(steps));
-  const at = (from: string) => sampleCubicPath(edges.find((e) => e.from === from && e.to === "verify")!.path);
-
-  const viaApply = at("apply");
-  const viaPlan = at("plan");
-  assert.ok(
-    viaPlan.at(-1)![0] > viaApply.at(-1)![0],
-    "the further parent (plan, two levels up) must arrive right of the nearer one (apply)",
-  );
-
-  const apply = nodes.find((n) => n.step.key === "apply")!;
-  const clipping = viaPlan.filter(
-    ([x, y]) =>
-      x > apply.x - 2 && x < apply.x + NODE_W + 2 && y > apply.y - 2 && y < apply.y + NODE_H + 2,
-  );
-  assert.deepEqual(clipping, [], "the detour must not be drawn through the node it goes around");
 });
 
 test("layoutGraph: edges converging on one node meet it at different points", () => {

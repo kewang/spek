@@ -231,10 +231,16 @@ geometry on purpose. Three rules worth knowing:
   edge is drawn **dashed and labelled derived**, never as a dependency the CLI blocks on. Ask
   `resolveImplementationOrdering`, which returns the ordering *and its source* (`declared` | `derived`) per step: when
   OpenSpec ships a way to declare this (#1456), it is a branch there and nothing else moves — pinned by a test that a
-  schema naming the apply phase in its `requires` renders as an ordinary solid edge. **Derived edges are reduced,
-  declared ones are not**: a schema's claim is carried whole and reduced only for drawing, but spek must not claim what
-  a longer path already entails, or `retrospective` repeats the explanation `verify` already gave.
-  Levelling runs on the **full** graph *before* that reduction, so the levels stay a guarantee rather than a coincidence.
+  schema naming the apply phase in its `requires` renders as an ordinary solid edge. **The derived edge is reduced
+  like a declared one** (`drawableEdges`, a plain transitive reduction counting declared and derived hops alike): a
+  post-implementation step whose declared dependency apply already covers draws **one** edge, from apply, not two —
+  `anvil`'s `verify` declares `requires: [tasks]` and apply requires `tasks`, so `tasks → apply ⇢ verify` carries it
+  and the direct `tasks → verify` edge is dropped. This is the bound the derivation *accepts*, not a fact it hides: on
+  the ~18% misread, the surviving edge is the derived (dashed, captioned) one, so the reader is told it is an inference;
+  the exact `requires` still lives in the panel. Keeping the declared edge alongside — the earlier belt-and-suspenders
+  after `spec-super` showed only a dashed line — drew every correct case with two lines saying one ordering, undoing
+  the simplification this feature exists for. Levelling runs on the **full** graph *before* that reduction, so the
+  levels stay a guarantee rather than a coincidence.
 
 **`openspec-cli.ts`**: one place for spawning the CLI (stderr discarded, `windowsHide`) and for `ttlCached` (256-entry
 cap). The two durations live in **`cli-budget.ts`** — its own browser-safe subpath, because the webview must derive its

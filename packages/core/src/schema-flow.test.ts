@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {
   applyStepLevel,
   computeArtifactLevels,
+  drawableEdges,
   drawableRequires,
   levelArtifacts,
   postApplyArtifacts,
   resolveImplementationOrdering,
   schemaArtifactCount,
+  type OriginNode,
   type RequiresNode,
 } from "./schema-flow.js";
 import type { SchemaApplyDef, SchemaArtifactDef } from "./types.js";
@@ -506,5 +508,49 @@ test("drawableRequires: levelling still uses the full requires", () => {
   assert.deepEqual(
     levels(artifacts),
     Object.fromEntries(computeArtifactLevels(artifacts.map((a) => artifact(a.id, reduced.get(a.id) ?? [])))),
+  );
+});
+
+// --- drawableEdges ---
+
+const drawnEdges = (steps: OriginNode[]): Record<string, string[]> =>
+  Object.fromEntries(
+    Array.from(drawableEdges(steps), ([id, edges]) => [
+      id,
+      edges.map((e) => `${e.from}:${e.origin}`).sort(),
+    ]),
+  );
+
+test("drawableEdges: a derived edge reduces a declared edge the same path implies", () => {
+  // `anvil`'s `verify`: it declares `requires: [tasks]` and is derived to follow apply, which also
+  // requires `tasks`. `tasks → apply ⇢ verify` carries the dependency, so the direct `tasks → verify`
+  // edge is dropped and `verify` keeps one incoming edge, from apply — declared and derived hops
+  // count alike in the reduction.
+  assert.deepEqual(
+    drawnEdges([
+      { id: "tasks", incoming: [] },
+      { id: "apply", incoming: [{ from: "tasks", origin: "declared" }] },
+      {
+        id: "verify",
+        incoming: [
+          { from: "tasks", origin: "declared" },
+          { from: "apply", origin: "derived" },
+        ],
+      },
+    ]),
+    { tasks: [], apply: ["tasks:declared"], verify: ["apply:derived"] },
+  );
+});
+
+test("drawableEdges: a derived edge nothing else implies survives", () => {
+  // Nothing carries `apply ⇢ verify` but the edge itself, so it is kept — the reduction removes
+  // repetition, not the ordering.
+  assert.deepEqual(
+    drawnEdges([
+      { id: "tasks", incoming: [] },
+      { id: "apply", incoming: [{ from: "tasks", origin: "declared" }] },
+      { id: "verify", incoming: [{ from: "apply", origin: "derived" }] },
+    ]),
+    { tasks: [], apply: ["tasks:declared"], verify: ["apply:derived"] },
   );
 });

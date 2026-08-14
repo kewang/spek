@@ -103,12 +103,12 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           {/* No chip after a possessive: `px-1.5` plus the word space reads as a double space. */}
           {step.incoming.some((edge) => edge.origin === "derived") && (
             <p className="text-text-muted border-accent/30 mt-2 border-l-2 pl-2 text-xs">
-              spek places this after implementation: it depends on everything the apply step depends
-              on, and apply depends on none of it. The schema cannot say so —{" "}
-              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">requires</code> can
-              name only other artifacts — so this order is spek&rsquo;s reading, not something{" "}
+              <span className="text-text-secondary font-semibold">
+                Assumed to run after apply.
+              </span>{" "}
+              spek&apos;s guess, since it relies on the same artifacts apply does — not something{" "}
               <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">openspec</code>{" "}
-              blocks on.
+              enforces.
             </p>
           )}
         </div>

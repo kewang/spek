@@ -237,19 +237,22 @@ export interface OriginNode {
 }
 
 /**
- * `drawableRequires` for a graph whose edges carry provenance: the edges worth drawing, per step.
+ * `drawableRequires` for a graph whose edges carry provenance: the edges worth drawing, per step,
+ * each survivor keeping the origin it will be drawn with.
  *
- * One rule with a parameter, not two. An edge is redundant iff some other path implies it **whose
- * weakest edge is at least as authoritative as the edge itself**, ordering `declared > derived`.
- * That yields both halves: a declared edge survives unless an all-declared path implies it, and a
- * derived edge falls to any implying path at all.
+ * A plain transitive reduction: an edge is dropped when some other path already implies it,
+ * **declared and derived hops counted alike**. A derived edge is subject to the same reduction as a
+ * declared one, so a post-implementation step whose declared dependency the apply step already
+ * covers draws a single incoming connection rather than two: in `anvil`, `verify` declares
+ * `requires: [tasks]` and is derived to follow apply, which already requires `tasks`, so
+ * `tasks → apply ⇢ verify` carries the dependency and the direct `tasks → verify` edge is not drawn.
+ * `verify` keeps one edge, from apply.
  *
- * The asymmetry is the point. A reduction is information-preserving over *facts*, and a derived
- * edge is spek's inference rather than a fact — so letting one stand in as an implying hop lets the
- * inference erase what the schema states, and it does so exactly where the inference is wrong. In
- * `spec-super`, `blackbox-test` declares `requires: [tasks]` and apply also requires `tasks`, so
- * `tasks → apply ⇢ blackbox-test` implied the declared edge away and left a node whose only
- * incoming line was dashed and captioned as something the CLI does not enforce.
+ * This is a **bound the derivation accepts, not a fact it hides**: on the ~18% of steps the
+ * post-implementation rule misreads, the surviving edge is the derived one — dashed and captioned as
+ * derived, never asserted — so the reader is told it is an inference. The alternative, keeping the
+ * declared edge alongside, drew every such node with two lines saying the same ordering; the diagram
+ * is a reduction, and the panel is where the exact `requires` still lives.
  */
 export function drawableEdges(steps: readonly OriginNode[]): Map<string, OriginEdge[]> {
   const declared = new Set(steps.map((s) => s.id));
@@ -264,17 +267,16 @@ export function drawableEdges(steps: readonly OriginNode[]): Map<string, OriginE
     }
   }
 
-  // Reachable from `from` without the direct hop, using only edges at least as authoritative?
-  const impliedBy = (from: string, to: string, minDeclared: boolean): boolean => {
+  // Reachable from `from` without the direct hop?
+  const impliedBy = (from: string, to: string): boolean => {
     const seen = new Set<string>();
-    const usable = (e: OriginEdge) => !minDeclared || e.origin === "declared";
-    const stack = (childrenOf.get(from) ?? []).filter((e) => usable(e) && e.from !== to);
+    const stack = (childrenOf.get(from) ?? []).filter((e) => e.from !== to);
     while (stack.length > 0) {
       const current = stack.pop() as OriginEdge;
       if (current.from === to) return true;
       if (seen.has(current.from)) continue;
       seen.add(current.from);
-      stack.push(...(childrenOf.get(current.from) ?? []).filter(usable));
+      stack.push(...(childrenOf.get(current.from) ?? []));
     }
     return false;
   };
@@ -282,10 +284,7 @@ export function drawableEdges(steps: readonly OriginNode[]): Map<string, OriginE
   return new Map(
     steps.map((step) => [
       step.id,
-      step.incoming.filter(
-        (edge) =>
-          declared.has(edge.from) && !impliedBy(edge.from, step.id, edge.origin === "declared"),
-      ),
+      step.incoming.filter((edge) => declared.has(edge.from) && !impliedBy(edge.from, step.id)),
     ]),
   );
 }

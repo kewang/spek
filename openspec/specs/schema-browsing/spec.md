@@ -483,17 +483,9 @@ under a cycle the levels are already a positional fallback rather than a reading
 
 Each post-implementation step SHALL be given a derived dependency on the apply step, so that it is
 levelled after implementation rather than beside it. Levelling SHALL continue to use the full
-declared `requires`.
-
-**A declared edge SHALL be suppressed only by a path made entirely of declared edges.** The
-transitive reduction is information-preserving over facts, and a derived edge is not a fact, so a
-derived edge SHALL NOT stand in as an implying hop that removes something the schema states. This
-bites on exactly the schemas where the derivation is wrong: a step declaring `requires: [tasks]`
-where apply also requires `tasks` would otherwise have that declared edge implied away by
-`tasks → apply ⇢ step`, leaving a node whose only incoming connection is derived and captioned as
-something the CLI does not enforce, while the dependency it does enforce is drawn nowhere. A derived
-edge SHALL still be suppressed by any implying path, declared or derived: spek must not claim what
-the drawn graph already entails.
+declared `requires`, and the derived edge SHALL be subject to the same transitive reduction as a
+declared one, so that a step whose declared dependency the apply step already covers draws a single
+incoming connection rather than two.
 
 The view SHALL NOT claim more for a derived edge than the derivation supports. The rule establishes
 that apply does not require the step and that the step cannot precede apply; it does not establish
@@ -649,10 +641,10 @@ blank or errored page.
 - **WHEN** the diagram draws the connection from apply into a post-implementation step
 - **THEN** that connection is rendered differently from a declared `requires` connection and is identified as derived rather than as a dependency the CLI blocks on
 
-#### Scenario: A derived edge does not suppress a declared one
+#### Scenario: A declared edge the derived edge implies is not drawn twice
 
 - **WHEN** `verify` declares `requires: [plan]`, apply requires `plan`, and `verify` is derived to follow apply
-- **THEN** `verify` draws both connections — the declared one from `plan` and the derived one from apply — because the only path implying the declared edge runs through a derived hop, which is an inference rather than a fact
+- **THEN** `verify` draws a single incoming connection, from apply, because the path through apply already carries the declared dependency on `plan`
 
 #### Scenario: A derived edge implied by another path is not drawn
 

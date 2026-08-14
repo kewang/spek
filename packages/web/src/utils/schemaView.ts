@@ -78,9 +78,8 @@ export interface FlowStep {
  * stale. Expect this to need editing if OpenSpec ever makes the derivation conditional (#1456).
  */
 export const DERIVED_EDGE_MEANING =
-  "Not declared by this schema. spek places this step after implementation because it depends on " +
-  "everything the apply step depends on, and the apply step depends on none of it. openspec does " +
-  "not block on this.";
+  "Assumed to run after apply. spek's guess, since it relies on the same artifacts apply does — " +
+  "not something openspec enforces.";
 
 /** The id a schema would use if it could name the apply phase in a `requires`. */
 const APPLY_ID = "apply";

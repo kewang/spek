@@ -295,7 +295,10 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
      * column say nothing about left and right, so the order was whatever the edge list happened to
      * hold — which put the long way round on the inside slot and crossed it over the short one. A
      * distant end is the one that has to travel around whatever sits between, so it takes the outer
-     * slot and its detour stays outside the direct edge instead of cutting through it.
+     * slot and its detour stays outside the direct edge instead of cutting through it. (The
+     * derived-edge case that first exposed this — a step drawn after apply beside its declared
+     * parent in the same column — no longer arises now that the redundant declared edge is reduced
+     * away; the tiebreak stays for any same-column convergence that survives reduction.)
      */
     const anchor = (
       key: (p: { parent: LayoutNode; child: LayoutNode }) => LayoutNode,
