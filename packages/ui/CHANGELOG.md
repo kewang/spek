@@ -32,6 +32,7 @@
   the archived bar measured 1.91:1 even with a corrected colour.
 - **Node labels carry a background halo**, so a label the force layout drifts over another node stays
   readable (1.06–1.84:1 against a node fill before).
+- **The build script no longer depends on a Unix shell.** `rm -rf` (and `cp`) are replaced by `node -e` one-liners, with no new dependencies, so building this package from a clone works under Windows `cmd.exe`. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) ([#47](https://github.com/spekhq/spek/pull/47))
 
 ## 1.2.0
 

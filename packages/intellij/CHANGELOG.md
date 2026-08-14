@@ -11,6 +11,7 @@
 - **The task progress bar's complete state is distinguishable from its track** — 2.02:1 before, in the light theme
 - **The graph and the timeline follow the theme.** Node fills, legend swatches and the archived timeline bars were hard-coded colours no theme could reach; the graph's spec nodes measured 1.85:1 on a light page and its archived nodes 2.93:1 in the dark one. Edges are now drawn in a colour that can be seen, labels carry a halo where they overlap a node, and the "today" marker is at full strength
 - **A CLI failure is no longer remembered for the full cache window.** An unreachable `openspec` binary left the schema pages reporting "unavailable" for 30 seconds after the cause was fixed; a failure that resolves is now retried on the next read, while one the installed CLI reproduces identically is still cached ([#46](https://github.com/spekhq/spek/issues/46))
+- **Building from source works on Windows.** `@spekjs/core` and `@spekjs/ui` used Unix-only `rm -rf` / `cp` in their build scripts, so `npm run build` failed under `cmd.exe`. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) ([#47](https://github.com/spekhq/spek/pull/47))
 
 ## 1.13.1
 

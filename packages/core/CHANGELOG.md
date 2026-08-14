@@ -15,6 +15,7 @@ repository root `CHANGELOG.md`.
   expensive one to re-ask. No exported type changed and no export was added — if you worked around the
   old behaviour by shortening a poll interval or restarting, you can stop
   ([#46](https://github.com/spekhq/spek/issues/46)).
+- **The build script no longer depends on a Unix shell.** `rm -rf` (and `cp`) are replaced by `node -e` one-liners, with no new dependencies, so building this package from a clone works under Windows `cmd.exe`. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) ([#47](https://github.com/spekhq/spek/pull/47))
 
 ## 1.9.0
 

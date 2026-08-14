@@ -385,6 +385,7 @@ Thanks to everyone who has contributed to spek:
   - User-selectable artifact tab ordering (last-modified / schema order / A–Z), with schema order sourced from the OpenSpec CLI
   - Schema badge across the Changes list, Dashboard, and Change Detail, hidden when it matches the repo default
   - Polling-based live-reload fallback for filesystems without native change events (devcontainer / WSL / network mounts)
+  - Cross-platform build scripts for `@spekjs/core` and `@spekjs/ui`, so building from source works under Windows `cmd.exe`
   - Worktree-aware schema baseline — under aggregation each change's badge is judged against its own worktree's default schema, and scanning reads each worktree's config once instead of once per change
   - TOC and `#hash` navigation that lands the target heading below the sticky header instead of behind it
   - Opening a change no longer consults the OpenSpec CLI once per change — the authoritative artifact order is cached per schema, since every change sharing a schema gets the same answer back
