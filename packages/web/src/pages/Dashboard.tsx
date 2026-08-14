@@ -19,7 +19,7 @@ export function Dashboard() {
     return <p className="text-text-muted">Loading...</p>;
   }
   if (overview.error) {
-    return <p className="text-red-400">Error: {overview.error}</p>;
+    return <p className="text-status-error">Error: {overview.error}</p>;
   }
 
   const data = overview.data!;

@@ -62,7 +62,7 @@ function ChangeRow({ c, today, accent, showSource }: {
           )}
           {c.conflictsWith && (
             <span
-              className="relative z-10 shrink-0 text-[11px] text-amber-400 border border-amber-400/40 rounded px-1.5 py-0.5"
+              className="relative z-10 shrink-0 text-[11px] text-status-warning border border-status-warning/40 rounded px-1.5 py-0.5"
               title={`This jj workspace's copy diverges in content from ${c.conflictsWith}`}
             >
               conflicts with {c.conflictsWith}
@@ -94,7 +94,7 @@ export function ChangeList() {
   const { data, loading, error } = useChanges();
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
 
   const active = data?.active ?? [];
   const archived = data?.archived ?? [];

@@ -31,7 +31,7 @@ export function GraphView() {
     return <p className="text-text-muted">Loading graph...</p>;
   }
   if (error) {
-    return <p className="text-red-400">Error: {error}</p>;
+    return <p className="text-status-error">Error: {error}</p>;
   }
   if (!data || data.edges.length === 0) {
     return (

@@ -22,7 +22,7 @@ function DiffView({ topic, entry, currentContent, onClose }: {
   const { data, loading, error } = useSpecAtChange(topic, entry.slug);
 
   if (loading) return <p className="text-text-muted">Loading diff...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
   if (!data) return null;
 
   return (
@@ -82,7 +82,7 @@ export function SpecDetail() {
   }, [data, location.hash, compareEntry]);
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
   if (!data) return <p className="text-text-muted">Spec not found</p>;
 
   const showToc = !compareEntry && headings.length >= TOC_MIN_HEADINGS;
@@ -144,7 +144,7 @@ export function SpecDetail() {
                         )}
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           entry.status === "active"
-                            ? "bg-green-400/10 text-green-400"
+                            ? "bg-status-success/10 text-status-success"
                             : "bg-text-muted/10 text-text-muted"
                         }`}>
                           {entry.status}

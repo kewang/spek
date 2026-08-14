@@ -1,9 +1,7 @@
 ## Purpose
 
 提供 changes 列表與單一 change 詳細檢視（proposal / design / tasks / specs 分頁），呈現 change 生命週期資訊。
-
 ## Requirements
-
 ### Requirement: Change list with active/archived separation
 The system SHALL display changes grouped into active and archived sections. Active changes SHALL be visually distinguished with a left accent color border (4px). Changes SHALL be sorted by git timestamp descending (most recent first), falling back to slug date when timestamp is unavailable. Each change row SHALL display a compact lifecycle indicator based on `createdDate` and `archivedDate` (label words like "Created" / "Archived" are intentionally omitted to reduce visual noise; the meaning is conveyed by date format and the `→` separator):
 
@@ -143,7 +141,13 @@ The system SHALL render inline code elements in proposal markdown as navigable l
 - **THEN** inline code matching any topic in the list SHALL be rendered as navigable links
 
 ### Requirement: Custom task checkbox styling
-The system SHALL render task items in the Tasks tab using custom SVG icons instead of text-based `[x]`/`[ ]` markers. Completed tasks SHALL display a filled checkmark icon in green, and incomplete tasks SHALL display an empty circle icon. Completed task text SHALL have reduced opacity (0.6) in addition to the existing strikethrough styling.
+The system SHALL render task items in the Tasks tab using custom SVG icons instead of text-based `[x]`/`[ ]` markers. Completed tasks SHALL display a filled checkmark icon in green, and incomplete tasks SHALL display an empty circle icon. Completed task text SHALL be de-emphasised relative to an incomplete task's, in addition to the existing strikethrough styling.
+
+The de-emphasis SHALL be carried by a colour from the theme's palette, and SHALL NOT be produced by opacity applied
+to the task row. Opacity on the row composites every descendant toward the page — the body text, and also the links
+and inline code spans a task's Markdown may contain, each of which sets its own colour — so no palette value can
+compensate for it. Everything the row renders remains subject to the readability floor stated by `theme-toggle`,
+including the checkmark icon, which is a graphical object carrying the completed state.
 
 Task text SHALL be rendered as Markdown using the same CommonMark+GFM renderer as the rest of the
 viewer, so inline formatting (emphasis, inline code, links) and a task's continuation lines display as
@@ -154,11 +158,17 @@ with its checkbox icon.
 
 #### Scenario: Incomplete task display
 - **WHEN** a task item is not completed
-- **THEN** the task displays an empty circle SVG icon followed by the task text at full opacity
+- **THEN** the task displays an empty circle SVG icon followed by the task text at the primary text colour
 
 #### Scenario: Completed task display
 - **WHEN** a task item is completed
-- **THEN** the task displays a green checkmark SVG icon followed by the task text with strikethrough and reduced opacity (0.6)
+- **THEN** the task displays a green checkmark SVG icon followed by the task text with strikethrough and a de-emphasised text colour
+- **AND** the row applies no opacity
+
+#### Scenario: A completed task stays readable
+- **WHEN** a completed task's text contains a link or an inline code span
+- **AND** either theme is active
+- **THEN** that link or code span still meets the readability floor stated by `theme-toggle`
 
 #### Scenario: Inline formatting in task text
 - **WHEN** a task's text contains `**bold**` or `` `code` ``
@@ -377,3 +387,4 @@ that job — the reader scrolls past a boundary without registering that one occ
 
 - **WHEN** the Specs tab renders two or more delta specs
 - **THEN** each spec is introduced by its own topic header on identical terms, so each boundary between specs is marked
+

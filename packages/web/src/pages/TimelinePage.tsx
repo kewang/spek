@@ -80,7 +80,7 @@ export function TimelinePage() {
   );
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
 
   const totalChanges = allChanges.length;
   const totalLaneItems = lanes.reduce<number>((acc: number, lane: Lane) => acc + lane.items.length, 0);

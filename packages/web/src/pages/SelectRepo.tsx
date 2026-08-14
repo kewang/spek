@@ -82,7 +82,7 @@ export function SelectRepo() {
             <div className="mt-3">
               {detect.data.hasOpenSpec ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-green-400 text-sm">OpenSpec detected ({detect.data.schema})</span>
+                  <span className="text-status-success text-sm">OpenSpec detected ({detect.data.schema})</span>
                   <button
                     type="submit"
                     className="px-4 py-1.5 bg-accent text-bg-primary rounded text-sm font-medium hover:bg-accent-hover transition-colors"
@@ -91,7 +91,7 @@ export function SelectRepo() {
                   </button>
                 </div>
               ) : (
-                <span className="text-yellow-400 text-sm">No openspec/ directory found</span>
+                <span className="text-status-warning text-sm">No openspec/ directory found</span>
               )}
             </div>
           )}
@@ -99,7 +99,7 @@ export function SelectRepo() {
             <p className="mt-3 text-text-muted text-sm">Detecting...</p>
           )}
           {detect.error && (
-            <p className="mt-3 text-red-400 text-sm">{detect.error}</p>
+            <p className="mt-3 text-status-error text-sm">{detect.error}</p>
           )}
         </form>
 
@@ -107,7 +107,7 @@ export function SelectRepo() {
         {showBrowser && (
           <div className="mb-6 bg-bg-secondary border border-border rounded p-4 max-h-64 overflow-y-auto">
             {browse.loading && <p className="text-text-muted text-sm">Loading...</p>}
-            {browse.error && <p className="text-red-400 text-sm">{browse.error}</p>}
+            {browse.error && <p className="text-status-error text-sm">{browse.error}</p>}
             {browse.data && (
               <>
                 <div className="flex items-center gap-2 mb-2">
@@ -170,12 +170,12 @@ export function SelectRepo() {
                         <span className="w-4 h-4 border-2 border-text-muted border-t-transparent rounded-full animate-spin flex-shrink-0" />
                       )}
                       {status === "valid" && (
-                        <svg className="w-4 h-4 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-status-success flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
                       {status === "invalid" && (
-                        <svg className="w-4 h-4 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-status-error flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                       )}
@@ -184,7 +184,7 @@ export function SelectRepo() {
                     {status === "invalid" && (
                       <button
                         onClick={() => removePath(p)}
-                        className="p-2 text-text-muted hover:text-red-400 transition-colors flex-shrink-0"
+                        className="p-2 text-text-muted hover:text-status-error transition-colors flex-shrink-0"
                         title="Remove path"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

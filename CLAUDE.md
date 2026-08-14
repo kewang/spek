@@ -440,7 +440,36 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   Heading levels and ids are untouched, because levels decide where folded sections end. In the Specs
   tab the delta spec's topic header is the section's dominant element — it used to be a `text-sm` `h3`
   *sibling* of the content's `h2`s, so it was terminated by the first one rather than containing them
-- **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
+- **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0. Light: bg #f8fafc family, accent
+  #92400e, text #0f172a
+- **Palette contrast is a stated obligation with a test behind it** (`theme-toggle`, generalising what #42
+  stated for the renderer's own marks). Every colour applied to text clears 4.5:1 **in both themes**, and a
+  graphic that is the only carrier of its information clears 3:1. Three things about how it is measured, all
+  of which change what a "passing" value is:
+  - **Against the worst of the theme's three surfaces**, not a nominal one. There is no map of which text
+    lands on which surface and a hand-written one is wrong the moment a component moves. Half the original
+    figures in this repo were quoted against `bg-primary`, which is the *easiest* surface in both themes.
+  - **Plus its own tint, where it has one.** `bg-accent/20 text-accent` (search highlight, and `@spekjs/ui`'s
+    badge) is what forces the light accent two ramp steps darker than plain link text needs — a tint moves
+    the background *toward* the text.
+  - **Opacity counts as part of the colour.** `opacity-60` on a completed task row put everything under it
+    below the floor, including the links and code spans that set their own colour, and no token value can
+    compensate — the multiply happens after the colour is chosen. De-emphasise with a token; `disabled:` is
+    the only exemption (WCAG 1.4.3).
+
+  `contrast.test.ts` parses **both blocks** of `global.css` and measures a declared table, then scans the
+  source for the three ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
+  alpha the table doesn't list, and a bare `opacity-*`. **Adding a colour token means adding a table row or
+  an exclusion** — a test fails on any `--color-*` that is neither. It cannot see two things: SVG
+  presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded) and the BDD
+  marks, whose fills are Tailwind palette values that would have to be pinned here and would drift on
+  upgrade.
+- **`@spekjs/ui` is knowingly unfixed** for the above, and it is on screen: `SpecGraph` paints nodes from hex
+  literals (1.85:1 / 1.96:1 against the light page), the legend swatches are the same literals, and
+  `TimelineBar`'s archived fill is `--spek-text-muted` at 0.45 (1.91:1 light, 2.17:1 dark **after** the token
+  fix). It inherits what the 8 `--spek-*` contract variables give it and no more. `graph-view` also still
+  mandates `opacity 0.1` on labelled nodes, which contradicts the clause above — resolving that is part of
+  the same follow-up, not a separate cleanup
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
   — the `- ` marker's CommonMark content offset), and the Tasks tab renders that text as Markdown. The

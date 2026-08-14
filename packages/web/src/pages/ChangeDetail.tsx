@@ -59,10 +59,15 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: Sp
           <div key={section.title}>
             <h3 className="text-sm font-semibold text-text-secondary mb-2">{section.title}</h3>
             <div className="space-y-1">
+              {/* A completed task carries no opacity: opacity composites every descendant toward the
+                  page, including the links and inline code spans a task's Markdown carries, each of
+                  which sets its own colour. Nothing in the row passed in either theme while it was
+                  applied — body text 3.24:1 dark / 2.77:1 light, a link 3.64 / 1.89. The de-emphasis
+                  is a colour instead, so a child with its own colour keeps it at full strength. */}
               {section.tasks.map((task, i) => (
-                <div key={i} className={`flex items-start gap-2 text-sm ${task.completed ? "opacity-60" : ""}`}>
+                <div key={i} className="flex items-start gap-2 text-sm">
                   {task.completed ? (
-                    <svg className="w-4 h-4 mt-0.5 shrink-0 text-green-400" viewBox="0 0 16 16" fill="none">
+                    <svg className="w-4 h-4 mt-0.5 shrink-0 text-status-success" viewBox="0 0 16 16" fill="none">
                       <circle cx="8" cy="8" r="7" fill="currentColor" opacity="0.2" />
                       <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -75,7 +80,7 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: Sp
                       (lists, code). As a flex item its display is blockified either way, so the
                       single-line appearance is unchanged. min-w-0 lets a code block scroll inside
                       the row instead of widening it. */}
-                  <div className={`min-w-0 ${task.completed ? "text-text-secondary line-through" : "text-text-primary"}`}>
+                  <div className={`min-w-0 ${task.completed ? "text-text-muted line-through" : "text-text-primary"}`}>
                     <TaskText text={task.text} />
                   </div>
                 </div>
@@ -216,7 +221,7 @@ export function ChangeDetail() {
   }, [data, activeTab, location.hash]);
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
   if (!data) return <p className="text-text-muted">Change not found</p>;
 
   const tabs = artifacts.map((artifact) => ({

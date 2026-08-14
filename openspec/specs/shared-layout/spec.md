@@ -1,7 +1,6 @@
 ## Purpose
 
 Define the layout shell every page shares - header, navigation sidebar, and content area - across all delivery surfaces.
-
 ## Requirements
 ### Requirement: Header component
 The system SHALL render a fixed header bar (56px height) containing: an inline SVG logomark (S-curve with diamond accents, 24x24) followed by the "spek" brand text (left), a search button (center), and the current repo path (right, desktop only). On mobile viewports, the header SHALL include a hamburger menu button with `aria-label="Open navigation menu"` and hide the repo path. The header SHALL also include a theme toggle button. The logomark SVG SHALL use `currentColor` to follow the accent color, ensuring theme compatibility.
@@ -48,6 +47,11 @@ The system SHALL render a sidebar with navigation links: Overview (Dashboard), S
 ### Requirement: TaskProgress component
 The system SHALL provide a reusable TaskProgress component that displays a progress bar with completed/total count. The progress bar color SHALL reflect completion status: amber/accent color when incomplete, green when all tasks are completed (completed equals total).
 
+The filled portion SHALL be distinguishable from its track by at least 3:1 in every theme, and both colours SHALL
+come from the theme's palette rather than from one literal shared by every theme. The fill is the only thing stating
+how far along a change is — no text beside it names the state — so it is a graphical object carrying information
+rather than decoration.
+
 #### Scenario: Display progress
 - **WHEN** TaskProgress is rendered with `completed=3` and `total=5`
 - **THEN** a progress bar at 60% width is shown in amber/accent color with text "3 / 5"
@@ -59,6 +63,11 @@ The system SHALL provide a reusable TaskProgress component that displays a progr
 #### Scenario: Zero tasks
 - **WHEN** TaskProgress is rendered with `total=0`
 - **THEN** component displays "No tasks" or an empty state
+
+#### Scenario: The fill is distinguishable from the track
+- **WHEN** the progress bar is rendered in either theme
+- **AND** the change is partially complete or fully complete
+- **THEN** the filled portion meets at least 3:1 against the track behind it
 
 ### Requirement: TabView component
 The system SHALL provide a reusable TabView component that renders tab headers and switches between tab content panels. When switching tabs, the new content panel SHALL fade in with a 150ms CSS animation.
@@ -103,3 +112,4 @@ The system SHALL render back navigation links (e.g., "← Back to Specs", "← B
 #### Scenario: Back link display
 - **WHEN** user views a detail page (SpecDetail or ChangeDetail)
 - **THEN** the back navigation link is displayed at 16px font size with medium weight, muted color, and accent color on hover
+

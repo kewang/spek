@@ -109,7 +109,7 @@ function LiveStatusNotice({ collapsed }: { collapsed: boolean }) {
 
   return (
     <div
-      className={`flex items-center gap-2 rounded text-xs text-amber-400/90 ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
+      className={`flex items-center gap-2 rounded text-xs text-status-warning ${collapsed ? "justify-center px-2 py-2" : "px-3 py-2"}`}
       title="Live updates offline — press Refresh to see the latest content"
       role="status"
     >

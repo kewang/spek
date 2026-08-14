@@ -1,0 +1,264 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+/*
+ * The palette's contrast guard. Two halves, because "the values are right" and "the values will stay
+ * right" are different claims:
+ *
+ * 1. Ratios — parse both themes out of `global.css` and measure a declared table.
+ * 2. Mechanism — scan the source for the ways a colour can bypass the tokens entirely.
+ *
+ * Without the second half, today's values can be silently undone by the next `text-red-400`; without the
+ * first, a colour can go through a token and still be unreadable.
+ *
+ * The contrast maths lives here rather than in `utils/`: nothing in the app computes contrast at runtime,
+ * so a module no one imports would be dead code carrying a type-check bill.
+ */
+
+const CSS = readFileSync(fileURLToPath(new URL("./global.css", import.meta.url)), "utf8");
+const SRC = fileURLToPath(new URL("..", import.meta.url));
+
+// --- Parsing -----------------------------------------------------------------
+
+/**
+ * Colour declarations from one block only. Deliberately not a whole-file scan: `--color-fold-lead:
+ * 1.25rem` and `--color-fold-trail: 1rem` are *lengths* wearing the colour prefix, and `--spek-*:
+ * var(--color-*)` are indirections rather than values. Neither block contains a nested brace, so
+ * `\{([^}]*)\}` is enough — the same idiom `MarkdownRenderer.keyword.test.ts` already uses on this file.
+ */
+function tokensIn(selector: string): Map<string, string> {
+  const block = new RegExp(`${selector}\\s*\\{([^}]*)\\}`).exec(CSS)?.[1];
+  assert.ok(block, `expected a ${selector} block in global.css`);
+  const out = new Map<string, string>();
+  for (const m of block.matchAll(/--color-([\w-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+    out.set(m[1], m[2].toLowerCase());
+  }
+  return out;
+}
+
+const DARK = tokensIn("@theme");
+// Light overrides only part of the palette and inherits the rest — which is how the theme works, and
+// why a missing override is not an error anywhere else.
+const LIGHT = new Map([...DARK, ...tokensIn('\\[data-theme="light"\\]')]);
+const THEMES = { dark: DARK, light: LIGHT } as const;
+
+// --- Contrast ----------------------------------------------------------------
+
+const channels = (hex: string): [number, number, number] => [
+  parseInt(hex.slice(1, 3), 16),
+  parseInt(hex.slice(3, 5), 16),
+  parseInt(hex.slice(5, 7), 16),
+];
+
+function luminance(hex: string): number {
+  const [r, g, b] = channels(hex).map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Browsers composite alpha in sRGB, so this does too — not oklab. */
+function over(fg: string, alpha: number, bg: string): string {
+  const f = channels(fg);
+  const b = channels(bg);
+  const mix = f.map((v, i) => Math.round(alpha * v + (1 - alpha) * b[i]));
+  return `#${mix.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+// --- The declared table ------------------------------------------------------
+
+const SURFACES = ["bg-primary", "bg-secondary", "bg-tertiary"] as const;
+
+/**
+ * Every colour is measured against the *worst* surface of its theme. There is no map of which text lands
+ * on which surface, and a hand-written one is wrong the moment a component moves. Worst-case needs no
+ * maintenance and cannot be gamed.
+ *
+ * `tints` are the alphas at which this token is also used as the background behind its own text. Text on
+ * a tint of itself is strictly harder than the same text on the bare page — the tint moves the background
+ * toward the text — so that is the real floor.
+ */
+const TEXT_TOKENS: Record<string, number[]> = {
+  "text-primary": [],
+  "text-secondary": [],
+  "text-muted": [0.1], // SpecDetail's inactive status pill
+  accent: [0.1, 0.15, 0.2], // sidebar / fold controls / spec tabs, timeline, search mark (ui's badge is 20% too)
+  "accent-hover": [],
+  "code-text": [],
+  "status-error": [0.1], // spec diff removed rows
+  "status-success": [0.1], // spec diff added rows, timeline active status pill
+  "status-warning": [],
+};
+
+/** Graphics that carry their own information (WCAG 1.4.11's 3:1), each against what it is drawn on. */
+const NON_TEXT: Array<{ token: string; on: string; label: string }> = [
+  { token: "status-success", on: "bg-tertiary", label: "progress bar fill on its track" },
+  { token: "accent", on: "bg-tertiary", label: "in-progress bar fill on its track" },
+  { token: "fold-rule", on: "bg-primary", label: "fold extent mark" },
+  { token: "fold-rule", on: "bg-secondary", label: "fold extent mark" },
+];
+
+/**
+ * Colours not measured here need a reason — the last test in this section forces a new token to pick a
+ * side.
+ *
+ * The BDD marks sit on `bg-<family>-500/20` fills that live in Tailwind, not in `global.css`. Measuring
+ * them would mean pinning framework hexes into this file and drifting silently on the next upgrade. They
+ * are specified by `markdown-renderer`; measured worst case is 4.86:1 dark and 4.97:1 light.
+ */
+const NOT_MEASURED_HERE = new Set([
+  "kw-when", "kw-then", "kw-and", "kw-normative",
+  "badge-added", "badge-modified", "badge-removed", "badge-renamed",
+]);
+
+const TEXT_FLOOR = 4.5;
+const GRAPHIC_FLOOR = 3;
+
+// --- Ratios ------------------------------------------------------------------
+
+for (const [theme, tokens] of Object.entries(THEMES)) {
+  test(`${theme}: every text colour clears ${TEXT_FLOOR}:1 on every surface`, () => {
+    for (const [name, tints] of Object.entries(TEXT_TOKENS)) {
+      const fg = tokens.get(name);
+      assert.ok(fg, `${theme} is missing --color-${name}`);
+      for (const surface of SURFACES) {
+        const bg = tokens.get(surface)!;
+        const ratio = contrast(fg, bg);
+        assert.ok(
+          ratio >= TEXT_FLOOR,
+          `${theme} --color-${name} (${fg}) on --color-${surface} (${bg}) is ${ratio.toFixed(2)}:1`
+        );
+        for (const alpha of tints) {
+          const tinted = contrast(fg, over(fg, alpha, bg));
+          assert.ok(
+            tinted >= TEXT_FLOOR,
+            `${theme} --color-${name} (${fg}) on its own ${alpha * 100}% tint over ` +
+              `--color-${surface} is ${tinted.toFixed(2)}:1`
+          );
+        }
+      }
+    }
+  });
+
+  test(`${theme}: a graphic carrying its own information clears ${GRAPHIC_FLOOR}:1`, () => {
+    for (const { token, on, label } of NON_TEXT) {
+      const fg = tokens.get(token)!;
+      const bg = tokens.get(on)!;
+      const ratio = contrast(fg, bg);
+      assert.ok(
+        ratio >= GRAPHIC_FLOOR,
+        `${theme} ${label}: --color-${token} (${fg}) on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
+      );
+    }
+  });
+}
+
+test("every colour token is either measured or explicitly excluded", () => {
+  // The hand-written table's likeliest failure is not a wrong number but a new token nobody added to it:
+  // that does not fail, it just quietly stops being covered.
+  const accounted = new Set([
+    ...Object.keys(TEXT_TOKENS),
+    ...SURFACES,
+    ...NON_TEXT.map((n) => n.token),
+    ...NOT_MEASURED_HERE,
+    "border",
+  ]);
+  const unaccounted = [...DARK.keys()].filter((name) => !accounted.has(name));
+  assert.deepEqual(
+    unaccounted,
+    [],
+    `these --color-* tokens are neither measured nor excluded: ${unaccounted.join(", ")}`
+  );
+});
+
+// --- Mechanism ---------------------------------------------------------------
+
+function sources(): Array<{ path: string; text: string }> {
+  const out: Array<{ path: string; text: string }> = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
+        out.push({ path: full.slice(SRC.length), text: readFileSync(full, "utf8") });
+      }
+    }
+  };
+  walk(SRC);
+  return out;
+}
+
+const PALETTE_FAMILIES =
+  "red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone";
+
+test("no colour is applied to text by a hard-coded palette class", () => {
+  // This is the half that stops the defect class returning: the values can be correct today and undone by
+  // the next `text-red-400`, because that is one literal shared by both themes and no shade in any family
+  // is readable on both backgrounds.
+  //
+  // Matches `text-` only. The BDD pill fills (`bg-<family>-500/20`) are deliberately plain classes — an
+  // alpha composites over whichever page colour is active and needs no token of its own. The text colour
+  // is the half that must be per-theme.
+  const offenders: string[] = [];
+  const pattern = new RegExp(`\\b(?:[a-z-]+:)?text-(?:${PALETTE_FAMILIES})-(?:50|[1-9]00|950)\\b`, "g");
+  for (const { path, text } of sources()) {
+    for (const m of text.matchAll(pattern)) offenders.push(`${path}: ${m[0]}`);
+  }
+  assert.deepEqual(offenders, [], `use a --color-* token instead:\n${offenders.join("\n")}`);
+});
+
+test("no tint of a text token goes unmeasured", () => {
+  // The table above is hand-written, and this is its weak point: an alpha nobody declared is simply not
+  // measured. The pairing itself cannot be discovered — SpecDiffViewer builds its fill and its text class
+  // in separate variables, so no scanner sees them on one element — but the *existence* of an unmeasured
+  // alpha can be.
+  //
+  // Scoped to the text tokens: `bg-black/60` scrims and `bg-bg-tertiary/80` surface-on-surface alphas must
+  // never be in the table, and without the scope this rule would fail on day one.
+  const measured = new Set(
+    Object.entries(TEXT_TOKENS).flatMap(([name, tints]) => tints.map((a) => `${name}/${a * 100}`))
+  );
+  const names = Object.keys(TEXT_TOKENS).join("|");
+  const pattern = new RegExp(`\\bbg-(${names})/(\\d+)\\b`, "g");
+  const unmeasured: string[] = [];
+  for (const { path, text } of sources()) {
+    for (const m of text.matchAll(pattern)) {
+      if (!measured.has(`${m[1]}/${m[2]}`)) unmeasured.push(`${path}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(
+    unmeasured,
+    [],
+    `add the alpha to TEXT_TOKENS so it is measured:\n${unmeasured.join("\n")}`
+  );
+});
+
+test("contrast is not undone by opacity", () => {
+  // Opacity is the one mechanism that defeats the token rule outright: it applies after the colour is
+  // chosen, and to every descendant at once. The completed task row failed exactly this way — body text
+  // 3.24:1 dark and 2.77:1 light, its links lower still.
+  //
+  // WCAG 1.4.3 exempts inactive components only, so `disabled:` is the single way out. The rule is blunt
+  // on purpose: someone who genuinely needs opacity can argue with this test once, which beats an
+  // allowlist nobody maintains.
+  const offenders: string[] = [];
+  for (const { path, text } of sources()) {
+    for (const m of text.matchAll(/(?:^|[\s"'`{])((?:[a-z-]+:)?opacity-\d+)\b/g)) {
+      if (!m[1].startsWith("disabled:")) offenders.push(`${path}: ${m[1]}`);
+    }
+  }
+  assert.deepEqual(
+    offenders,
+    [],
+    `de-emphasise with a --color-* token instead:\n${offenders.join("\n")}`
+  );
+});
