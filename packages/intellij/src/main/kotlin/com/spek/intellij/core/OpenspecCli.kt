@@ -39,6 +39,21 @@ object OpenspecCli {
     }
 
     /**
+     * Reasons a second read could plausibly come out differently — the ones a running host repairs
+     * by itself: a binary not on `PATH` *yet*, or load easing before the next call.
+     *
+     * The other two are not. A non-zero exit with no body, or output that cannot be parsed, is the
+     * *installed CLI* answering — a version too old for a command it still marks experimental, a
+     * wrapper printing a banner — and a read a second later finds it identical. Retrying those on
+     * every read spawns a process to be told the same thing, on views that re-read whenever the
+     * watched tree changes.
+     *
+     * The mirror of `isTransient` in `openspec-cli.ts`, and stated once here for the same reason.
+     */
+    fun isTransient(reason: SchemaDegradedReason): Boolean =
+        reason == SchemaDegradedReason.CLI_UNAVAILABLE || reason == SchemaDegradedReason.CLI_TIMEOUT
+
+    /**
      * Run `openspec <args>` in [cwd] and return its exit code and stdout.
      *
      * Four safeguards, all load-bearing:
@@ -104,36 +119,63 @@ object OpenspecCli {
  * A TTL because caching a failure forever meant a reader who installed the CLI after first load
  * never got data without restarting the IDE; it must stay >= [OpenspecCli.TIMEOUT_SECONDS] so an
  * in-flight call is never judged stale. A size cap because these are application-level singletons
- * shared across every project window. (`cli-budget.ts` states the same bounds.)
+ * shared across every project window. (`cli-budget.ts` states the same bounds.) The TTL is the
+ * bound on a remembered *answer*; a failure worth retrying is not held for it at all — see
+ * [Outcome].
  *
  * `ConcurrentHashMap` because handlers arrive on Netty threads. CHM forbids null values, so entries
- * wrap the result — [V] may be nullable, since "computed, and unavailable" must cache too. CHM has
- * no insertion order, so the cap evicts an arbitrary entry rather than the oldest.
+ * wrap the result — [V] may be nullable, since "computed, and there is none" is an answer like any
+ * other. CHM has no insertion order, so the cap evicts an arbitrary entry rather than the oldest.
  *
  * The entry holds a [FutureTask] so a caller arriving mid-flight joins the run rather than starting
  * a second one — storing the value instead made two concurrent callers each run the whole CLI
  * enumeration for one answer. `putIfAbsent` + `run()`, **not** `computeIfAbsent`, which would hold
  * the bin lock across a subprocess.
+ *
+ * What is remembered is decided by [compute], which returns an [Outcome] saying so — see
+ * `openspec-cli.ts`'s `CliOutcome`, of which this is the mirror. The cache cannot judge it from the
+ * value, because by then the value has usually lost the distinction: a null schema order is both
+ * "the CLI answered and there is no order" and "the CLI could not be reached".
  */
 class TtlCache<K : Any, V>(
     private val ttlMs: Long = 30_000L,
     private val maxSize: Int = 256,
 ) {
-    private class Entry<V>(val at: Long, val task: FutureTask<V>)
+    /**
+     * A result, plus whether it is worth remembering.
+     *
+     * Covariant because it only ever hands [value] out: without that, `failed(null)` and
+     * `answered(order)` in one `when` infer as unrelated types and every call site has to spell the
+     * type parameter out.
+     */
+    class Outcome<out V> private constructor(val value: V, val remember: Boolean) {
+        companion object {
+            /** An answer: kept for the TTL, like any successful read. */
+            fun <V> answered(value: V): Outcome<V> = Outcome(value, true)
+
+            /** A failure the next read could find gone: returned to the caller, but not kept. */
+            fun <V> failed(value: V): Outcome<V> = Outcome(value, false)
+        }
+    }
+
+    private class Entry<V>(val at: Long, val task: FutureTask<Outcome<V>>)
 
     private val map = ConcurrentHashMap<K, Entry<V>>()
 
-    fun getOrCompute(key: K, compute: () -> V): V {
+    fun getOrCompute(key: K, compute: () -> Outcome<V>): V {
         while (true) {
             val existing = map[key]
             if (existing != null) {
-                if (System.currentTimeMillis() - existing.at <= ttlMs) return existing.task.awaitValue()
+                // A joiner holds the entry itself, so a failure removed from the map after it
+                // resolves is still delivered here — sharing the run does not depend on keeping it.
+                if (System.currentTimeMillis() - existing.at <= ttlMs) return existing.task.awaitValue().value
                 // Two-arg remove, so a fresher entry installed since the read is not discarded.
                 map.remove(key, existing)
             }
 
             val task = FutureTask(compute)
-            val raced = map.putIfAbsent(key, Entry(System.currentTimeMillis(), task))
+            val entry = Entry(System.currentTimeMillis(), task)
+            val raced = map.putIfAbsent(key, entry)
             // Someone else got there first; loop so their entry is freshness-checked like any hit.
             if (raced != null) continue
             if (map.size > maxSize) {
@@ -141,14 +183,25 @@ class TtlCache<K : Any, V>(
                 map.keys.firstOrNull { it != key }?.let { map.remove(it) }
             }
             task.run()
-            return task.awaitValue()
+            // The thread that installed the entry is the only one that runs it, so it is the one
+            // that drops it. `finally` rather than a check on the result: a compute that threw
+            // produces no outcome to inspect, and a remembered exception is the same bug in another
+            // shape — every caller in the window handed a failure whose cause may be gone.
+            var remember = false
+            try {
+                val outcome = task.awaitValue()
+                remember = outcome.remember
+                return outcome.value
+            } finally {
+                if (!remember) map.remove(key, entry)
+            }
         }
     }
 
     fun clear() = map.clear()
 
     /** Unwrapped, so a shared run reports the same exception an unshared one would. */
-    private fun FutureTask<V>.awaitValue(): V =
+    private fun FutureTask<Outcome<V>>.awaitValue(): Outcome<V> =
         try {
             get()
         } catch (e: ExecutionException) {

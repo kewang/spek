@@ -1,7 +1,9 @@
 package com.spek.intellij.core
 
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -199,10 +201,76 @@ class SchemaCatalogTest {
         val repo = tempRepo()
         writeProjectSchema(repo, "house-style")
         withRunner({ _, _ -> SchemaCatalog.CliResult.Failed(SchemaDegradedReason.CLI_UNAVAILABLE, null) }) {
-            val result = SchemaCatalog.readSchemaUncached(repo.absolutePath, "house-style")
+            val result = SchemaCatalog.readSchemaUncached(repo.absolutePath, "house-style").value
             assertTrue(result is SchemaReadResult.Failed)
-            assertEquals(SchemaDegradedReason.CLI_UNAVAILABLE, (result as SchemaReadResult.Failed).reason)
+            assertEquals(SchemaDegradedReason.CLI_UNAVAILABLE, result.reason)
         }
+    }
+
+    // --- what the cache keeps -------------------------------------------------
+    //
+    // An answer is remembered for the TTL; a failure the next read could find gone is not. Mirrors
+    // the four judgements asserted in `schemas.test.ts`.
+
+    @Test
+    fun `an unreachable CLI is not remembered, so the next request retries`() {
+        val repo = tempRepo()
+        val calls = AtomicInteger()
+        SchemaCatalog.clearCache()
+        withRunner({ _, _ ->
+            if (calls.incrementAndGet() == 1) {
+                SchemaCatalog.CliResult.Failed(SchemaDegradedReason.CLI_UNAVAILABLE, null)
+            } else {
+                SchemaCatalog.CliResult.Ok(Json.parseToJsonElement("[]"))
+            }
+        }) {
+            assertEquals(SchemaDegradedReason.CLI_UNAVAILABLE, SchemaCatalog.listSchemas(repo.absolutePath).degradedReason)
+            assertEquals(null, SchemaCatalog.listSchemas(repo.absolutePath).degradedReason)
+            assertEquals(2, calls.get())
+        }
+        SchemaCatalog.clearCache()
+    }
+
+    @Test
+    fun `a CLI that ran and answered unusably is remembered`() {
+        val repo = tempRepo()
+        val calls = AtomicInteger()
+        SchemaCatalog.clearCache()
+        withRunner({ _, _ ->
+            calls.incrementAndGet()
+            SchemaCatalog.CliResult.Failed(SchemaDegradedReason.CLI_FAILED, null)
+        }) {
+            repeat(2) {
+                assertEquals(SchemaDegradedReason.CLI_FAILED, SchemaCatalog.listSchemas(repo.absolutePath).degradedReason)
+            }
+            // Nothing the next read can do changes this, and the Schemas view re-reads on every
+            // watcher event — re-asking would spawn a process per refetch to be told the same thing.
+            assertEquals(1, calls.get())
+        }
+        SchemaCatalog.clearCache()
+    }
+
+    @Test
+    fun `a definition whose schema yaml cannot be read is re-read`() {
+        // Reported as not-found like the three other paths that produce it, and indistinguishable
+        // from them by the time the cache sees it — so the read itself says it is not worth keeping.
+        val repo = tempRepo()
+        val dir = File(repo, "openspec/schemas/house-style")
+        dir.mkdirs()
+        SchemaCatalog.clearCache()
+        withRunner({ _, _ ->
+            SchemaCatalog.CliResult.Ok(
+                Json.parseToJsonElement("""{"path": ${Json.encodeToString(String.serializer(), dir.absolutePath)}, "source": "project"}"""),
+            )
+        }) {
+            assertTrue(SchemaCatalog.readSchema(repo.absolutePath, "house-style") is SchemaReadResult.Failed)
+            File(dir, "schema.yaml").writeText("name: house-style\nartifacts:\n  - id: only\n")
+            assertTrue(
+                SchemaCatalog.readSchema(repo.absolutePath, "house-style") is SchemaReadResult.Ok,
+                "the failed read was remembered instead of being retried",
+            )
+        }
+        SchemaCatalog.clearCache()
     }
 
     private fun <T> withRunner(

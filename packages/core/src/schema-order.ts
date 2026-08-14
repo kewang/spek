@@ -1,4 +1,4 @@
-import { runOpenspec, ttlCached, type CacheEntry } from "./openspec-cli.js";
+import { answered, failed, runOpenspec, ttlCached, type CacheEntry } from "./openspec-cli.js";
 
 /** schema 中單一 artifact 的權威參照（由 openspec CLI 提供） */
 export interface SchemaArtifactRef {
@@ -95,7 +95,7 @@ export function resolveSchemaOrder(
 // schema 為 key，同一 repo 內共用該 schema 的所有 change 至多 spawn 一次 CLI（issue #15）。
 // 呼叫端只在 change 有 schema 時才進來（無 schema → 無權威順序，提前回 null），故 key 不需 slug fallback。
 //
-// The TTL / size-cap policy itself — and why caching a failure forever was a bug — now lives on
+// The TTL / size-cap policy itself — and which failures are worth remembering — now lives on
 // `ttlCached` in openspec-cli.ts, shared with schemas.ts. It was stated in both files before, and
 // the "remember failures forever" fix had to be made twice.
 const cache = new Map<string, CacheEntry<SchemaArtifactRef[] | null>>();
@@ -104,8 +104,9 @@ const cache = new Map<string, CacheEntry<SchemaArtifactRef[] | null>>();
  * 預設 SchemaOrderProvider：非阻塞地呼叫 openspec CLI 取得權威順序（回 Promise）。
  * openspec 未安裝 / 非 0 結束 / archived change / 逾時 / 解析失敗時一律 resolve 為 null。
  *
- * The CLI's failure taxonomy is deliberately discarded here: this caller has one fallback (the
- * frontend's narrative order) whatever went wrong, so every `!ok` collapses to null.
+ * The CLI's failure taxonomy is deliberately discarded in the *value*: this caller has one fallback
+ * (the frontend's narrative order) whatever went wrong, so every `!ok` collapses to null. It is not
+ * discarded in the *cache*, where an unsuccessful run is never remembered — see below.
  */
 export const cliSchemaOrderProvider: SchemaOrderProvider = (repoRoot, slug, schema) => {
   // schema 已知 → 以 schema 分桶；schema 為 null/空（spek 本地解析不出名稱）→ 共用 repo 級預設桶：
@@ -114,11 +115,14 @@ export const cliSchemaOrderProvider: SchemaOrderProvider = (repoRoot, slug, sche
   return ttlCached(cache, cacheKey, async () => {
     // slug 自成一個 argv 引數，結構上即無 shell injection 之虞，毋須對 slug 另做過濾。
     const cli = await runOpenspec(["status", "--change", slug, "--json"], repoRoot);
-    if (!cli.ok) return null;
-    try {
-      return parseOrderFromStatus(cli.json);
-    } catch {
-      return null;
-    }
+    // Every unsuccessful run is forgotten, including the ones `isTransient` calls settled — and for
+    // a reason of this bucket's own, not the environment's: the key names a **schema** while the
+    // argv names a **change**. A non-zero exit is typically the CLI refusing *this* slug, and that
+    // is not the bucket's answer to keep — remembering it denies the order to every other change
+    // sharing the schema for the rest of the window.
+    if (!cli.ok) return failed(null);
+    // A successful run that parses to null is the CLI reporting no order, which is an answer: the
+    // two nulls are indistinguishable downstream, so they are told apart here.
+    return answered(parseOrderFromStatus(cli.json));
   });
 };

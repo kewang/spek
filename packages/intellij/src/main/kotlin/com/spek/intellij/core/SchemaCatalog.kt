@@ -333,50 +333,90 @@ object SchemaCatalog {
         return PathResolution.Failed(null)
     }
 
-    /** Read one schema's full definition. */
-    fun readSchemaUncached(repoRoot: String, name: String): SchemaReadResult {
+    /**
+     * Read one schema's full definition, saying whether the result is worth remembering.
+     *
+     * The judgement is made here because this is the last place that holds it. Four different things
+     * leave as `Failed(null)` — a name we refuse to pass on, the CLI reporting no such schema, a
+     * resolution missing its fields, and a `schema.yaml` that could not be opened — and only the last
+     * is about the environment. By the time [readSchema] consults the cache they are one value.
+     *
+     * Mirrors `readSchemaUncached` in `schemas.ts`; what the caller is told is unchanged.
+     */
+    fun readSchemaUncached(repoRoot: String, name: String): TtlCache.Outcome<SchemaReadResult> {
         val resolved = when (val resolution = resolveSchemaPath(repoRoot, name)) {
-            is PathResolution.Failed -> return SchemaReadResult.Failed(resolution.reason)
+            is PathResolution.Failed -> {
+                // A null reason is the CLI's answer about this repo; a degraded reason is about the
+                // CLI, and only its transient half is worth re-asking.
+                val failure = SchemaReadResult.Failed(resolution.reason)
+                val reason = resolution.reason
+                return if (reason == null || !OpenspecCli.isTransient(reason)) {
+                    TtlCache.Outcome.answered(failure)
+                } else {
+                    TtlCache.Outcome.failed(failure)
+                }
+            }
             is PathResolution.Ok -> resolution.path
         }
 
         val text = try {
             File(resolved.dir, "schema.yaml").readText()
         } catch (_: Exception) {
-            return SchemaReadResult.Failed(null)
+            // A permission error, or a file being rewritten as it was read. Reported as not-found
+            // like the rest, but the next read may well find it — so it is not remembered.
+            return TtlCache.Outcome.failed(SchemaReadResult.Failed(null))
         }
-        val parsed = parseSchemaYaml(text) ?: return SchemaReadResult.Failed(null)
+        // A file OpenSpec would refuse to run: read successfully, and it says the same next time.
+        val parsed = parseSchemaYaml(text)
+            ?: return TtlCache.Outcome.answered(SchemaReadResult.Failed(null))
 
-        return SchemaReadResult.Ok(
-            SchemaDefinition(
-                // The requested name is authoritative over schema.yaml's own `name`: it is what
-                // resolved, and what every link back to this schema uses.
-                name = name,
-                version = parsed.version,
-                description = parsed.description,
-                source = resolved.source,
-                path = resolved.dir,
-                displayPath = shortenSchemaPath(resolved.dir, repoRoot),
-                isDefault = readDefaultSchema(repoRoot) == name,
-                shadows = resolved.shadows,
-                artifacts = parsed.artifacts,
-                apply = parsed.apply,
+        return TtlCache.Outcome.answered(
+            SchemaReadResult.Ok(
+                SchemaDefinition(
+                    // The requested name is authoritative over schema.yaml's own `name`: it is what
+                    // resolved, and what every link back to this schema uses.
+                    name = name,
+                    version = parsed.version,
+                    description = parsed.description,
+                    source = resolved.source,
+                    path = resolved.dir,
+                    displayPath = shortenSchemaPath(resolved.dir, repoRoot),
+                    isDefault = readDefaultSchema(repoRoot) == name,
+                    shadows = resolved.shadows,
+                    artifacts = parsed.artifacts,
+                    apply = parsed.apply,
+                ),
             ),
         )
     }
 
     // --- caching -------------------------------------------------------------
 
-    // Policy (TTL, size cap, why a failure must not be remembered forever) lives on TtlCache, shared
-    // with SchemaOrder. Only the two stores are local.
+    // Policy (TTL, size cap, which failures are worth remembering) lives on TtlCache, shared with
+    // SchemaOrder. Only the two stores are local.
     private val catalogCache = TtlCache<String, SchemaCatalogResult>()
     private val definitionCache = TtlCache<String, SchemaReadResult>()
 
-    /** The schemas available to a repo. Cached per repo. */
+    /**
+     * The schemas available to a repo. Cached per repo.
+     *
+     * A catalog degraded because the CLI could not be reached is not remembered — the next request
+     * is how a host whose environment has since been fixed recovers. One degraded because the CLI
+     * *ran* and answered unusably is kept: it will say the same thing next time, and this view
+     * re-reads on every watcher event.
+     */
     fun listSchemas(repoRoot: String): SchemaCatalogResult =
-        catalogCache.getOrCompute(repoRoot) { listSchemasUncached(repoRoot) }
+        catalogCache.getOrCompute(repoRoot) {
+            val catalog = listSchemasUncached(repoRoot)
+            val reason = catalog.degradedReason
+            if (reason != null && OpenspecCli.isTransient(reason)) {
+                TtlCache.Outcome.failed(catalog)
+            } else {
+                TtlCache.Outcome.answered(catalog)
+            }
+        }
 
-    /** One schema's full definition. Cached per (repo, name). */
+    /** One schema's full definition. Cached per (repo, name); the read classifies its own result. */
     fun readSchema(repoRoot: String, name: String): SchemaReadResult =
         definitionCache.getOrCompute("$repoRoot::$name") { readSchemaUncached(repoRoot, name) }
 

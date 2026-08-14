@@ -210,7 +210,9 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   companion. (See `CONTRIBUTING.md` and `CLAUDE.md`.)
 - **Artifacts are discovered, not enumerated.** Scanning never calls the OpenSpec CLI; the authoritative
   schema order is resolved lazily (and cached per `repoRoot::schema`) only when a single change is
-  opened.
+  opened. What is cached is an *answer*: a lookup that failed because the CLI could not be reached is
+  retried on the next read rather than being served for the rest of the cache window, so an environment
+  repaired while the app runs recovers immediately.
 - **Refresh is best-effort and honest.** A cache-invalidation (resync) failure must never block a
   refetch; the busy indicator lasts until refetched data actually arrives; live-status only surfaces
   when the update channel is genuinely `offline` (no always-on "everything's fine" light).

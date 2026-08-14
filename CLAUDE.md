@@ -227,6 +227,28 @@ exits 1, so discarding stdout there reports a working CLI as broken. The Kotlin 
 (`OpenspecCli.kt`, `SchemaCatalog.kt`, `SpekCaches.kt`) — but **not** `schema-flow.ts`, which has no Kotlin caller: no
 Kotlin host draws the diagram, since the IntelliJ tool window loads the same React SPA.
 
+**The cache remembers answers, not every failure** — `compute` returns `{value, remember}` (`answered` / `failed`), and
+a failure is dropped once it resolves, so the next read retries. It is required, with no default: every call site that
+existed when this landed had got it wrong, and one unreachable CLI meant 30s of stale "unavailable" even after `PATH`
+was fixed (issue #46, reported by an Electron consumer that resolves the user's shell `PATH` at startup). Three things
+about it:
+- **The cache cannot judge the value, because the value has already lost the distinction.** A null schema order is both
+  "the CLI answered and there is no order" and "the CLI could not be reached"; a definition read reports "no such
+  schema" for a name the CLI refused *and* for a `schema.yaml` it could not open. So `readSchemaUncached` classifies
+  inside itself — it is the last place holding the two apart — while `listSchemas` reads the reason off the catalog.
+- **Not every failure is worth retrying**, and `isTransient` is the one rule: `cli-unavailable` / `cli-timeout` yes,
+  `cli-failed` / `cli-unparsable` no. The second pair is the *installed CLI* answering, identical a second later, and it
+  is also the expensive pair (~0.65–1.3s against ~5ms for a missing binary) on views that refetch per watcher event.
+  Forgetting those turned a 30s wrong answer into a permanent ~1s tax per read. A reason added later must be placed on
+  one side of it.
+- **`schema-order` is the exception, and not for the environment's sake**: it forgets *every* unsuccessful run, because
+  the key names a schema while the argv names a change — a refusal of one slug is not the bucket's to keep, and
+  remembering it denied the order to every other change sharing the schema. For the same reason the Kotlin unsafe-slug
+  allowlist (a Windows argument-injection boundary with no TS counterpart) sits **outside** `getOrCompute`: it spawns
+  nothing, so there is no run to share, and inside the cache a concurrent read of a legitimate change would join it.
+An entry is still installed while in flight — not remembering a failure must not become not deduping one — and a
+rejection is dropped too (Kotlin does this in a `finally`, since a compute that throws leaves no outcome to inspect).
+
 **Artifact sort**: the rule is `sortArtifacts(artifacts, mode, schemaOrder?)` in **core**, beside `DEFAULT_ORDER` /
 `defaultRank` on the `@spekjs/core/artifact-order` subpath — `modified` (the order given, i.e. mtime; default) /
 `schema` (`schemaOrder`, falling back to the narrative order when it is absent, which is what archived changes always
