@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.14.0
+
+**Highlight: the light theme is readable.** The webview follows VS Code's theme, so this is what a reader gets rather than a mode they chose, and nearly every colour in the light one failed WCAG AA. An error message measured 2.76:1; the spec diff's added lines 1.70:1, sitting directly beside removed lines that were merely bad. The dark theme was audited on the same terms and carried two failures of its own.
+
+- **Error, success and warning colours are now defined per theme.** Each was one shade applied to both, and none of them reaches even 3:1 on a light background — the spec diff's added and removed lines, every page's error message and the jj conflict badge all failed there
+- **Secondary text is readable in both themes.** Timestamps, counts and empty states measured 2.34:1 light and 3.54:1 dark
+- **Links, the active sidebar item and search highlighting** take a deeper amber in the light theme; the previous one was 3.04:1 as text and 3.50:1 behind a search hit's tint
+- **A completed task no longer fades its own links and code spans.** The row carried 60% opacity, which composites everything beneath it — its body text measured 3.24:1 dark and 2.77:1 light. Completion is marked by colour now, with the strikethrough and checkmark unchanged
+- **The task progress bar's complete state is distinguishable from its track** — 2.02:1 before, in the light theme
+- **The graph and the timeline follow the theme.** Node fills, legend swatches and the archived timeline bars were hard-coded colours no theme could reach; the graph's spec nodes measured 1.85:1 on a light page and its archived nodes 2.93:1 in the dark one. Edges are now drawn in a colour that can be seen, labels carry a halo where they overlap a node, and the "today" marker is at full strength
+- **A CLI failure is no longer remembered for the full cache window.** An unreachable `openspec` binary meant 30 seconds of "unavailable" even after `PATH` was fixed — which is how this was reported, from a host that resolves the user's shell `PATH` at startup ([#46](https://github.com/spekhq/spek/issues/46))
+
 ## 1.13.1
 
 **Highlight: the rule beside an open section now starts and ends where its content does.** 1.13.0 gave each requirement its own rule and a gap between them, but the rule was drawn down the section's *box* — and a box holds two spaces its content does not (issue #42).

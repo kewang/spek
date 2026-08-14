@@ -25,14 +25,16 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.13.1</b></p>
-        <p><b>The rule beside an open section now starts and ends where its content does.</b> 1.13.0 gave each requirement its own rule and a gap between them, but the rule was drawn down the section's <i>box</i> &mdash; and a box holds two spaces its content does not. Reported from this tool window (issue #42), where a narrow width makes the spacing count most.</p>
+        <p><b>1.14.0</b></p>
+        <p><b>The light theme is readable.</b> The tool window follows the IDE's theme, so this is what a reader gets rather than a mode they chose, and nearly every colour in the light one failed WCAG AA. An error message measured 2.76:1; the spec diff's added lines 1.70:1, sitting directly beside removed lines that were merely bad. The dark theme was audited on the same terms and carried two failures of its own.</p>
         <ul>
-            <li><b>The rule starts at its heading, not 20px above it.</b> That space is also what separates a section from the one before it, so of the 28px between two requirements, 20px was drawn as rule &mdash; 1.13.0's gap was real but invisible, and a page of requirements still read as one interrupted line with a notch in it.</li>
-            <li><b>And it ends at the last of its content</b>, instead of running past it. The trailing space below a section's last paragraph sits inside the box too, so the rule overshot the thing it was marking by a further 20px &mdash; plainest under the last scenario of a requirement.</li>
-            <li><b>An open requirement's heading no longer sits 1px right of a closed one's.</b> The rule used to be a border, which inset everything inside an open section; drawn as its own element it does not. Headings and disclosure arrows now line up down the page regardless of open state.</li>
-            <li><b>The rule stays visible in high contrast themes</b>, where the previous drawing method would have been discarded.</li>
-            <li>A scenario written with no requirement above it now takes a top-level section's spacing, 4px lower than before: how much room a section leaves above its heading follows its nesting, not its heading level.</li>
+            <li><b>Error, success and warning colours are now defined per theme.</b> Each was one shade applied to both, and none of them reaches even 3:1 on a light background &mdash; the spec diff's added and removed lines, every page's error message and the jj conflict badge all failed there.</li>
+            <li><b>Secondary text is readable in both themes.</b> Timestamps, counts and empty states measured 2.34:1 light and 3.54:1 dark.</li>
+            <li><b>Links, the active sidebar item and search highlighting</b> take a deeper amber in the light theme; the previous one was 3.04:1 as text and 3.50:1 behind a search hit's tint.</li>
+            <li><b>A completed task no longer fades its own links and code spans.</b> The row carried 60% opacity, which composites everything beneath it &mdash; its body text measured 3.24:1 dark and 2.77:1 light. Completion is marked by colour now, with the strikethrough and checkmark unchanged.</li>
+            <li><b>The task progress bar's complete state is distinguishable from its track</b> &mdash; 2.02:1 before, in the light theme.</li>
+            <li><b>The graph and the timeline follow the theme.</b> Node fills, legend swatches and the archived timeline bars were hard-coded colours no theme could reach; the graph's spec nodes measured 1.85:1 on a light page and its archived nodes 2.93:1 in the dark one. Edges are now drawn in a colour that can be seen, labels carry a halo where they overlap a node, and the "today" marker is at full strength.</li>
+            <li><b>A CLI failure is no longer remembered for the full cache window.</b> An unreachable <code>openspec</code> binary left the schema pages reporting "unavailable" for 30 seconds after the cause was fixed (issue #46).</li>
         </ul>
     ]]></change-notes>
 
