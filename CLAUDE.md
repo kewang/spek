@@ -388,21 +388,39 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   rather than by wrapping the body in the transform: `foldSections.ts` is a pure function whose tests
   assert its output shape, and styling is not worth churning the one piece of folding that can silently
   lose content. **Which selectors carry `[open]` is the whole design, in both directions:**
-  - **`[open]`-scoped** — the inset and the `> summary` negative margin that cancels it. Unscoped, that
-    margin shifts *closed* sections one step left of open ones, which the default mode (requirements
-    open, scenarios closed) shows on first render. The two values must stay equal, or headings drift;
-    there is a test for exactly that.
+  - **`[open]`-scoped** — the inset, the `> summary` negative margin that cancels it, and the rule
+    itself. Unscoped, that margin shifts *closed* sections one step left of open ones, which the default
+    mode (requirements open, scenarios closed) shows on first render. The two values must stay equal, or
+    headings drift; there is a test for exactly that.
   - **Deliberately unscoped** — the `margin-bottom` separating sibling sections, the `display: flow-root`
-    that keeps interior margins interior, and the `> summary` padding that stops the disclosure marker
-    being drawn against the rule. Anything here keyed to `[open]` moves the page as a reader toggles a
-    section, which is the defect these rules exist to prevent.
+    that keeps interior margins interior, the `padding-top` holding the space above a heading, and the
+    `> summary` padding that stops the disclosure marker being drawn against the rule. Anything here
+    keyed to `[open]` moves the page as a reader toggles a section, which is the defect these rules
+    exist to prevent.
 
-  Only the **outermost** open section draws a rule (`[open] [open]` resets `border-left-color` to
-  transparent, keeping the 1px so nesting stays aligned): two rules of equal weight in parallel read as
-  one ornament repeated. The condition is *a fold inside a fold*, never `data-spek-fold="4"` — fold
-  levels come from the caller. `flow-root` is load-bearing and non-obvious: without it the body's last
-  margin collapses **out** of the section, so the gap between sections became whichever was larger and
-  opening a scenario pushed everything below it down by another 8px.
+  **The rule is a `::before`, and neither of its ends is the section's box** — the box holds two spaces
+  the content does not. A `border-left` (what shipped through v1.13.0) starts at the box top, i.e. above
+  the heading, and that space is also what separates this section from the one before it: of the 28px
+  between two requirements, 20px was drawn, so the gap added in v1.13.0 was invisible and the page read
+  as one interrupted line (issue #42). The same at the bottom, where `flow-root` seals the last
+  paragraph's `mb-4` inside the box and the rule ran 20px past the last thing it enclosed. So `top` and
+  `bottom` clear `--color-fold-lead` / `--color-fold-trail`; `top` is the same property the section's
+  `padding-top` reads, which is what makes the rule's start and the space it clears one value rather
+  than two that can drift. **Both restate a value the renderer owns** (`h3`'s `mt-5`, `h4`'s `mt-4`,
+  `p`'s `mb-4`) — CSS cannot read a descendant's margin, so tests pin the pair; change a heading's
+  spacing utility without them and folded specs silently stop matching unfolded content.
+  It is painted with `border-left` on a zero-width box, **not a background**: forced-colors mode drops
+  backgrounds and forces borders to `CanvasText`, and the mark is a normative requirement.
+  Removing the border also removed the 1px it added inside every open section — open and closed headings
+  now sit on the same left edge, which the spec required and v1.13.0 quietly violated.
+
+  Only the **outermost** open section draws a rule (`[open] [open]::before` is `content: none`): two
+  rules of equal weight in parallel read as one ornament repeated. The condition is *a fold inside a
+  fold*, never `data-spek-fold="4"` — fold levels come from the caller, which is also why the *leading
+  space* follows nesting rather than heading level: a scenario with no requirement before it is
+  top-level and is spaced as one. `flow-root` is load-bearing and non-obvious: without it the body's
+  last margin collapses **out** of the section, so the gap between sections became whichever was larger
+  and opening a scenario pushed everything below it down by another 8px.
   The rule uses `--color-fold-rule`, **not `--color-border`**: the panel border measures 1.4:1 dark and
   1.2:1 light, and marking a section's extent is a stated requirement, not decoration. One mid-gray
   clears 3:1 against both backgrounds, so it is deliberately one value — re-measure if either

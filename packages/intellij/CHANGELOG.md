@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.13.1
+
+**Highlight: the rule beside an open section now starts and ends where its content does.** 1.13.0 gave each requirement its own rule and a gap between them, but the rule was drawn down the section's *box* — and a box holds two spaces its content does not. Reported from this tool window (issue #42), where a narrow width makes the spacing count most.
+
+- **The rule starts at its heading, not 20px above it.** That space is also what separates a section from the one before it, so of the 28px between two requirements, 20px was drawn as rule — 1.13.0's gap was real but invisible, and a page of requirements still read as one interrupted line with a notch in it
+- **And it ends at the last of its content**, instead of running past it. The trailing space below a section's last paragraph sits inside the box too, so the rule overshot the thing it was marking by a further 20px — plainest under the last scenario of a requirement
+- **An open requirement's heading no longer sits 1px right of a closed one's.** The rule used to be a border, which inset everything inside an open section; drawn as its own element it does not. Headings and disclosure arrows now line up down the page regardless of open state
+- **The rule stays visible in high contrast themes**, where the previous drawing method would have been discarded
+- A scenario written with no requirement above it now takes a top-level section's spacing, 4px lower than before: how much room a section leaves above its heading follows its nesting, not its heading level
+
 ## 1.13.0
 
 **Highlight: a requirement is now called what it is named.** Every requirement heading in a spec opened with the word `Requirement:` and every scenario with `Scenario:` — the same twelve characters at the front of every heading in the document, taken from exactly where a reader scans for what distinguishes one from the next. Suggested from this tool window (issue #42), which is where the cost is plainest: at a few hundred pixels of width, the boilerplate stays and the distinguishing part is what truncates.

@@ -25,13 +25,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.13.0</b></p>
-        <p><b>A requirement is now called what it is named.</b> Every requirement heading in a spec opened with the word <code>Requirement:</code> and every scenario with <code>Scenario:</code> &mdash; the same twelve characters at the front of every heading in the document, taken from exactly where a reader scans for what distinguishes one from the next. Suggested from this tool window (issue #42), which is where the cost is plainest: at a few hundred pixels of width, the boilerplate stays and the distinguishing part is what truncates.</p>
+        <p><b>1.13.1</b></p>
+        <p><b>The rule beside an open section now starts and ends where its content does.</b> 1.13.0 gave each requirement its own rule and a gap between them, but the rule was drawn down the section's <i>box</i> &mdash; and a box holds two spaces its content does not. Reported from this tool window (issue #42), where a narrow width makes the spacing count most.</p>
         <ul>
-            <li><b>Requirement and scenario headings drop their format keyword</b>, in the rendered spec and in its table of contents. This became removable only in 1.12.0: before the <code>ADDED Requirements</code> label was restored to visibility, the keyword was the only thing naming what these sections were. Presentation only &mdash; your files, every heading id and every deep link are untouched.</li>
-            <li><b>The rule beside an open section now marks that section.</b> Consecutive requirements drew rules that met, forming a single unbroken line down the whole page: a bracket around everything says the same as no bracket at all. Each requirement now carries its own, ending where the requirement ends. A nested open scenario no longer draws a second rule of equal weight beside its parent's.</li>
-            <li><b>Expanding a scenario no longer nudges the rest of the page.</b> The gap between sections depended on what the last visible element inside one happened to be, so opening a scenario pushed every requirement below it down by a further 8px.</li>
-            <li><b>A little more room around the fold</b> &mdash; the body sits further from the rule, and the disclosure arrow is no longer drawn against it.</li>
+            <li><b>The rule starts at its heading, not 20px above it.</b> That space is also what separates a section from the one before it, so of the 28px between two requirements, 20px was drawn as rule &mdash; 1.13.0's gap was real but invisible, and a page of requirements still read as one interrupted line with a notch in it.</li>
+            <li><b>And it ends at the last of its content</b>, instead of running past it. The trailing space below a section's last paragraph sits inside the box too, so the rule overshot the thing it was marking by a further 20px &mdash; plainest under the last scenario of a requirement.</li>
+            <li><b>An open requirement's heading no longer sits 1px right of a closed one's.</b> The rule used to be a border, which inset everything inside an open section; drawn as its own element it does not. Headings and disclosure arrows now line up down the page regardless of open state.</li>
+            <li><b>The rule stays visible in high contrast themes</b>, where the previous drawing method would have been discarded.</li>
+            <li>A scenario written with no requirement above it now takes a top-level section's spacing, 4px lower than before: how much room a section leaves above its heading follows its nesting, not its heading level.</li>
         </ul>
     ]]></change-notes>
 

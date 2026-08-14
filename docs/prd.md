@@ -165,7 +165,10 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
   sentences rather than as a wall of text; Expand all / Collapse all, remembered across specs and
   sessions. Applies to spec detail and a change's Specs tab, not to its other artifacts. An open
   section is inset with a hairline rule marking its extent, so nesting is carried by position and not
-  by type size alone.
+  by type size alone. The rule runs from its heading to the last of its content — not the full height
+  of the section's box, which also holds the space separating it from the section above and the
+  trailing space below its last paragraph, so a rule drawn to the box overstates its section at both
+  ends and closes up the gap between siblings.
 - **Spec typography** — in spec content a level-2 heading is a structural separator, not a content
   heading, so it renders as a subordinate label; the delta spec's topic is the dominant header of its
   section, which matters most in a change's Specs tab where several specs stack in one view.
