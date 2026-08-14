@@ -93,8 +93,16 @@ export function SpecGraph({
     const height = container.clientHeight;
 
     // 主題色在繪製當下解出來（d3 寫的是屬性，不是 var()）。
-    const edgeColor = resolveColor(CSS_VARS.border);
+    // 連線走 text-muted 而不是 border：border 是面板髮絲線，全強度也只有 1.22:1（深）／1.13:1（淺），
+    // 沒有任何透明度能讓它畫出看得見的邊 —— 而一條連線就是它要表達的那個關係本身。0.85 是兩個主題都
+    // 清得過 3:1 的最輕一階（4.37 / 3.81；0.75 在淺色只有 3.24）。
+    const edgeColor = resolveColor(CSS_VARS.textMuted);
+    const EDGE_OPACITY = 0.85;
     const edgeHighlight = resolveColor(CSS_VARS.textPrimary);
+    const specColor = resolveColor(CSS_VARS.accent);
+    const activeColor = resolveColor(CSS_VARS.nodeActive);
+    const archivedColor = resolveColor(CSS_VARS.textMuted);
+    const NODE_FILL_OPACITY = 0.85;
     const labelColor = resolveColor(CSS_VARS.textSecondary);
 
     // 清除舊內容
@@ -135,7 +143,7 @@ export function SpecGraph({
       .join("line")
       .attr("stroke", edgeColor)
       .attr("stroke-width", 1.5)
-      .attr("stroke-opacity", 0.6);
+      .attr("stroke-opacity", EDGE_OPACITY);
 
     // Node groups
     const nodeSel = g
@@ -151,9 +159,11 @@ export function SpecGraph({
       .filter((d) => d.type === "spec")
       .append("circle")
       .attr("r", (d) => nodeRadius(d))
-      .attr("fill", "#f59e0b")
-      .attr("fill-opacity", 0.85)
-      .attr("stroke", "#fbbf24")
+      .attr("fill", specColor)
+      .attr("fill-opacity", NODE_FILL_OPACITY)
+      // 描邊取填色本身：比填色亮一階是深色主題的假設，淺底下框線得往暗走，而套件無從得知往哪邊。
+      // 量出來框對填只有 1.31–1.39:1，所以它撐的是節點外緣壓在頁面上的那半邊，不是框與填的對比。
+      .attr("stroke", specColor)
       .attr("stroke-width", 2);
 
     // Change 節點：圓角矩形
@@ -165,9 +175,9 @@ export function SpecGraph({
       .attr("x", (d) => -nodeRadius(d))
       .attr("y", (d) => -nodeRadius(d) * 0.7)
       .attr("rx", 6)
-      .attr("fill", (d) => (d.status === "active" ? "#22c55e" : "#64748b"))
-      .attr("fill-opacity", 0.85)
-      .attr("stroke", (d) => (d.status === "active" ? "#4ade80" : "#94a3b8"))
+      .attr("fill", (d) => (d.status === "active" ? activeColor : archivedColor))
+      .attr("fill-opacity", NODE_FILL_OPACITY)
+      .attr("stroke", (d) => (d.status === "active" ? activeColor : archivedColor))
       .attr("stroke-width", 2);
 
     // 標籤
@@ -178,6 +188,16 @@ export function SpecGraph({
       .attr("dy", (d) => nodeRadius(d) + 16)
       .attr("fill", labelColor)
       .attr("font-size", 12)
+      // A halo of the page colour, drawn behind the glyphs (`paint-order`), so a label keeps its own
+      // background when the layout drifts another node under it. A label sits below *its* node and never on
+      // it, but nodes collide: measured against a node fill a label is 1.06–1.84:1 in either theme, and
+      // this change made the light case worse by giving the fills the saturation they were missing
+      // (a spec node went 3.91:1 → 1.48:1). With the halo the label is read against `bg-primary` — 7.64:1
+      // dark, 7.24:1 light — whatever it happens to overlap.
+      .attr("paint-order", "stroke")
+      .attr("stroke", resolveColor(CSS_VARS.bgPrimary))
+      .attr("stroke-width", 3)
+      .attr("stroke-linejoin", "round")
       .attr("pointer-events", "none");
 
     // 聚合圖：非主 worktree 的 change 節點以 <title> 標示來源 worktree / branch
@@ -201,7 +221,7 @@ export function SpecGraph({
       })
       .on("mouseleave", () => {
         nodeSel.attr("opacity", 1);
-        linkSel.attr("stroke-opacity", 0.6).attr("stroke", edgeColor);
+        linkSel.attr("stroke-opacity", EDGE_OPACITY).attr("stroke", edgeColor);
       });
 
     // Click（區分 drag vs click）。**元件不導航** —— 它只回報使用者選了什麼。

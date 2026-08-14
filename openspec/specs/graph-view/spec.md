@@ -45,6 +45,16 @@ The system SHALL render an interactive force-directed graph using D3 force simul
 ### Requirement: Node visual encoding
 The system SHALL render spec nodes as circles and change nodes as rounded rectangles. Spec node radius SHALL scale with `historyCount` (minimum 20px, maximum 45px). Change node size SHALL scale with `specCount` (number of specs modified). Spec nodes SHALL use the accent color (amber). Change nodes SHALL use green for active status and blue-gray for archived status.
 
+Each of those colours SHALL come from the package's colour contract rather than from a literal, so that a
+host's theme reaches them: the spec node from the accent property, the archived change node from the muted
+text property, and the active change node from a property of its own, since no existing one expresses it.
+A node's colour states its kind and its status with no text beside it, so it SHALL meet at least 3:1
+against the least favourable of the host's surfaces in every theme the host offers.
+
+Where a node is drawn with both a fill and a stroke, the stroke SHALL be the same contract colour as the
+fill rather than a separate value. A rim one step lighter than its fill is a dark-theme assumption — on a
+light background the rim has to darken instead — and the package cannot know which way to move.
+
 #### Scenario: Spec node sizing
 - **WHEN** a spec has `historyCount` of 5 (highest in the dataset)
 - **THEN** its circle radius is at or near the maximum (45px)
@@ -58,6 +68,11 @@ The system SHALL render spec nodes as circles and change nodes as rounded rectan
 - **THEN** its rectangle uses a green color scheme
 - **WHEN** a change has `status: "archived"`
 - **THEN** its rectangle uses a blue-gray color scheme
+
+#### Scenario: Node colours follow the host's theme
+- **WHEN** a host renders the graph with a light theme
+- **THEN** every node's fill and stroke resolve from the contract to that theme's values
+- **AND** each meets at least 3:1 against the least favourable of the host's surfaces
 
 ### Requirement: Node labels
 The system SHALL display text labels next to each node. Spec labels SHALL show the topic name. Change labels SHALL show the description (derived from slug). Labels longer than 25 characters SHALL be truncated with ellipsis.
@@ -73,9 +88,18 @@ The system SHALL display text labels next to each node. Spec labels SHALL show t
 ### Requirement: Edge rendering
 The system SHALL render edges as lines connecting change nodes to the spec nodes they modified. Edges SHALL use a muted color by default. When a node is hovered, its connected edges SHALL be highlighted.
 
+An edge is the only thing stating that a change touched a spec, so it SHALL meet at least 3:1 against the
+least favourable of the host's surfaces in every theme. It SHALL NOT be drawn in the contract's border
+colour: that value is a panel hairline — 1.22:1 dark and 1.13:1 light **at full strength** — so no opacity
+of it can satisfy the floor.
+
 #### Scenario: Edge display
 - **WHEN** change "phase3-markdown-and-search" modified specs "markdown-renderer" and "search-ui"
 - **THEN** two edges are drawn from the change node to each respective spec node
+
+#### Scenario: Edges are visible in every theme
+- **WHEN** the graph is rendered in either theme
+- **THEN** each edge meets at least 3:1 against the least favourable of the host's surfaces
 
 ### Requirement: Drag interaction
 The system SHALL support dragging nodes to reposition them. During drag, the dragged node's position SHALL be fixed. After releasing, the node SHALL remain at its dragged position until the simulation is restarted.
@@ -89,6 +113,19 @@ The system SHALL support dragging nodes to reposition them. During drag, the dra
 ### Requirement: Hover highlight interaction
 The system SHALL highlight a node and its connected neighbors when the user hovers over it. All non-connected nodes and edges SHALL reduce opacity to 0.1. The hovered node, its neighbors, and their connecting edges SHALL remain at full opacity.
 
+This dimming is a **stated exemption** from the contrast floor, not a satisfaction of it. It is permitted
+because it is a pointer-driven emphasis state that reverts when the pointer leaves, and nothing is
+available only while it is active — every dimmed node is fully legible in the graph's resting state. The
+exemption is limited to that shape: a de-emphasis that the reader causes, that ends when they stop causing
+it, and that hides nothing.
+
+The exemption is claimed against a measurement, and the measurement is stated exactly. A node label in the
+light theme holds 2.82:1 at 0.6 opacity and 4.41:1 at 0.8, and clears the 4.5:1 floor from **α ≈ 0.81**
+(dark, α ≈ 0.73). So a conforming dimming does exist — at a strength no reader would perceive as dimming.
+The choice was therefore this exemption, dimming the graphics while leaving every label at full strength,
+or hiding the non-connected labels outright; it is a judgement about what de-emphasis means, not a claim
+that no value passes.
+
 #### Scenario: Hover on spec node
 - **WHEN** user hovers over spec node "markdown-renderer"
 - **THEN** the "markdown-renderer" node, all change nodes connected to it, and their edges are highlighted at full opacity
@@ -97,6 +134,11 @@ The system SHALL highlight a node and its connected neighbors when the user hove
 #### Scenario: Hover off
 - **WHEN** user moves the cursor away from all nodes
 - **THEN** all nodes and edges return to full opacity
+
+#### Scenario: The dimmed state ends on its own
+- **WHEN** the pointer leaves the graph without any further action
+- **THEN** every dimmed node and edge returns to full strength
+- **AND** no information was reachable only while they were dimmed
 
 ### Requirement: Click navigation
 The system SHALL navigate to the detail page when a node is clicked (without dragging). Clicking a spec node SHALL navigate to `/specs/:topic`. Clicking a change node SHALL navigate to `/changes/:slug`; when the graph is showing aggregated worktree data, the navigation SHALL include the change's source worktree as a `wt` query parameter (`/changes/:slug?wt=<key>`).
@@ -135,9 +177,16 @@ The system SHALL support zooming (scroll wheel or pinch) and panning (click-and-
 ### Requirement: Graph legend
 The system SHALL display a legend overlay in a corner of the graph container, showing the meaning of node shapes and colors: amber circle = Spec, green rectangle = Active Change, blue-gray rectangle = Archived Change.
 
+Each swatch SHALL take the same contract colour as the node kind it explains. A legend drawn from its own
+literals states the key in colours the graph may not be using.
+
 #### Scenario: Legend display
 - **WHEN** the graph is rendered
 - **THEN** a legend is visible showing node type indicators with labels
+
+#### Scenario: Swatch matches the node it explains
+- **WHEN** the graph is rendered in either theme
+- **THEN** each legend swatch is the same colour as the nodes of that kind
 
 ### Requirement: Aggregated change nodes from worktrees
 When the graph is built from aggregated worktree data, change nodes SHALL include one node per active change slug (deduplicated using the **same divergence-based election as the aggregated active changes list**: a non-main worktree wins a slug only when it has diverged from main's `HEAD` for that change, otherwise the slug stays on main; most-recently-modified-mtime breaks ties among diverging worktrees) plus the slug-deduplicated archived changes. Change node ids SHALL be namespaced by the winning worktree (`change:<worktreeKey>:<slug>`). Spec nodes SHALL come only from the main worktree.

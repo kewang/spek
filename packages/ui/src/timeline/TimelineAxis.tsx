@@ -71,11 +71,15 @@ export function TimelineAxis({
         y1={axisHeight - 8}
         y2={chartHeight}
         stroke={ACCENT}
-        strokeOpacity={0.5}
         strokeWidth={1.5}
         strokeDasharray="4 3"
       />
-      <text x={todayX + 4} y={axisHeight - 22} fontSize={10} fill={ACCENT} fillOpacity={0.8}>
+      {/* No opacity on either mark: the line states where now is and the label names it, and both were
+          under their floors on that mechanism alone — 2.35:1 and 4.39:1 in the light theme. The accent
+          clears both at full strength, and the dash pattern is what separates the line from a bar.
+          The grid lines above are deliberately left alone: they are border-coloured decoration, and the
+          dates they help read are stated by the axis labels. */}
+      <text x={todayX + 4} y={axisHeight - 22} fontSize={10} fill={ACCENT}>
         today
       </text>
     </g>

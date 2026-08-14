@@ -57,9 +57,10 @@ change to those still needs manual verification — a temporary `workflow_dispat
   only runtime dep is `cross-spawn`. In-repo consumers resolve it locally via `"*"` workspaces, so development is
   independent of core's release cadence.
 - **`@spekjs/ui`** — reusable visual components (`SpecGraph`, `ChangeTimeline`). Published to npm. **Purely
-  presentational**: data in via props, selection out via callbacks; no router / adapter / CSS framework. Colors are 8
-  `--spek-*` CSS variables (its own names, never the host's tokens). The web `/graph` and `/timeline` pages are thin
-  shells (fetch / loading / navigation / theme).
+  presentational**: data in via props, selection out via callbacks; no router / adapter / CSS framework. Colors are 9
+  `--spek-*` CSS variables (its own names, never the host's tokens) and **nothing else** — see the colour-contract
+  entry under Key Design Decisions. The web `/graph` and `/timeline` pages are thin shells (fetch / loading /
+  navigation / theme).
 - React 19 + Vite + TS + Tailwind v4; Express (REST); VS Code Webview + esbuild; IntelliJ Kotlin + JCEF + built-in
   server; react-markdown + remark-gfm (BDD highlighting); search = server-side full-text + Fuse.js; React Router v7
   (Web BrowserRouter / webview MemoryRouter).
@@ -464,12 +465,35 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded) and the BDD
   marks, whose fills are Tailwind palette values that would have to be pinned here and would drift on
   upgrade.
-- **`@spekjs/ui` is knowingly unfixed** for the above, and it is on screen: `SpecGraph` paints nodes from hex
-  literals (1.85:1 / 1.96:1 against the light page), the legend swatches are the same literals, and
-  `TimelineBar`'s archived fill is `--spek-text-muted` at 0.45 (1.91:1 light, 2.17:1 dark **after** the token
-  fix). It inherits what the 8 `--spek-*` contract variables give it and no more. `graph-view` also still
-  mandates `opacity 0.1` on labelled nodes, which contradicts the clause above — resolving that is part of
-  the same follow-up, not a separate cleanup
+- **`@spekjs/ui` carries the same obligation, stated in terms it can actually check.** The package has no
+  theme — a host maps its tokens onto the contract — so "per-theme token" is not a rule it can hold. Its rule
+  is that **the contract is the only source of colour**: no literal outside the `:root` defaults and
+  `FALLBACKS`, with exactly two exemptions, both written into `ui-package` (`transparent`, which renders
+  nothing and is how a tint of a contract colour is expressed; and a shadow's black, which is the absence of
+  light rather than a chosen colour). Eleven literals had grown beside the contract and most were **copies of
+  a contract value** — the archived graph node held `--spek-text-muted`'s former dark default and stayed at
+  2.93:1 after the host re-authored that token, which is the whole argument in one number.
+  Three consequences worth knowing:
+  - **Adding a contract member is the one change existing hosts do not inherit.** A host overrides the names
+    it knows, so a new one silently takes the package's dark default. That is why only `--spek-node-active`
+    was added (the graph's active-change green is the one colour the others cannot express) and why the two
+    node strokes take their fill's colour instead of becoming members ten and eleven. It is named for the
+    *mark*, not the state: the timeline draws the same "active" fact from `--spek-accent`.
+  - **The guard is split, because neither side can do it alone.** The package cannot measure ratios (it has
+    no values) and the host cannot see the alphas (they are `fill-opacity` / `stroke-opacity` attributes d3
+    writes at draw time). So `packages/ui` asserts *no literal outside the contract* plus *its own defaults
+    are legible* (the un-themed host, the only case it has values for), and `contrast.test.ts` parses the
+    `--spek-*` → `--color-*` mapping and measures what the package draws, at alphas declared in its table.
+  - **`--spek-border` cannot draw anything that carries meaning** — 1.22:1 dark / 1.13:1 light at *full*
+    strength, so no opacity of it helps. Graph edges use `--spek-text-muted` at 0.85; the timeline's grid
+    lines and topic separators keep it and are stated as decoration in `timeline-view`, since a bar's dates
+    come from the axis labels.
+  `theme-toggle`'s opacity clause now carries a second exemption for a **reader-caused transient emphasis
+  state** (the graph's hover dimming, at 0.1). A conforming dimming does exist — a label clears 4.5:1 down to
+  α ≈ 0.81 — but nobody would perceive it as dimming; the exemption is a judgement, and it is recorded with
+  that measurement so it can be argued with. Node labels carry a `--spek-bg-primary` halo (`paint-order:
+  stroke`) because a force layout drifts nodes under them: against a fill a label is 1.06–1.84:1, and giving
+  the fills their missing saturation made the light case worse before the halo fixed both themes at once
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
   — the `- ` marker's CommonMark content offset), and the Tasks tab renders that text as Markdown. The

@@ -45,6 +45,25 @@ const DARK = tokensIn("@theme");
 const LIGHT = new Map([...DARK, ...tokensIn('\\[data-theme="light"\\]')]);
 const THEMES = { dark: DARK, light: LIGHT } as const;
 
+/**
+ * `@spekjs/ui`'s colour contract, resolved through this app's tokens.
+ *
+ * The package holds no values of its own beyond a set of dark defaults — a host maps its tokens onto the
+ * nine `--spek-*` names, so what a reader actually sees on `/graph` and `/timeline` is measurable *here*
+ * and nowhere else. The package cannot do it (no values) and cannot be asked to (its own test would have to
+ * know this app), so the split is: the package guards that nothing is drawn outside the contract, and this
+ * file measures what the contract resolves to.
+ */
+function spekMapping(): Map<string, string> {
+  const block = /:root\s*\{([^}]*)\}/.exec(CSS)?.[1];
+  assert.ok(block, "expected the :root block mapping --spek-* onto this app's tokens");
+  const out = new Map<string, string>();
+  for (const m of block.matchAll(/--spek-([\w-]+):\s*var\(--color-([\w-]+)\)\s*;/g)) {
+    out.set(m[1], m[2]);
+  }
+  return out;
+}
+
 // --- Contrast ----------------------------------------------------------------
 
 const channels = (hex: string): [number, number, number] => [
@@ -161,6 +180,65 @@ for (const [theme, tokens] of Object.entries(THEMES)) {
     }
   });
 }
+
+/**
+ * What `@spekjs/ui` draws, and at what strength. The alphas live in SVG attributes the package writes at
+ * draw time (`fill-opacity`, `stroke-opacity`), so no CSS parse can find them — they are declared here, in
+ * the one place that has the values to multiply them against.
+ *
+ * The maths is a **fill over a background**, not text on a tint: the mark itself is composited, and the
+ * question is whether what lands is distinguishable from the page. `TEXT_TOKENS`'s `tints` asks the
+ * opposite question and cannot express this.
+ */
+const SPEK_MARKS: Array<{ spekVar: string; alpha: number; floor: number; label: string }> = [
+  { spekVar: "accent", alpha: 0.85, floor: GRAPHIC_FLOOR, label: "graph spec node" },
+  { spekVar: "node-active", alpha: 0.85, floor: GRAPHIC_FLOOR, label: "graph active change node" },
+  { spekVar: "text-muted", alpha: 0.85, floor: GRAPHIC_FLOOR, label: "graph archived node and edges" },
+  { spekVar: "accent", alpha: 1, floor: GRAPHIC_FLOOR, label: "timeline active bar and today marker" },
+  { spekVar: "text-muted", alpha: 1, floor: GRAPHIC_FLOOR, label: "timeline archived bar" },
+  { spekVar: "accent", alpha: 1, floor: TEXT_FLOOR, label: "timeline today label" },
+];
+
+for (const [theme, tokens] of Object.entries(THEMES)) {
+  test(`${theme}: what @spekjs/ui draws clears its floor`, () => {
+    const mapping = spekMapping();
+    for (const { spekVar, alpha, floor, label } of SPEK_MARKS) {
+      const tokenName = mapping.get(spekVar);
+      assert.ok(tokenName, `--spek-${spekVar} is not mapped in :root — the package would use its own default`);
+      const fg = tokens.get(tokenName);
+      assert.ok(fg, `--spek-${spekVar} maps to --color-${tokenName}, which this theme does not define`);
+      for (const surface of SURFACES) {
+        const bg = tokens.get(surface)!;
+        const drawn = alpha === 1 ? fg : over(fg, alpha, bg);
+        const ratio = contrast(drawn, bg);
+        assert.ok(
+          ratio >= floor,
+          `${theme} ${label}: --spek-${spekVar} → --color-${tokenName} (${fg}) at ${alpha} over ` +
+            `--color-${surface} is ${ratio.toFixed(2)}:1, below ${floor}:1`
+        );
+      }
+    }
+  });
+}
+
+test("every contract member is mapped and measured", () => {
+  // An unmapped member silently falls back to the package's dark default — the failure mode that adding a
+  // member to the contract creates, and the one nothing in the package can detect.
+  const mapping = spekMapping();
+  const measured = new Set(SPEK_MARKS.map((m) => m.spekVar));
+  // Surfaces and text colours the package uses for its own panels are measured as `--color-*` already.
+  const carriedByTheAppsOwnTable = new Set([
+    "bg-primary", "bg-secondary", "bg-tertiary", "border", "text-primary", "text-secondary",
+  ]);
+  const unaccounted = [...mapping.keys()].filter(
+    (name) => !measured.has(name) && !carriedByTheAppsOwnTable.has(name)
+  );
+  assert.deepEqual(
+    unaccounted,
+    [],
+    `these --spek-* members are mapped but nothing measures what they draw: ${unaccounted.join(", ")}`
+  );
+});
 
 test("every colour token is either measured or explicitly excluded", () => {
   // The hand-written table's likeliest failure is not a wrong number but a new token nobody added to it:
