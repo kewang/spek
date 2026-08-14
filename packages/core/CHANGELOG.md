@@ -3,6 +3,19 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.9.1
+
+- **A cached CLI failure no longer outlives its cause.** `ttlCached` — behind `schemaOrder`, the schema
+  catalog and the schema definition read — remembered every outcome for the full 30-second window,
+  including "the `openspec` binary could not be reached". A consumer that fixes `PATH` (or resolves the
+  user's shell environment after startup, which is how this surfaced from an Electron host) got 30 more
+  seconds of "unavailable" from a CLI that was by then working.
+  Failures are now classified: an unreachable or timed-out CLI is retried on the next read, while a CLI
+  that answered unusably is still cached, because that answer is identical a second later and is the
+  expensive one to re-ask. No exported type changed and no export was added — if you worked around the
+  old behaviour by shortening a poll interval or restarting, you can stop
+  ([#46](https://github.com/spekhq/spek/issues/46)).
+
 ## 1.9.0
 
 - **New: `specHeadingLabel(text)`**, exported from the package root and from the browser-safe
