@@ -127,6 +127,36 @@ const NON_TEXT: Array<{ token: string; on: string; label: string }> = [
 ];
 
 /**
+ * A surface token rendered as **text** on a solid fill of another token.
+ *
+ * Its role in the palette does not exempt it: a label on the primary call to action is text on a
+ * background like any other, and a token being a surface elsewhere says nothing about this pairing.
+ * `SURFACES` counting as "accounted for" in the completeness test below is what left this measured by
+ * nothing — and it is exactly the pairing that moves when either colour is re-authored.
+ */
+const TEXT_ON_FILL: Array<{ token: string; on: string; label: string }> = [
+  { token: "bg-primary", on: "accent", label: "primary button label (SelectRepo, empty states)" },
+  { token: "bg-primary", on: "accent-hover", label: "primary button label, hovered" },
+];
+
+/**
+ * Border alphas that owe nothing, each with why.
+ *
+ * `theme-toggle` states the rule and it is unchanged — decoration owes nothing, an indicator owes 3:1 —
+ * so what these entries record is the judgement that each *is* decoration. Every one frames a badge or a
+ * panel whose own text states what it states; none is the sole carrier of anything. Measured worst case
+ * over the three surfaces: `status-warning/40` is 1.77:1 light / 2.63:1 dark, `accent/40` 1.92:1 light /
+ * 2.30:1 dark. Raising either would make a hairline compete with the text it frames.
+ *
+ * The next border alpha that *is* the sole carrier of its information has to be measured instead of
+ * landing here — which it now cannot avoid, because the scan below surfaces it either way.
+ */
+const DECORATIVE_BORDERS: Record<string, string> = {
+  "status-warning/40": "jj conflict badge — its text names the conflict",
+  "accent/40": "default-schema badge, timeline heading, schema-flow legend — each labelled in text",
+};
+
+/**
  * Colours not measured here need a reason — the last test in this section forces a new token to pick a
  * side.
  *
@@ -175,6 +205,18 @@ for (const [theme, tokens] of Object.entries(THEMES)) {
       const ratio = contrast(fg, bg);
       assert.ok(
         ratio >= GRAPHIC_FLOOR,
+        `${theme} ${label}: --color-${token} (${fg}) on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
+      );
+    }
+  });
+
+  test(`${theme}: a surface token used as text on a solid fill clears ${TEXT_FLOOR}:1`, () => {
+    for (const { token, on, label } of TEXT_ON_FILL) {
+      const fg = tokens.get(token)!;
+      const bg = tokens.get(on)!;
+      const ratio = contrast(fg, bg);
+      assert.ok(
+        ratio >= TEXT_FLOOR,
         `${theme} ${label}: --color-${token} (${fg}) on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
       );
     }
@@ -247,6 +289,7 @@ test("every colour token is either measured or explicitly excluded", () => {
     ...Object.keys(TEXT_TOKENS),
     ...SURFACES,
     ...NON_TEXT.map((n) => n.token),
+    ...TEXT_ON_FILL.flatMap((t) => [t.token, t.on]),
     ...NOT_MEASURED_HERE,
     "border",
   ]);
@@ -294,6 +337,24 @@ test("no colour is applied to text by a hard-coded palette class", () => {
   assert.deepEqual(offenders, [], `use a --color-* token instead:\n${offenders.join("\n")}`);
 });
 
+/**
+ * The mechanisms this file enumerates, and the ones it does not.
+ *
+ * Stated because an enumeration that is not stated reads as a complete one. A palette is reported as
+ * conforming on the strength of the cases someone thought to look at, and the two gaps found so far were
+ * both of that shape — a border alpha nobody scanned, and a token exempted from measurement by its role
+ * rather than by its use.
+ *
+ * **Enumerated**: a hard-coded palette class on text (`text-<family>-<shade>`), a token tint used as a
+ * background (`bg-<token>/<alpha>`), a token tint used as a border (`border-<token>/<alpha>`), and
+ * `opacity-*` on anything.
+ *
+ * **Not enumerated**, and each would need its own scan: inline `style={{ color }}`, SVG presentation
+ * attributes (the checkmark disc's `opacity="0.2"` — measured by hand, passing), `ring-*` / `outline-*` /
+ * gradient utilities, and literal alphas of non-token colours (`bg-black/60` scrims). A mechanism the app
+ * begins to use belongs here or in a scan, not in neither.
+ */
+
 test("no tint of a text token goes unmeasured", () => {
   // The table above is hand-written, and this is its weak point: an alpha nobody declared is simply not
   // measured. The pairing itself cannot be discovered — SpecDiffViewer builds its fill and its text class
@@ -317,6 +378,30 @@ test("no tint of a text token goes unmeasured", () => {
     unmeasured,
     [],
     `add the alpha to TEXT_TOKENS so it is measured:\n${unmeasured.join("\n")}`
+  );
+});
+
+test("no alpha of a token reaches the screen through a border unaccounted for", () => {
+  // The third mechanism, and the one the scan above cannot see: it builds its pattern from `bg-`, so a
+  // `border-<token>/<alpha>` passed either way — measured or not — without ever being surfaced. Five
+  // occurrences existed when this was added, all decorative and now declared as such.
+  //
+  // Declared, not measured: `theme-toggle` holds that a border framing a badge whose text names the state
+  // is not the indicator. What this rule forces is the *choice* — a border alpha is either in
+  // DECORATIVE_BORDERS with a reason, or somebody has to measure it.
+  const names = Object.keys(TEXT_TOKENS).join("|");
+  const pattern = new RegExp(`\\bborder-(${names})/(\\d+)\\b`, "g");
+  const unaccounted: string[] = [];
+  for (const { path, text } of sources()) {
+    for (const m of text.matchAll(pattern)) {
+      // Keyed by the utility as written (`accent/40`), so a declaration reads as the class it exempts.
+      if (!(`${m[1]}/${m[2]}` in DECORATIVE_BORDERS)) unaccounted.push(`${path}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(
+    unaccounted,
+    [],
+    `measure it, or declare it in DECORATIVE_BORDERS with why it owes nothing:\n${unaccounted.join("\n")}`
   );
 });
 
