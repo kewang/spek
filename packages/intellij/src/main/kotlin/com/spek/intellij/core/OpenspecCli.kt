@@ -158,9 +158,27 @@ class TtlCache<K : Any, V>(
         }
     }
 
+    /** A held value, boxed so an absent entry stays distinguishable from an entry holding null. */
+    class Held<out V>(val value: V)
+
     private class Entry<V>(val at: Long, val task: FutureTask<Outcome<V>>)
 
     private val map = ConcurrentHashMap<K, Entry<V>>()
+
+    /**
+     * What [key] currently holds, or null — **without installing anything**.
+     *
+     * [getOrCompute] cannot answer this: asking it is asking it to compute. A caller with something
+     * cheaper than a CLI call to do when there is no current entry has to find that out without
+     * creating one — see [SchemaOrder], which replays a settled failure only when the bucket has no
+     * answer to serve. Joins an in-flight run like any hit; an expired entry reads as absent and is
+     * left for [getOrCompute] to replace, so a peek cannot race out a run installed since.
+     */
+    fun peek(key: K): Held<V>? {
+        val existing = map[key] ?: return null
+        if (System.currentTimeMillis() - existing.at > ttlMs) return null
+        return Held(existing.task.awaitValue().value)
+    }
 
     fun getOrCompute(key: K, compute: () -> Outcome<V>): V {
         while (true) {
@@ -207,4 +225,39 @@ class TtlCache<K : Any, V>(
         } catch (e: ExecutionException) {
             throw e.cause ?: e
         }
+}
+
+/**
+ * A TTL- and size-capped set of keys: the record that something happened, carrying no value.
+ *
+ * Beside [TtlCache] rather than in a module of its own, and taking the same bounds, because the one
+ * thing it must never do is age differently from the cache it complements — [SchemaOrder] keeps a
+ * cache of answers and a set of settled changes, and a mark outliving an answer is a mark denying a
+ * consultation the cache would already have re-run.
+ *
+ * `ConcurrentHashMap` for the reason [TtlCache] uses one: handlers arrive on Netty threads. CHM has
+ * no insertion order, so the cap evicts an arbitrary key rather than the oldest — a bound, not a
+ * policy.
+ */
+class TtlMarks<K : Any>(
+    private val ttlMs: Long = 30_000L,
+    private val maxSize: Int = 256,
+) {
+    private val map = ConcurrentHashMap<K, Long>()
+
+    fun isMarked(key: K): Boolean {
+        val at = map[key] ?: return false
+        if (System.currentTimeMillis() - at > ttlMs) {
+            map.remove(key, at)
+            return false
+        }
+        return true
+    }
+
+    fun mark(key: K) {
+        if (map.size >= maxSize) map.keys.firstOrNull { it != key }?.let { map.remove(it) }
+        map[key] = System.currentTimeMillis()
+    }
+
+    fun clear() = map.clear()
 }

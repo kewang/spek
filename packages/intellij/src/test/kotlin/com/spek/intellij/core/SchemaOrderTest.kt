@@ -8,11 +8,11 @@ import kotlin.test.assertTrue
 
 class SchemaOrderTest {
 
-    // --- parseOrderFromStatus ---
+    // --- readOrderFromStatus ---
 
     @Test
     fun parseExtractsOrderedRefs() {
-        val refs = SchemaOrder.parseOrderFromStatus(
+        val refs = SchemaOrder.readOrderFromStatus(
             """
             {
               "actionContext": { "planningArtifacts": ["brainstorm", "proposal", "specs"] },
@@ -25,10 +25,12 @@ class SchemaOrderTest {
             """.trimIndent(),
         )
         assertEquals(
-            listOf(
-                SchemaArtifactRef("brainstorm", "brainstorm.md"),
-                SchemaArtifactRef("proposal", "proposal.md"),
-                SchemaArtifactRef("specs", "specs/**/*.md"),
+            SchemaOrder.OrderResponse.Readable(
+                listOf(
+                    SchemaArtifactRef("brainstorm", "brainstorm.md"),
+                    SchemaArtifactRef("proposal", "proposal.md"),
+                    SchemaArtifactRef("specs", "specs/**/*.md"),
+                ),
             ),
             refs,
         )
@@ -36,7 +38,7 @@ class SchemaOrderTest {
 
     @Test
     fun parseSkipsIdsWithoutOutputPath() {
-        val refs = SchemaOrder.parseOrderFromStatus(
+        val refs = SchemaOrder.readOrderFromStatus(
             """
             {
               "actionContext": { "planningArtifacts": ["proposal", "ghost"] },
@@ -44,15 +46,35 @@ class SchemaOrderTest {
             }
             """.trimIndent(),
         )
-        assertEquals(listOf(SchemaArtifactRef("proposal", "proposal.md")), refs)
+        assertEquals(
+            SchemaOrder.OrderResponse.Readable(listOf(SchemaArtifactRef("proposal", "proposal.md"))),
+            refs,
+        )
     }
 
     @Test
-    fun parseReturnsNullForMalformed() {
-        assertNull(SchemaOrder.parseOrderFromStatus("not json"))
-        assertNull(SchemaOrder.parseOrderFromStatus("{}"))
-        assertNull(
-            SchemaOrder.parseOrderFromStatus(
+    fun readClassifiesUnparsableOutputAsUnreadable() {
+        // The whole point of the split: output that will not parse is the installed CLI answering
+        // unusably, not "this schema has no order". Read as an answer, it was held for the full
+        // window for every change sharing the schema.
+        assertEquals(SchemaOrder.OrderResponse.Unreadable, SchemaOrder.readOrderFromStatus("not json"))
+    }
+
+    @Test
+    fun readClassifiesParsableOutputWithNoOrderAsAnAnswer() {
+        // Readable means it parsed, not that it was shaped as expected. The boundary is
+        // `parseToJsonElement` alone, matching TypeScript's `JSON.parse` — so a root that is not an
+        // object is an answer on both sides, not a failure on one of them.
+        for (body in listOf("{}", "null", "42", "\"str\"", "[1,2]")) {
+            assertEquals(
+                SchemaOrder.OrderResponse.Readable(null),
+                SchemaOrder.readOrderFromStatus(body),
+                "expected a readable response with no order for: $body",
+            )
+        }
+        assertEquals(
+            SchemaOrder.OrderResponse.Readable(null),
+            SchemaOrder.readOrderFromStatus(
                 """{ "actionContext": { "planningArtifacts": [] }, "artifactPaths": {} }""",
             ),
         )
@@ -60,9 +82,10 @@ class SchemaOrderTest {
 
     @Test
     fun parseSkipsNonStringElementsInsteadOfAborting() {
-        // 一個非字串（物件 / 數字）的 planningArtifacts 元素、以及一個非字串 outputPath，都應被「略過」，
-        // 而非讓整份解析回 null —— 保留其餘有效 refs（對齊 TS 版逐一 skip、單一壞元素不致命的行為）。
-        val refs = SchemaOrder.parseOrderFromStatus(
+        // A non-string planningArtifacts element (an object, a number) and a non-string outputPath
+        // are each **skipped**, rather than voiding the whole read — the remaining valid refs survive,
+        // matching the TS side's element-by-element skip.
+        val refs = SchemaOrder.readOrderFromStatus(
             """
             {
               "actionContext": { "planningArtifacts": ["proposal", { "nested": true }, 42, "specs"] },
@@ -73,7 +96,10 @@ class SchemaOrderTest {
             }
             """.trimIndent(),
         )
-        assertEquals(listOf(SchemaArtifactRef("proposal", "proposal.md")), refs)
+        assertEquals(
+            SchemaOrder.OrderResponse.Readable(listOf(SchemaArtifactRef("proposal", "proposal.md"))),
+            refs,
+        )
     }
 
     // --- resolveSchemaOrder ---
@@ -239,6 +265,101 @@ class SchemaOrderTest {
             // The refusal left nothing behind: a legitimate change in the same bucket still asks.
             assertTrue(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven") != null)
             assertEquals(1, calls.get())
+        }
+    }
+
+    // --- a settled change is remembered against itself ---
+
+    @Test
+    fun `a settled refusal is not consulted again on the next read`() {
+        // An installation that cannot answer at all — one too old for `status --change --json` —
+        // exits non-zero for every slug. Dropping that outcome entirely cost a full process start on
+        // every change-detail read and on every watcher-driven refetch, forever.
+        val calls = AtomicInteger()
+        withRunner({ _, _ ->
+            calls.incrementAndGet()
+            OpenspecCli.Outcome.Completed(1, "")
+        }) {
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertEquals(1, calls.get(), "a settled change consulted the CLI again")
+        }
+    }
+
+    @Test
+    fun `an unreadable body settles the change rather than answering for the schema`() {
+        // Exit 0 with output that will not parse. Read as an answer — which is what this side did —
+        // the null was held for the whole window for every change sharing the schema.
+        val calls = AtomicInteger()
+        withRunner({ _, _ ->
+            calls.incrementAndGet()
+            OpenspecCli.Outcome.Completed(0, "not json")
+        }) {
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            // Not the schema's answer: a sibling still gets its own consultation.
+            assertNull(SchemaOrder.cli.order("/repo", "add-bar", "spec-driven"))
+            assertEquals(2, calls.get(), "an unreadable body was cached as the schema's answer")
+        }
+    }
+
+    @Test
+    fun `a settled change is still served its schema's cached answer`() {
+        // The order is a property of the schema, so once a sibling has fetched it, it is this
+        // change's too — the mark replaces a consultation, never an answer. Read the other way
+        // round: this is the regression the mark must not introduce.
+        val calls = mutableListOf<String>()
+        withRunner({ args, _ ->
+            val slug = args[args.indexOf("--change") + 1]
+            calls.add(slug)
+            if (slug == "odd-one") {
+                OpenspecCli.Outcome.Completed(1, "")
+            } else {
+                OpenspecCli.Outcome.Completed(0, statusJson("proposal"))
+            }
+        }) {
+            assertNull(SchemaOrder.cli.order("/repo", "odd-one", "spec-driven"))
+            SchemaOrder.cli.order("/repo", "add-foo", "spec-driven")
+            assertEquals(
+                listOf("proposal"),
+                SchemaOrder.cli.order("/repo", "odd-one", "spec-driven")?.map { it.id },
+            )
+            assertEquals(listOf("odd-one", "add-foo"), calls)
+        }
+    }
+
+    @Test
+    fun `a transient failure marks nothing`() {
+        // `isTransient` is the one rule and it decides this too: an absent binary and a timeout are
+        // what a running host repairs by itself, so neither is held anywhere.
+        val calls = AtomicInteger()
+        withRunner({ _, _ ->
+            calls.incrementAndGet()
+            OpenspecCli.Outcome.TimedOut
+        }) {
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertEquals(2, calls.get())
+        }
+    }
+
+    @Test
+    fun `clearing the cache clears settled changes with it`() {
+        // `SpekCaches` drives clearCache from the resync route and the file watcher alike. A mark
+        // surviving it would make a manual Refresh invalidate less than the automatic one beside it,
+        // for the one change it names.
+        val calls = AtomicInteger()
+        withRunner({ _, _ ->
+            calls.incrementAndGet()
+            OpenspecCli.Outcome.Completed(1, "")
+        }) {
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertEquals(1, calls.get())
+
+            SchemaOrder.clearCache()
+            assertNull(SchemaOrder.cli.order("/repo", "add-foo", "spec-driven"))
+            assertEquals(2, calls.get(), "a settled change survived clearCache")
         }
     }
 }
