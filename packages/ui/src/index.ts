@@ -9,7 +9,7 @@
  *
  * 1. `import '@spekjs/ui/styles.css'`
  * 2. 餵資料（`GraphData` / `Lane[]`），接回呼（`onSelectChange` / `onSelectSpec`）
- * 3.（可選）在自己的 `:root` 覆寫 8 個顏色變數換膚
+ * 3.（可選）在自己的 `:root` 覆寫全部 9 個顏色變數換膚（漏掉的那個會留在套件的深色預設值）
  */
 
 export { SpecGraph, type SpecGraphProps } from "./SpecGraph.js";

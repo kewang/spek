@@ -124,39 +124,57 @@ function over(fg: string, alpha: number, bg: string): string {
 const SURFACES = ["bg-primary", "bg-secondary", "bg-tertiary"] as const;
 
 /**
- * What each default carries, and therefore which floor it answers to. `alpha` is the opacity the component
- * draws it at — a node fill is 0.85, an edge 0.85, everything else full strength.
+ * What each default carries, and therefore which floor it answers to — **once per strength it is drawn
+ * at**, not once per member.
+ *
+ * A member is not used one way. `text-muted` sets tooltip body text at full strength *and* strokes every
+ * graph edge at 0.85 *and* fills an archived node at 0.85; `accent` fills a spec node at 0.85 *and* sets
+ * the timeline's *today* label, which is text and answers to 4.5:1. Declaring one nominal strength per
+ * member means the guard passes on the use it happens to name and says nothing about the others — and
+ * both of the wrong entries here were wrong in the *stricter* direction, so nothing failed and nothing
+ * would have, until a default was re-authored toward the surface.
+ *
+ * `packages/web/src/styles/contrast.test.ts`'s `SPEK_MARKS` is the same shape, and is where the alphas
+ * the host draws these at are declared: the two halves of one obligation, split because the package has
+ * no values to measure a themed host with and the host cannot see the alphas d3 writes at draw time.
  */
-const CARRIES: Record<string, { floor: number; alpha: number } | null> = {
-  "text-primary": { floor: 4.5, alpha: 1 },
-  "text-secondary": { floor: 4.5, alpha: 1 },
-  "text-muted": { floor: 4.5, alpha: 1 }, // tooltip body, timeline empty state, section labels, axis ticks
-  accent: { floor: 3, alpha: 0.85 }, // spec node; also the timeline's active bar at full strength
-  "node-active": { floor: 3, alpha: 0.85 },
-  "bg-primary": null,
-  "bg-secondary": null,
-  "bg-tertiary": null,
+const CARRIES: Record<string, Array<{ floor: number; alpha: number; use: string }>> = {
+  "text-primary": [{ floor: 4.5, alpha: 1, use: "tooltip slug, highlighted graph edges" }],
+  "text-secondary": [{ floor: 4.5, alpha: 1, use: "graph node labels, timeline row labels" }],
+  "text-muted": [
+    { floor: 4.5, alpha: 1, use: "tooltip body, timeline empty state, section labels, axis ticks" },
+    { floor: 3, alpha: 0.85, use: "graph edges (stroke-opacity), archived change node fill" },
+  ],
+  accent: [
+    { floor: 3, alpha: 0.85, use: "spec node fill" },
+    { floor: 4.5, alpha: 1, use: "the timeline's *today* label — 10px text, so the text floor" },
+  ],
+  "node-active": [{ floor: 3, alpha: 0.85, use: "active change node fill" }],
+  "bg-primary": [],
+  "bg-secondary": [],
+  "bg-tertiary": [],
   // A panel hairline, and deliberately not held to 3:1 — see `timeline-view`: the marks it draws
   // (grid lines, separators) are decoration, and the dates they help read are stated by the axis labels.
-  border: null,
+  border: [],
 };
 
-test("every default is legible on the package's own surfaces", () => {
+test("every default is legible on the package's own surfaces, at every strength it is drawn at", () => {
   // The un-themed host is the only case this package has values for, so it is the only one it asserts.
   const defaults = contractDefaults();
-  for (const [name, spec] of Object.entries(CARRIES)) {
-    if (!spec) continue;
+  for (const [name, uses] of Object.entries(CARRIES)) {
     const fg = defaults.get(name);
     assert.ok(fg, `the contract no longer declares --spek-${name}`);
-    for (const surface of SURFACES) {
-      const bg = defaults.get(surface)!;
-      const drawn = spec.alpha === 1 ? fg : over(fg, spec.alpha, bg);
-      const ratio = contrast(drawn, bg);
-      assert.ok(
-        ratio >= spec.floor,
-        `--spek-${name} (${fg}${spec.alpha === 1 ? "" : ` at ${spec.alpha}`}) on --spek-${surface} (${bg}) ` +
-          `is ${ratio.toFixed(2)}:1, below ${spec.floor}:1`
-      );
+    for (const spec of uses) {
+      for (const surface of SURFACES) {
+        const bg = defaults.get(surface)!;
+        const drawn = spec.alpha === 1 ? fg : over(fg, spec.alpha, bg);
+        const ratio = contrast(drawn, bg);
+        assert.ok(
+          ratio >= spec.floor,
+          `--spek-${name} (${fg}${spec.alpha === 1 ? "" : ` at ${spec.alpha}`}) on --spek-${surface} (${bg}) ` +
+            `is ${ratio.toFixed(2)}:1, below ${spec.floor}:1 — ${spec.use}`
+        );
+      }
     }
   }
 });
@@ -192,6 +210,26 @@ test("every declared default is classified", () => {
   assert.deepEqual(
     unclassified,
     [],
-    `classify these in CARRIES (a floor, or null for a colour that carries nothing): ${unclassified.join(", ")}`
+    `classify these in CARRIES (one entry per strength it is drawn at, or [] for a colour that carries ` +
+      `nothing): ${unclassified.join(", ")}`
+  );
+});
+
+test("the shipped documentation names every contract member", () => {
+  // The one drift no other guard here can see, and the one that actually shipped: @spekjs/ui@1.3.0 added a
+  // ninth member and went out with a README describing eight. A host overrides the names it is told about,
+  // so the omitted one silently kept the package's *dark* default — reproducing, in a light theme, the very
+  // bug that release fixed.
+  //
+  // What this can hold is membership, not description: it cannot tell that a row describes a colour the
+  // components stopped drawing with it (two rows were wrong that way too). Membership is the half that is
+  // mechanical, and it is the half that failed.
+  const readme = readFileSync(join(SRC, "..", "README.md"), "utf8");
+  const missing = [...contractDefaults().keys()].filter((name) => !readme.includes(`--spek-${name}`));
+  assert.deepEqual(
+    missing,
+    [],
+    `the README does not name these members, so a host re-theming from it would inherit the package's ` +
+      `defaults for them: ${missing.join(", ")}`
   );
 });

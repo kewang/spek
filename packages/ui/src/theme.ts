@@ -1,7 +1,7 @@
 /**
  * 顏色契約。
  *
- * 這個套件的所有顏色都經由這 8 個 CSS 變數表達，`styles.css` 為它們宣告了深色預設值。
+ * 這個套件的所有顏色都經由這 9 個 CSS 變數表達，`styles.css` 為它們宣告了深色預設值。
  * **宿主換膚 = 在自己的 `:root` 覆寫它們**，不需要用 Tailwind，也不需要與套件共用任何 token 命名。
  *
  * 這些元件原本讀的是 spek web 的 Tailwind token（`--color-border` / `--color-text-primary` …）。
