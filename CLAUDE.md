@@ -242,11 +242,27 @@ about it:
   is also the expensive pair (~0.65–1.3s against ~5ms for a missing binary) on views that refetch per watcher event.
   Forgetting those turned a 30s wrong answer into a permanent ~1s tax per read. A reason added later must be placed on
   one side of it.
-- **`schema-order` is the exception, and not for the environment's sake**: it forgets *every* unsuccessful run, because
-  the key names a schema while the argv names a change — a refusal of one slug is not the bucket's to keep, and
-  remembering it denied the order to every other change sharing the schema. For the same reason the Kotlin unsafe-slug
-  allowlist (a Windows argument-injection boundary with no TS counterpart) sits **outside** `getOrCompute`: it spawns
-  nothing, so there is no run to share, and inside the cache a concurrent read of a legitimate change would join it.
+- **`schema-order` is the exception, and not for the environment's sake**: no unsuccessful run is held in the
+  *bucket*, because the key names a schema while the argv names a change — a refusal of one slug is not the bucket's to
+  keep, and holding it denied the order to every other change sharing the schema. Not the bucket's to keep is not the
+  same as not worth keeping, so a **settled** failure (`isTransient` false) is remembered against the change it was
+  about, in a second, slug-keyed store: dropping it entirely made an installation that answers nothing — one too old for
+  `status --change --json` — cost a process start on every change-detail read. Three rules hold that store in place, and
+  each is a bug that was reasoned through rather than found:
+  - **The bucket is consulted first.** A settled change is still owed its schema's order: the sequence is a property of
+    the schema, so once a sibling has fetched it, a plain cache hit serves the refused change too — which is what
+    already happened, at zero spawns. The mark replaces a *consultation*, never an answer, and a mark read ahead of the
+    bucket is a regression wearing a fix's clothes.
+  - **The mark is read outside the cache and written inside `compute`.** Read inside, a concurrent read of a different
+    change joins an entry that never spawned and inherits a settlement that was not about it. Written outside, a reader
+    that legitimately *joined* another change's run takes that run's null and marks itself. Only `compute` holds both
+    the reason and the slug the argv named. For the same reason the Kotlin unsafe-slug allowlist (a Windows
+    argument-injection boundary with no TS counterpart) sits **outside** `getOrCompute`: it spawns nothing, so there is
+    no run to share.
+  - **`cli-unparsable` is marked per change too**, though it is a property of the installation rather than the change —
+    a repo-scoped mark would cost one consultation per window instead of one per change. A second scope is a second
+    lifetime and a second invalidation site, and `isTransient` is the rule a new reason is already required to be placed
+    against. If it ever moves, it is that reason alone.
 An entry is still installed while in flight — not remembering a failure must not become not deduping one — and a
 rejection is dropped too (Kotlin does this in a `finally`, since a compute that throws leaves no outcome to inspect).
 
@@ -459,12 +475,17 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
     the only exemption (WCAG 1.4.3).
 
   `contrast.test.ts` parses **both blocks** of `global.css` and measures a declared table, then scans the
-  source for the three ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
-  alpha the table doesn't list, and a bare `opacity-*`. **Adding a colour token means adding a table row or
-  an exclusion** — a test fails on any `--color-*` that is neither. It cannot see two things: SVG
-  presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded) and the BDD
-  marks, whose fills are Tailwind palette values that would have to be pinned here and would drift on
-  upgrade.
+  source for the four ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
+  alpha the table doesn't list, a `border-<token>/<alpha>` that is neither measured nor in
+  `DECORATIVE_BORDERS`, and a bare `opacity-*`. **Adding a colour token means adding a table row or an
+  exclusion** — a test fails on any `--color-*` that is neither, and **a token's role does not exempt it**:
+  a surface token applied as text on a solid fill (`bg-accent text-bg-primary`, the primary call to action)
+  is measured by `TEXT_ON_FILL`, because counting it as accounted-for by being in `SURFACES` is what left it
+  measured by nothing. **The enumeration is stated with the scan, including what it does not cover** — an
+  unstated enumeration reads as a complete one, which is how both of those gaps survived. Outside it: SVG
+  presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded), inline
+  `style`, `ring-*` / `outline-*` / gradients, literal alphas of non-token colours, and the BDD marks, whose
+  fills are Tailwind palette values that would have to be pinned here and would drift on upgrade.
 - **`@spekjs/ui` carries the same obligation, stated in terms it can actually check.** The package has no
   theme — a host maps its tokens onto the contract — so "per-theme token" is not a rule it can hold. Its rule
   is that **the contract is the only source of colour**: no literal outside the `:root` defaults and
@@ -493,7 +514,16 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   α ≈ 0.81 — but nobody would perceive it as dimming; the exemption is a judgement, and it is recorded with
   that measurement so it can be argued with. Node labels carry a `--spek-bg-primary` halo (`paint-order:
   stroke`) because a force layout drifts nodes under them: against a fill a label is 1.06–1.84:1, and giving
-  the fills their missing saturation made the light case worse before the halo fixed both themes at once
+  the fills their missing saturation made the light case worse before the halo fixed both themes at once.
+  **The halo is worth nothing without paint order, so labels are a layer of their own, appended after the
+  nodes.** Nested in its own node's `<g>` — where they shipped in v1.14.0 — a label was painted over, halo
+  included, by every node drawn *after* it: the protection held for one direction of each collision and not
+  the other, at no cost to any colour, so nothing measurable could see it. Two consequences, both
+  load-bearing: the hover de-emphasis is applied to the labels **directly** (it is written onto the node
+  group, and `graph-view` records "dim the graphics, leave the labels at full strength" as the alternative it
+  rejected — so lifting them out without carrying the dim silently adopts it), and `--spek-bg-primary` now
+  means *the surface the graph is mounted on*, which is a fact about the host and is stated as such in the
+  package's README
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
   — the `- ` marker's CommonMark content offset), and the Tasks tab renders that text as Markdown. The
@@ -581,7 +611,10 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 - **Refresh invariant**: a resync (cache-invalidation) failure **must not block the refetch** — it's best-effort,
   enforced in the single spot `runManualRefresh` (one 404 from IntelliJ's missing resync route once made the whole
   button go dead — issue #18). resync means "invalidate stale server-side state this host actually holds": Web/VS Code
-  clear the git-timestamp cache, IntelliJ has no such cache (`timestamp` is always null) so it clears the schema-order cache
+  clear the git-timestamp cache, IntelliJ has no such cache (`timestamp` is always null) so it clears the schema-order
+  cache — **both of its stores**, the per-schema answers and the settled changes, since a mark surviving invalidation
+  makes a manual Refresh weaker than the automatic one beside it. The TypeScript core has no invalidation seam at all:
+  its bucket is bounded by the TTL alone, so a mark there ages exactly as an answer does
 - **live-status**: `liveStatus` (live/offline/unsupported) only speaks up when `offline` — no always-on "everything's
   fine" light (an always-lit light is noise and dulls the real signal). VS Code/IntelliJ have no observable failure
   signal, so they always report `live` (lying `offline` is worse than not reporting)
