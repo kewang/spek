@@ -93,9 +93,10 @@ export function SpecGraph({
     const height = container.clientHeight;
 
     // 主題色在繪製當下解出來（d3 寫的是屬性，不是 var()）。
-    // 連線走 text-muted 而不是 border：border 是面板髮絲線，全強度也只有 1.22:1（深）／1.13:1（淺），
-    // 沒有任何透明度能讓它畫出看得見的邊 —— 而一條連線就是它要表達的那個關係本身。0.85 是兩個主題都
-    // 清得過 3:1 的最輕一階（4.37 / 3.81；0.75 在淺色只有 3.24）。
+    // Edges take text-muted rather than border: border is a panel hairline, 1.22:1 dark / 1.13:1 light
+    // even at full strength, and no opacity of it draws a visible edge — while an edge *is* the
+    // relationship it states. 0.85 is the lightest step clearing 3:1 in both themes (4.37 / 3.81; 0.75
+    // is only 3.24 in light).
     const edgeColor = resolveColor(CSS_VARS.textMuted);
     const EDGE_OPACITY = 0.85;
     const edgeHighlight = resolveColor(CSS_VARS.textPrimary);
@@ -154,15 +155,18 @@ export function SpecGraph({
       .join("g")
       .attr("cursor", "pointer");
 
-    // Spec 節點：圓形。這些顏色是視覺化自己的調色盤，不是宿主的主題色。
+    // Spec nodes: circles. The *shape* is the visualization's own vocabulary; the colour is a contract
+    // property like every other, so a host re-themes it by overriding `--spek-accent`.
     nodeSel
       .filter((d) => d.type === "spec")
       .append("circle")
       .attr("r", (d) => nodeRadius(d))
       .attr("fill", specColor)
       .attr("fill-opacity", NODE_FILL_OPACITY)
-      // 描邊取填色本身：比填色亮一階是深色主題的假設，淺底下框線得往暗走，而套件無從得知往哪邊。
-      // 量出來框對填只有 1.31–1.39:1，所以它撐的是節點外緣壓在頁面上的那半邊，不是框與填的對比。
+      // The stroke takes the fill's own colour: a step lighter than the fill is a dark-theme
+      // assumption, on a light ground the outline has to go darker, and the package cannot know
+      // which. Measured, stroke against fill is only 1.31-1.39:1, so what it carries is the node's
+      // outer edge against the page, not any contrast with the fill.
       .attr("stroke", specColor)
       .attr("stroke-width", 2);
 
@@ -180,20 +184,31 @@ export function SpecGraph({
       .attr("stroke", (d) => (d.status === "active" ? activeColor : archivedColor))
       .attr("stroke-width", 2);
 
-    // 標籤
-    nodeSel
-      .append("text")
+    // Labels, in a layer of their own **after** the nodes layer.
+    //
+    // Paint order is the only thing that decides which of two overlapping labels survives, and the
+    // halo below is worth nothing without it: nested in its own node's `<g>`, a label — halo and all
+    // — is painted over by every node drawn after it, so the protection held for one direction of
+    // each collision and not the other. Nothing about the colours can reveal that.
+    const labelSel = g
+      .append("g")
+      .attr("class", "labels")
+      .selectAll<SVGTextElement, SimNode>("text")
+      .data(nodes)
+      .join("text")
       .text((d) => truncateLabel(d.label))
       .attr("text-anchor", "middle")
       .attr("dy", (d) => nodeRadius(d) + 16)
       .attr("fill", labelColor)
       .attr("font-size", 12)
-      // A halo of the page colour, drawn behind the glyphs (`paint-order`), so a label keeps its own
+      // A halo of the mounted surface's colour, drawn behind the glyphs (`paint-order`), so a label keeps its own
       // background when the layout drifts another node under it. A label sits below *its* node and never on
       // it, but nodes collide: measured against a node fill a label is 1.06–1.84:1 in either theme, and
       // this change made the light case worse by giving the fills the saturation they were missing
       // (a spec node went 3.91:1 → 1.48:1). With the halo the label is read against `bg-primary` — 7.64:1
-      // dark, 7.24:1 light — whatever it happens to overlap.
+      // dark, 7.24:1 light — whatever it happens to overlap. `bg-primary` names the surface the graph
+      // sits on, which is a fact about the host: a host mounting the graph on a different surface maps
+      // that member to it, and the README says so.
       .attr("paint-order", "stroke")
       .attr("stroke", resolveColor(CSS_VARS.bgPrimary))
       .attr("stroke-width", 3)
@@ -210,7 +225,13 @@ export function SpecGraph({
     nodeSel
       .on("mouseenter", (_event, d) => {
         const connected = neighbors.get(d.id) || new Set<string>();
-        nodeSel.attr("opacity", (n) => (n.id === d.id || connected.has(n.id) ? 1 : 0.1));
+        const lit = (n: SimNode) => (n.id === d.id || connected.has(n.id) ? 1 : 0.1);
+        nodeSel.attr("opacity", lit);
+        // Applied to the labels directly, because they are no longer inside the group this dims.
+        // `graph-view` requires every non-connected node to drop to 0.1, and records "dim the
+        // graphics, leave the labels at full strength" as the alternative it rejected — so lifting
+        // the labels out without carrying the dim with them would quietly adopt it.
+        labelSel.attr("opacity", lit);
         linkSel
           .attr("stroke-opacity", (l) =>
             l.source.id === d.id || l.target.id === d.id ? 0.9 : 0.05,
@@ -221,6 +242,7 @@ export function SpecGraph({
       })
       .on("mouseleave", () => {
         nodeSel.attr("opacity", 1);
+        labelSel.attr("opacity", 1);
         linkSel.attr("stroke-opacity", EDGE_OPACITY).attr("stroke", edgeColor);
       });
 
@@ -255,6 +277,7 @@ export function SpecGraph({
           .attr("x2", (d) => d.target.x)
           .attr("y2", (d) => d.target.y);
         nodeSel.attr("transform", (d) => `translate(${d.x},${d.y})`);
+        labelSel.attr("transform", (d) => `translate(${d.x},${d.y})`);
       });
 
     // Drag 互動
