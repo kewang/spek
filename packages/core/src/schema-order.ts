@@ -1,4 +1,14 @@
-import { answered, failed, runOpenspec, ttlCached, type CacheEntry } from "./openspec-cli.js";
+import {
+  answered,
+  CACHE_MAX,
+  CACHE_TTL_MS,
+  failed,
+  isTransient,
+  peekCached,
+  runOpenspec,
+  ttlCached,
+  type CacheEntry,
+} from "./openspec-cli.js";
 
 /** schema 中單一 artifact 的權威參照（由 openspec CLI 提供） */
 export interface SchemaArtifactRef {
@@ -101,26 +111,99 @@ export function resolveSchemaOrder(
 const cache = new Map<string, CacheEntry<SchemaArtifactRef[] | null>>();
 
 /**
+ * Changes the installed CLI has already settled against, and when.
+ *
+ * The bucket above holds **answers**, and no unsuccessful run may be held there whatever its cause:
+ * its key names a schema while the query names a change, so an outcome that may be about the change
+ * would deny the order to every other change sharing that schema. That is why it is not kept there —
+ * not a finding that it is worthless. A refusal of one change is worth keeping *against that change*,
+ * and dropping it entirely is what made an installation that cannot answer at all — one too old for
+ * `status --change --json` — cost a process start on every change-detail read and on every refetch a
+ * watcher triggers.
+ *
+ * Only what the installed CLI produced is marked (`isTransient` is false): the absent binary and the
+ * timeout are what a running host repairs by itself, and remembering those is the bug this cache's
+ * TTL already exists for.
+ *
+ * Keyed under a NUL-prefixed tag for the same reason `DEFAULT_SCHEMA_BUCKET` carries one: the two
+ * key spaces are built the same way, and a slug that happens to equal a schema name must not be able
+ * to name a bucket entry if these stores are ever merged.
+ */
+const settled = new Map<string, number>();
+
+const settledKey = (repoRoot: string, slug: string): string => `\0settled\0${repoRoot}::${slug}`;
+
+function isSettled(repoRoot: string, slug: string): boolean {
+  const at = settled.get(settledKey(repoRoot, slug));
+  if (at === undefined) return false;
+  if (Date.now() - at > CACHE_TTL_MS) {
+    settled.delete(settledKey(repoRoot, slug));
+    return false;
+  }
+  return true;
+}
+
+function markSettled(repoRoot: string, slug: string): void {
+  if (settled.size >= CACHE_MAX) {
+    const oldest = settled.keys().next().value; // Map keeps insertion order
+    if (oldest !== undefined) settled.delete(oldest);
+  }
+  settled.set(settledKey(repoRoot, slug), Date.now());
+}
+
+/**
+ * Forget every settled change.
+ *
+ * Used by tests, and it is the seam a host would clear these on. No TypeScript host clears the bucket
+ * either — it is bounded by its TTL alone, and Web / VS Code resync clears the git-timestamp cache and
+ * nothing else — so a mark here ages exactly as an answer does. The Kotlin side *does* have such a seam
+ * (`SchemaOrder.clearCache`, driven by `SpekCaches` from both the resync route and the file watcher),
+ * and clears its own marks there, because `intellij-embedded-server` requires it to.
+ */
+export function clearSchemaOrderSettlements(): void {
+  settled.clear();
+}
+
+/**
  * 預設 SchemaOrderProvider：非阻塞地呼叫 openspec CLI 取得權威順序（回 Promise）。
  * openspec 未安裝 / 非 0 結束 / archived change / 逾時 / 解析失敗時一律 resolve 為 null。
  *
  * The CLI's failure taxonomy is deliberately discarded in the *value*: this caller has one fallback
  * (the frontend's narrative order) whatever went wrong, so every `!ok` collapses to null. It is not
- * discarded in the *cache*, where an unsuccessful run is never remembered — see below.
+ * discarded in the *cache*, where a settled run is remembered against the change — see below.
  */
 export const cliSchemaOrderProvider: SchemaOrderProvider = (repoRoot, slug, schema) => {
   // schema 已知 → 以 schema 分桶；schema 為 null/空（spek 本地解析不出名稱）→ 共用 repo 級預設桶：
   // CLI 會自行解析出同一個內建預設順序，故這類 change 正確地共享一次 spawn。schema 僅用於組 key，不進 argv。
   const cacheKey = `${repoRoot}::${schema || DEFAULT_SCHEMA_BUCKET}`;
+
+  // The bucket first, and this order is the whole rule: a settled change is still owed its schema's
+  // order. The authoritative sequence is a property of the schema, so once the bucket holds one —
+  // typically fetched by a sibling change after this one was refused — it is this change's too, and
+  // `resolveSchemaOrder` maps it onto this change's own artifacts. The mark below replaces a
+  // **consultation**, never an answer.
+  const held = peekCached(cache, cacheKey);
+  if (held) return held;
+
+  // Read outside `ttlCached`, because replaying a mark consults nothing: there is no run for another
+  // reader to share, and reached from inside `compute` a concurrent read of a *different* change
+  // would join it and be handed a settlement that was never about it. Same reason the Kotlin
+  // unsafe-slug allowlist sits outside its cache, and the reason scanner.ts's empty-slug guard sits
+  // outside this provider.
+  if (isSettled(repoRoot, slug)) return Promise.resolve(null);
+
   return ttlCached(cache, cacheKey, async () => {
     // slug 自成一個 argv 引數，結構上即無 shell injection 之虞，毋須對 slug 另做過濾。
     const cli = await runOpenspec(["status", "--change", slug, "--json"], repoRoot);
-    // Every unsuccessful run is forgotten, including the ones `isTransient` calls settled — and for
-    // a reason of this bucket's own, not the environment's: the key names a **schema** while the
-    // argv names a **change**. A non-zero exit is typically the CLI refusing *this* slug, and that
-    // is not the bucket's answer to keep — remembering it denies the order to every other change
-    // sharing the schema for the rest of the window.
-    if (!cli.ok) return failed(null);
+    if (!cli.ok) {
+      // Written *inside* `compute` — the mirror of reading it outside, and the opposite answer. This
+      // is the only place holding both the reason and the slug the argv actually named. Marked by
+      // whoever awaits the provider instead, a reader for change Y that legitimately joined an
+      // in-flight run about change X would take X's null and mark **Y** as settled.
+      if (!isTransient(cli.reason)) markSettled(repoRoot, slug);
+      // Never held in the bucket, whatever the reason — see the note on `settled` above.
+      return failed(null);
+    }
     // A successful run that parses to null is the CLI reporting no order, which is an answer: the
     // two nulls are indistinguishable downstream, so they are told apart here.
     return answered(parseOrderFromStatus(cli.json));

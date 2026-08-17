@@ -138,9 +138,16 @@ export function runOpenspec(args: string[], cwd: string): Promise<CliResult> {
 // Caching
 // ---------------------------------------------------------------------------
 
-/** TTL and its floor are stated in cli-budget.ts; the size cap is local and depends on nothing. */
+/**
+ * TTL and its floor are stated in cli-budget.ts; the size cap depends on nothing and is stated here.
+ *
+ * Both are exported because a caller may need a second, differently-keyed store beside the one it
+ * memoises through — `schema-order.ts` keeps one — and such a store has to age and be bounded on the
+ * same terms. A second copy of either number is a second thing to keep in step, which is the whole
+ * reason this module exists.
+ */
 export const CACHE_TTL_MS = CLI_CACHE_TTL_MS;
-const CACHE_MAX = 256;
+export const CACHE_MAX = 256;
 
 export interface CacheEntry<T> {
   at: number;
@@ -185,6 +192,23 @@ export function failed<T>(value: T): CliOutcome<T> {
  * any other, and joiners must share it. Not remembering a failure must not become not deduping one,
  * or a host with no `openspec` on `PATH` spawns a process per concurrent reader.
  */
+/**
+ * What `key` currently holds, or `undefined` — **without installing anything**.
+ *
+ * `ttlCached` cannot answer this: asking it is asking it to compute. A caller that has something
+ * cheaper than a CLI call to do when there is no current entry needs to find that out without
+ * creating one, and creating one is exactly what would make the cheaper path wrong (see
+ * `schema-order.ts`, which replays a settled failure only when the bucket has no answer to serve).
+ *
+ * An expired entry reads as absent and is left in place: dropping it is `ttlCached`'s to do, on the
+ * call that replaces it, and a peek that deleted could race a run installed since.
+ */
+export function peekCached<T>(store: Map<string, CacheEntry<T>>, key: string): Promise<T> | undefined {
+  const hit = store.get(key);
+  if (!hit || Date.now() - hit.at > CACHE_TTL_MS) return undefined;
+  return hit.promise;
+}
+
 export function ttlCached<T>(
   store: Map<string, CacheEntry<T>>,
   key: string,
