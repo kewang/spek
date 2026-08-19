@@ -201,7 +201,8 @@ filesystem read to decide what a schema is, that is the regression.
 **`schema-flow.ts` is browser-safe and exported at the `@spekjs/core/schema-flow` subpath** (like `headings`), because
 the SPA needs the graph maths and the package index reaches for `child_process`. It owns facts about the `requires`
 graph — `computeArtifactLevels`, `levelArtifacts`, `applyStepLevel`, `schemaArtifactCount`,
-`drawableRequires`, `postApplyArtifacts`, `resolveImplementationOrdering` — kept out of the view's
+`drawableEdges` (and `drawableRequires`, its provenance-free delegate), `postApplyArtifacts`,
+`resolveImplementationOrdering` — kept out of the view's
 geometry on purpose. Three rules worth knowing:
 - **`artifactCount` is one per declared artifact, and the noun is OpenSpec's, not ours.** `artifacts:` is the
   `schema.yaml` key, the CLI's enumeration field, and `planningArtifacts` in `status`; spek views OpenSpec content, so a
@@ -214,9 +215,10 @@ geometry on purpose. Three rules worth knowing:
   `requires` — enough for the count, so no summary needs a definition read. An earlier `stageCount` defined as *distinct
   dependency levels* needed the whole `requires` graph, which meant a `schema which` per schema on a cold list. If you
   find yourself reaching for a definition to fill a `SchemaSummary` field, that is the regression.
-- **The diagram draws the transitive reduction** (`drawableRequires`). A `requires` entry a longer path already implies
-  states nothing new, and drawing it is worse than redundant — it detours around the very step that implies it. Across
-  eleven community schemas surveyed, *every* curved edge was one of these. Levelling still uses the **full** `requires`.
+- **The diagram draws the transitive reduction** (`drawableEdges`, over origin-carrying edges). A `requires` entry a
+  longer path already implies states nothing new, and drawing it is worse than redundant — it detours around the very
+  step that implies it. Across eleven community schemas surveyed, *every* curved edge was one of these. Levelling still
+  uses the **full** `requires`.
 - **A step that follows implementation is *derived*, and the diagram says so.** OpenSpec cannot express it: an
   artifact's `requires` may name only other artifacts (the CLI's build-order pass dereferences each entry as a declared
   artifact), and `status` treats every artifact as a *planning* artifact, telling you to apply once all of them exist.
