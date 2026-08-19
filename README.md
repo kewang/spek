@@ -381,19 +381,11 @@ This project was inspired by [龍哥（高見龍）](https://kaochenlong.com)'s 
 Thanks to everyone who has contributed to spek:
 
 - [@nthansen](https://github.com/nthansen) (Norman Hansen)
-  - Custom OpenSpec schema support — a change's artifacts are discovered from disk, so any schema's artifacts render as their own tabs
-  - User-selectable artifact tab ordering (last-modified / schema order / A–Z), with schema order sourced from the OpenSpec CLI
-  - Schema badge across the Changes list, Dashboard, and Change Detail, hidden when it matches the repo default
-  - Polling-based live-reload fallback for filesystems without native change events (devcontainer / WSL / network mounts)
-  - Cross-platform build scripts for `@spekjs/core` and `@spekjs/ui`, so building from source works under Windows `cmd.exe`
-  - Worktree-aware schema baseline — under aggregation each change's badge is judged against its own worktree's default schema, and scanning reads each worktree's config once instead of once per change
-  - TOC and `#hash` navigation that lands the target heading below the sticky header instead of behind it
-  - Opening a change no longer consults the OpenSpec CLI once per change — the authoritative artifact order is cached per schema, since every change sharing a schema gets the same answer back
-  - Bullets and numbers stay inline with their item's first line in lists whose items are separated by blank lines, instead of being pushed onto a line of their own
-  - Task text in the Tasks tab renders as Markdown, and a task's continuation lines — sub-bullets, paragraphs, code blocks — are kept instead of being discarded by the parser before they reach any surface
-  - Removal of the web server's unreferenced `server/lib/` copies of the core scanning logic, which shadowed `@spekjs/core` as a second place the same rules could drift
-  - Workflow schema browsing on every surface — a Schemas page listing what each schema defines, and a detail view rendering its artifacts in dependency order as a readable flow
-  - Schema steps that follow implementation — derived from the `requires` graph and drawn after `apply` on an edge marked as inferred, since OpenSpec's format cannot declare that ordering
+  - **Custom schema support** — a change's artifacts are discovered from disk, so any schema renders its own tabs; each change carries a schema badge judged against its own worktree's default, and tabs sort by last-modified / schema order / A–Z, with the authoritative order taken from the OpenSpec CLI and cached per schema
+  - **The Schemas pages** — a list of what every available schema defines, and a detail view drawing one as a readable flow, including the steps a schema produces only after implementation
+  - **Markdown fidelity** — a task's continuation lines survive the parser and render as Markdown, list markers stay inline with their item's first line, and TOC / `#hash` navigation lands the target heading below the sticky header
+  - **Platform reach** — polling live-reload for filesystems without native change events (devcontainer / WSL / network mounts), and build scripts that work under Windows `cmd.exe`
+  - **Removal of the web server's unreferenced `server/lib/` copies** of the core scanning logic, which shadowed `@spekjs/core` as a second place the same rules could drift
 
 - [@david-lutz](https://github.com/david-lutz) (David Lutz)
   - Deduplication of active changes shared across git worktrees, in both the Changes list and the dependency graph — the surviving copy is elected from git divergence rather than file timestamps, which a fresh checkout rewrites

@@ -376,19 +376,11 @@ spek 會監看 `openspec/` 並在檔案變更時即時重載。在不傳遞原�
 感謝所有為 spek 貢獻的人：
 
 - [@nthansen](https://github.com/nthansen)（Norman Hansen）
-  - 支援自訂 OpenSpec schema —— 從磁碟探索 change 的 artifact，任何 schema 的 artifact 都能各自成為分頁
-  - 使用者可選的 artifact 分頁排序（最後修改 / Schema order / A–Z），其中 Schema order 取自 OpenSpec CLI
-  - Changes 列表、Dashboard 與 Change 詳情頁的 schema badge，與 repo 預設相同時自動隱藏
-  - 網路掛載 / 無原生檔案事件檔案系統（devcontainer / WSL）的 polling 即時重載 fallback
-  - `@spekjs/core` 與 `@spekjs/ui` 的跨平台建置指令 —— 從原始碼建置在 Windows `cmd.exe` 下也能運作
-  - 跨 worktree 聚合時的 schema 基準 —— 每個 change 對照自己所在 worktree 的預設 schema 判斷 badge，掃描時每個 worktree 的 config 只讀一次而非每個 change 讀一次
-  - TOC 與 `#hash` 導覽把目標標題捲到 sticky header 下方，而不是被它遮住
-  - 開啟 change 不再每個都查一次 OpenSpec CLI —— 權威 artifact 順序改以 schema 為單位快取，因為共用同一 schema 的 change 得到的答案完全相同
-  - 項目間有空行的清單，項目符號與編號改為與內容首行同行，不再被擠到自己一行
-  - Tasks 分頁的 task 文字改以 Markdown 呈現，且 task 的續行 —— 子項目、段落、程式碼區塊 —— 不再於 parser 階段就被丟棄，得以完整顯示
-  - 移除 web server 中未被引用的 `server/lib/` 核心掃描邏輯副本 —— 它是 `@spekjs/core` 之外的第二份同規則實作，會成為漂移的溫床
-  - 各介面皆可瀏覽 workflow schema —— Schemas 頁面列出每個 schema 定義了什麼，詳情頁把它的 artifact 依相依順序畫成可讀的流程
-  - Schema 中位於實作之後的步驟 —— 從 `requires` 圖推導，畫在 `apply` 之後並標記為推論，因為 OpenSpec 格式無法宣告這個順序
+  - **自訂 schema 支援** —— 從磁碟探索 change 的 artifact，任何 schema 的 artifact 都能各自成為分頁；每個 change 的 schema badge 對照自己所在 worktree 的預設判斷，分頁可依最後修改 / Schema order / A–Z 排序，其中權威順序取自 OpenSpec CLI 並以 schema 為單位快取
+  - **Schemas 頁面** —— 列出每個可用 schema 定義了什麼，詳情頁把一份 schema 畫成可讀的流程，包含只在實作之後才產出的步驟
+  - **Markdown 呈現的忠實度** —— task 的續行不再被 parser 丟棄，改以 Markdown 呈現；清單的項目符號與編號留在項目首行；TOC 與 `#hash` 導覽把目標標題落在 sticky header 下方
+  - **平台涵蓋** —— 無原生檔案事件的檔案系統（devcontainer / WSL / 網路掛載）改用 polling 即時重載，建置指令在 Windows `cmd.exe` 下也能運作
+  - **移除 web server 中未被引用的 `server/lib/`** 核心掃描邏輯副本 —— 它是 `@spekjs/core` 之外的第二份同規則實作，會成為漂移的溫床
 
 - [@david-lutz](https://github.com/david-lutz)（David Lutz）
   - Changes 列表與關聯圖中，跨 git worktree 共用的 active change 去重 —— 勝出的副本以 git 分歧選舉決定，而非檔案時間戳（fresh checkout 會把它整個重寫掉）
