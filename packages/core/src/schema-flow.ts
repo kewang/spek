@@ -94,7 +94,13 @@ export function applyStepLevel(
     : deepest + 1;
 }
 
-/** Every id reachable from `seeds` by following `requires`, including the seeds themselves. */
+/**
+ * Every declared id reachable from `seeds` by following `requires`, seeds included.
+ *
+ * A closure over the declared graph: an undeclared seed (absent from `requiresOf`) is not returned. A
+ * caller seeding from a raw `apply.requires` — which can name an undeclared artifact — must filter to
+ * declared ids first, as `applyContext` does.
+ */
 function closureOf(seeds: readonly string[], requiresOf: Map<string, readonly string[]>): Set<string> {
   const seen = new Set<string>();
   const stack = [...seeds];
@@ -137,14 +143,29 @@ export function postApplyArtifacts(
   apply: { requires: readonly string[] } | null,
 ): string[] {
   if (!apply) return [];
-  const { requiresOf, resolved, beforeApply } = applyContext(artifacts, apply.requires);
-  if (resolved.length === 0 || levelArtifacts(artifacts).cyclic) return [];
+  return postApplyFromContext(
+    artifacts,
+    applyContext(artifacts, apply.requires),
+    levelArtifacts(artifacts).cyclic,
+  );
+}
 
+/**
+ * The post-implementation filter, given a precomputed context and cyclicity. Internal, so
+ * `resolveImplementationOrdering` shares one `applyContext` with its declared branch instead of each
+ * rebuilding the same `beforeApply` — the shared context is what keeps the two rules from disagreeing.
+ */
+function postApplyFromContext(
+  artifacts: SchemaArtifactDef[],
+  ctx: ReturnType<typeof applyContext>,
+  cyclic: boolean,
+): string[] {
+  if (ctx.resolved.length === 0 || cyclic) return [];
   return artifacts
     .filter((a) => {
-      if (beforeApply.has(a.id)) return false;
-      const needs = closureOf([a.id], requiresOf);
-      return resolved.every((id) => needs.has(id));
+      if (ctx.beforeApply.has(a.id)) return false;
+      const needs = closureOf([a.id], ctx.requiresOf);
+      return ctx.resolved.every((id) => needs.has(id));
     })
     .map((a) => a.id);
 }
@@ -174,21 +195,23 @@ export function resolveImplementationOrdering(
   const ordering = new Map<string, OrderingSource>();
   if (!applyStep) return ordering;
 
+  // Computed once and shared with the derived pass below, so the two rules read one `beforeApply`.
+  const ctx = applyContext(artifacts, applyStep.requires);
+
   // Skipped when an artifact claims that id: there the declared-artifact reading is the one
   // OpenSpec itself takes, so reading it as the phase would invent an edge the author never wrote.
   if (!artifacts.some((a) => a.id === applyStep.id)) {
     // And never for a step apply already waits on. The CLI rejects such a schema but spek parses
     // `schema.yaml` directly, so it arrives here, and at face value it is a cycle through apply —
     // which drops the *whole* schema to positional levels and draws one edge running backwards.
-    const { beforeApply } = applyContext(artifacts, applyStep.requires);
     for (const a of artifacts) {
-      if (a.requires.includes(applyStep.id) && !beforeApply.has(a.id)) {
+      if (a.requires.includes(applyStep.id) && !ctx.beforeApply.has(a.id)) {
         ordering.set(a.id, "declared");
       }
     }
   }
 
-  for (const id of postApplyArtifacts(artifacts, applyStep)) {
+  for (const id of postApplyFromContext(artifacts, ctx, levelArtifacts(artifacts).cyclic)) {
     if (!ordering.has(id)) ordering.set(id, "derived");
   }
 
@@ -237,91 +260,32 @@ export interface OriginNode {
 }
 
 /**
- * `drawableRequires` for a graph whose edges carry provenance: the edges worth drawing, per step,
- * each survivor keeping the origin it will be drawn with.
+ * The edges worth drawing, per step — the graph's transitive reduction, each survivor keeping its
+ * origin. Edges into a step are deduped by source (a repeated `requires` entry would otherwise draw
+ * two colliding paths and collide on one React key); a declared edge wins a tie.
  *
- * A plain transitive reduction: an edge is dropped when some other path already implies it,
- * **declared and derived hops counted alike**. A derived edge is subject to the same reduction as a
- * declared one, so a post-implementation step whose declared dependency the apply step already
- * covers draws a single incoming connection rather than two: in `anvil`, `verify` declares
- * `requires: [tasks]` and is derived to follow apply, which already requires `tasks`, so
- * `tasks → apply ⇢ verify` carries the dependency and the direct `tasks → verify` edge is not drawn.
- * `verify` keeps one edge, from apply.
+ * Declared and derived hops count alike, so a post-implementation step whose declared dependency
+ * apply already covers draws one edge, from apply, not two: `anvil`'s `verify` requires `tasks` and
+ * is derived to follow apply (which also requires `tasks`), so `tasks → apply ⇢ verify` carries it
+ * and the direct `tasks → verify` is dropped.
  *
- * This is a **bound the derivation accepts, not a fact it hides**: on the ~18% of steps the
- * post-implementation rule misreads, the surviving edge is the derived one — dashed and captioned as
- * derived, never asserted — so the reader is told it is an inference. The alternative, keeping the
- * declared edge alongside, drew every such node with two lines saying the same ordering; the diagram
- * is a reduction, and the panel is where the exact `requires` still lives.
+ * A bound the derivation accepts, not one it hides: on the steps the rule misreads (~18%), the
+ * surviving edge is the derived one — dashed and captioned — so the reader is told it is an inference.
  */
 export function drawableEdges(steps: readonly OriginNode[]): Map<string, OriginEdge[]> {
   const declared = new Set(steps.map((s) => s.id));
-  const childrenOf = new Map<string, OriginEdge[]>();
-  for (const step of steps) {
-    for (const edge of step.incoming) {
-      if (!declared.has(edge.from)) continue;
-      childrenOf.set(edge.from, [
-        ...(childrenOf.get(edge.from) ?? []),
-        { from: step.id, origin: edge.origin },
-      ]);
-    }
-  }
-
-  // Reachable from `from` without the direct hop?
-  const impliedBy = (from: string, to: string): boolean => {
-    const seen = new Set<string>();
-    const stack = (childrenOf.get(from) ?? []).filter((e) => e.from !== to);
-    while (stack.length > 0) {
-      const current = stack.pop() as OriginEdge;
-      if (current.from === to) return true;
-      if (seen.has(current.from)) continue;
-      seen.add(current.from);
-      stack.push(...(childrenOf.get(current.from) ?? []));
-    }
-    return false;
-  };
-
-  return new Map(
-    steps.map((step) => [
-      step.id,
-      step.incoming.filter((edge) => declared.has(edge.from) && !impliedBy(edge.from, step.id)),
-    ]),
-  );
-}
-
-/**
- * Each step's `requires` with the entries a longer path already implies removed — the graph's
- * **transitive reduction**.
- *
- * `super-spec-driven` declares that `design` requires `proposal` *and* `specs`, but `specs` already
- * requires `proposal`, so the direct entry states only what the chain states. Surveying eleven
- * community schemas, every such entry was of this kind, and drawing them was worse than redundant:
- * each had to detour around the very step that implied it, producing curves that crossed the column
- * they belonged to.
- *
- * A **graph fact, not a drawing one**, which is why it sits beside `computeArtifactLevels` rather
- * than in the view's geometry: it reads ids and `requires`, never coordinates. Anything wanting to
- * know what a step *really* adds — a diagram, or an annotation saying a requirement is already
- * implied — asks here.
- *
- * **Levelling must keep using the full `requires`.** Removing an implied edge never shortens the
- * longest path, so levels are unchanged either way, but computing them from the reduction would make
- * that a coincidence rather than a guarantee.
- *
- * Not mirrored in Kotlin, deliberately: no Kotlin host draws the diagram — the IntelliJ tool window
- * loads the same React SPA — so nothing on that side has a use for it.
- */
-export function drawableRequires(steps: readonly RequiresNode[]): Map<string, string[]> {
-  const declared = new Set(steps.map((s) => s.id));
+  // Adjacency parent -> successor ids. Origin only labels the survivors, so it stays off the walk.
   const childrenOf = new Map<string, string[]>();
   for (const step of steps) {
-    for (const parent of step.requires) {
-      if (declared.has(parent)) childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), step.id]);
+    for (const edge of step.incoming) {
+      if (declared.has(edge.from)) {
+        childrenOf.set(edge.from, [...(childrenOf.get(edge.from) ?? []), step.id]);
+      }
     }
   }
 
   // Reachable from `from` without taking the direct hop to `to`? Then the direct hop adds nothing.
-  const impliedByALongerPath = (from: string, to: string): boolean => {
+  const impliedBy = (from: string, to: string): boolean => {
     const seen = new Set<string>();
     const stack = (childrenOf.get(from) ?? []).filter((id) => id !== to);
     while (stack.length > 0) {
@@ -334,12 +298,30 @@ export function drawableRequires(steps: readonly RequiresNode[]): Map<string, st
     return false;
   };
 
-  const out = new Map<string, string[]>();
-  for (const step of steps) {
-    out.set(
-      step.id,
-      step.requires.filter((id) => declared.has(id) && !impliedByALongerPath(id, step.id)),
-    );
-  }
-  return out;
+  const survivors = (step: OriginNode): OriginEdge[] => {
+    const byFrom = new Map<string, OrderingSource>();
+    for (const edge of step.incoming) {
+      if (!declared.has(edge.from) || impliedBy(edge.from, step.id)) continue;
+      const kept = byFrom.get(edge.from);
+      if (kept === undefined || (kept === "derived" && edge.origin === "declared")) {
+        byFrom.set(edge.from, edge.origin);
+      }
+    }
+    return [...byFrom].map(([from, origin]) => ({ from, origin }));
+  };
+
+  return new Map(steps.map((step) => [step.id, survivors(step)]));
+}
+
+/**
+ * The transitive reduction of each step's `requires`, as plain id lists — `drawableEdges` for a graph
+ * with no edge provenance. A published `@spekjs/core` export (shipped 1.8.0), so it stays; it now
+ * delegates, leaving one traversal. No Kotlin mirror: no Kotlin host draws the diagram.
+ */
+export function drawableRequires(steps: readonly RequiresNode[]): Map<string, string[]> {
+  const nodes: OriginNode[] = steps.map((s) => ({
+    id: s.id,
+    incoming: s.requires.map((from) => ({ from, origin: "declared" as const })),
+  }));
+  return new Map([...drawableEdges(nodes)].map(([id, edges]) => [id, edges.map((e) => e.from)]));
 }

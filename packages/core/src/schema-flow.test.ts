@@ -17,7 +17,8 @@ import type { SchemaApplyDef, SchemaArtifactDef } from "./types.js";
 /**
  * Tested from inside core, against `./schema-flow.js`. The web suite covers these too, but via the
  * `@spekjs/core/schema-flow` subpath — i.e. `dist/` — so it goes green against the previous build
- * unless `build:core` was run. `drawableRequires` also has no Kotlin mirror to disagree with it.
+ * unless `build:core` was run. The reduction has no Kotlin mirror to disagree with it — no Kotlin
+ * host draws the diagram.
  */
 
 function artifact(id: string, requires: string[] = []): SchemaArtifactDef {
@@ -32,6 +33,7 @@ function levels(artifacts: SchemaArtifactDef[]): Record<string, number> {
   return Object.fromEntries(computeArtifactLevels(artifacts));
 }
 
+// The reduction tests exercise the public `drawableRequires`, which delegates to `drawableEdges`.
 function drawable(steps: RequiresNode[]): Record<string, string[]> {
   return Object.fromEntries(drawableRequires(steps));
 }
@@ -415,9 +417,9 @@ test("schemaArtifactCount: a schema declaring nothing counts zero", () => {
   assert.equal(schemaArtifactCount([]), 0);
 });
 
-// --- drawableRequires ---
+// --- transitive reduction (via `drawable`) ---
 
-test("drawableRequires: keeps an edge nothing else implies", () => {
+test("reduction:keeps an edge nothing else implies", () => {
   assert.deepEqual(
     drawable([
       { id: "proposal", requires: [] },
@@ -427,7 +429,7 @@ test("drawableRequires: keeps an edge nothing else implies", () => {
   );
 });
 
-test("drawableRequires: drops an edge a longer path already imposes", () => {
+test("reduction:drops an edge a longer path already imposes", () => {
   // The PR's own example: proposal → specs → verification already imposes proposal → verification,
   // so the direct entry states nothing new and is not drawn.
   assert.deepEqual(
@@ -440,7 +442,7 @@ test("drawableRequires: drops an edge a longer path already imposes", () => {
   );
 });
 
-test("drawableRequires: an implied edge is dropped however long the implying path is", () => {
+test("reduction:an implied edge is dropped however long the implying path is", () => {
   assert.deepEqual(
     drawable([
       { id: "a", requires: [] },
@@ -452,7 +454,7 @@ test("drawableRequires: an implied edge is dropped however long the implying pat
   );
 });
 
-test("drawableRequires: two independent paths to the same step both survive", () => {
+test("reduction:two independent paths to the same step both survive", () => {
   // Neither branch reaches `d` through the other, so removing either would lose a real dependency.
   assert.deepEqual(
     drawable([
@@ -465,12 +467,12 @@ test("drawableRequires: two independent paths to the same step both survive", ()
   );
 });
 
-test("drawableRequires: an entry naming an undeclared step is dropped", () => {
+test("reduction:an entry naming an undeclared step is dropped", () => {
   // There is nothing to draw an edge to.
   assert.deepEqual(drawable([{ id: "specs", requires: ["ghost"] }]), { specs: [] });
 });
 
-test("drawableRequires: surviving entries keep their declared order", () => {
+test("reduction:surviving entries keep their declared order", () => {
   assert.deepEqual(
     drawable([
       { id: "a", requires: [] },
@@ -481,7 +483,7 @@ test("drawableRequires: surviving entries keep their declared order", () => {
   );
 });
 
-test("drawableRequires: a cycle terminates and keeps both edges", () => {
+test("reduction:a cycle terminates and keeps both edges", () => {
   // Each of the two edges is implied by the other, and dropping both would erase the relationship
   // entirely. The traversal must also not loop, which is what this really guards.
   assert.deepEqual(
@@ -493,7 +495,7 @@ test("drawableRequires: a cycle terminates and keeps both edges", () => {
   );
 });
 
-test("drawableRequires: levelling still uses the full requires", () => {
+test("reduction:levelling still uses the full requires", () => {
   // The property the reduction is only safe under: removing an implied edge never shortens the
   // longest path, so levels are identical either way. Asserted rather than assumed, because a
   // reduction that did move a level would silently reposition steps in the diagram.
@@ -502,12 +504,12 @@ test("drawableRequires: levelling still uses the full requires", () => {
     artifact("specs", ["proposal"]),
     artifact("verification", ["proposal", "specs"]),
   ];
-  const reduced = drawableRequires(
-    artifacts.map((a) => ({ id: a.id, requires: a.requires ?? [] })),
-  );
+  const reduced = drawable(artifacts.map((a) => ({ id: a.id, requires: a.requires ?? [] })));
   assert.deepEqual(
     levels(artifacts),
-    Object.fromEntries(computeArtifactLevels(artifacts.map((a) => artifact(a.id, reduced.get(a.id) ?? [])))),
+    Object.fromEntries(
+      computeArtifactLevels(artifacts.map((a) => artifact(a.id, reduced[a.id] ?? []))),
+    ),
   );
 });
 
@@ -552,5 +554,38 @@ test("drawableEdges: a derived edge nothing else implies survives", () => {
       { id: "verify", incoming: [{ from: "apply", origin: "derived" }] },
     ]),
     { tasks: [], apply: ["tasks:declared"], verify: ["apply:derived"] },
+  );
+});
+
+test("drawableEdges: a repeated prerequisite collapses to one edge", () => {
+  // Two edges from the same source would draw two paths sharing one React key. Deduped.
+  assert.deepEqual(
+    drawnEdges([
+      { id: "a", incoming: [] },
+      {
+        id: "b",
+        incoming: [
+          { from: "a", origin: "declared" },
+          { from: "a", origin: "declared" },
+        ],
+      },
+    ]),
+    { a: [], b: ["a:declared"] },
+  );
+});
+
+test("drawableEdges: a declared edge wins a same-source tie", () => {
+  assert.deepEqual(
+    drawnEdges([
+      { id: "a", incoming: [] },
+      {
+        id: "b",
+        incoming: [
+          { from: "a", origin: "derived" },
+          { from: "a", origin: "declared" },
+        ],
+      },
+    ]),
+    { a: [], b: ["a:declared"] },
   );
 });

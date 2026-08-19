@@ -96,10 +96,13 @@ export {
   computeArtifactLevels,
   levelArtifacts,
   resolveImplementationOrdering,
+  postApplyArtifacts,
   applyStepLevel,
   schemaArtifactCount,
 } from "./schema-flow.js";
-export type { OrderingSource } from "./schema-flow.js";
+// `RequiresNode` is a param of the level fns; `ArtifactLevelling` is `levelArtifacts`'s return. Both
+// were unnameable from the root. `drawableEdges` and its `OriginEdge`/`OriginNode` stay subpath-only.
+export type { OrderingSource, RequiresNode, ArtifactLevelling } from "./schema-flow.js";
 
 // Also on the `@spekjs/core/cli-budget` subpath, for clients that must not pull in the index.
 export { CLI_TIMEOUT_MS, CLI_CACHE_TTL_MS } from "./cli-budget.js";
