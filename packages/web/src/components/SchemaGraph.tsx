@@ -1,6 +1,14 @@
 import { useMemo, useState } from "react";
 import { DERIVED_EDGE_MEANING, type FlowLevel } from "../utils/schemaView";
-import { ARROW_LEN, DERIVED_DASH, fitLabel, layoutGraph, NODE_H, NODE_W } from "../utils/schemaLayout";
+import {
+  ARCHIVE_DASH,
+  ARROW_LEN,
+  DERIVED_DASH,
+  fitLabel,
+  layoutGraph,
+  NODE_H,
+  NODE_W,
+} from "../utils/schemaLayout";
 
 /**
  * The schema workflow as a real diagram: nodes for steps, edges for `requires`.
@@ -107,21 +115,33 @@ export function SchemaGraph({
           {edges.map((edge) => {
             const connected = isConnected(edge);
             // Dashed, not a second hue: colour here already means selection, and a dash survives
-            // greyscale and colour-blindness. Same vocabulary the archive node uses for "not
-            // declared by this schema", one level down from a node to a connection.
+            // greyscale and colour-blindness. Its own pattern (DERIVED_DASH), distinct from the
+            // archive node's (ARCHIVE_DASH) — the two are different meanings, not one shared mark.
             const derived = edge.origin === "derived";
             return (
-              <path
-                key={`${edge.from}->${edge.to}`}
-                d={edge.path}
-                fill="none"
-                stroke={connected ? "var(--color-accent)" : "var(--color-border)"}
-                strokeWidth={connected ? 2 : 1.5}
-                strokeDasharray={derived ? DERIVED_DASH : undefined}
-                markerEnd={connected ? "url(#schema-arrow-active)" : "url(#schema-arrow)"}
-              >
-                {derived && <title>{DERIVED_EDGE_MEANING}</title>}
-              </path>
+              <g key={`${edge.from}->${edge.to}`}>
+                <path
+                  d={edge.path}
+                  fill="none"
+                  stroke={connected ? "var(--color-accent)" : "var(--color-border)"}
+                  strokeWidth={connected ? 2 : 1.5}
+                  strokeDasharray={derived ? DERIVED_DASH : undefined}
+                  markerEnd={connected ? "url(#schema-arrow-active)" : "url(#schema-arrow)"}
+                />
+                {derived && (
+                  // Wide transparent companion so the meaning is hoverable: the visible dashed 1.5px
+                  // line is nearly untargetable, and ~half of it is gaps.
+                  <path
+                    d={edge.path}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={12}
+                    pointerEvents="stroke"
+                  >
+                    <title>{DERIVED_EDGE_MEANING}</title>
+                  </path>
+                )}
+              </g>
             );
           })}
         </g>
@@ -162,7 +182,7 @@ export function SchemaGraph({
                 fill="var(--color-bg-tertiary)"
                 // Dashed for archive: it really is the terminal stage of every workflow, but no
                 // schema declares it, so it must not read as one of the steps this schema owns.
-                strokeDasharray={step.isArchive ? "4 3" : undefined}
+                strokeDasharray={step.isArchive ? ARCHIVE_DASH : undefined}
                 // Hover brightens the node's own outline. Without it the only feedback was other
                 // nodes fading, so the one under the pointer was the one that never reacted.
                 stroke={

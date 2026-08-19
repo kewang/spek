@@ -73,9 +73,10 @@ export interface FlowStep {
 /**
  * What a derived connection means, in one place.
  *
- * Three surfaces state it — the edge, the legend, and the selected step's detail — and the same
- * centralising reason applies as for `sourceTitle` below: spelled out per call site, one copy goes
- * stale. Expect this to need editing if OpenSpec ever makes the derivation conditional (#1456).
+ * Two surfaces read this string directly — the edge title and the legend. The selected-step detail
+ * renders the same meaning as rich prose (it embeds a `<code>` chip the plain string can't carry), so
+ * it restates rather than imports — keep the three in step. Expect edits if OpenSpec ever makes the
+ * derivation conditional (#1456).
  */
 export const DERIVED_EDGE_MEANING =
   "Assumed to run after apply. spek's guess, since it relies on the same artifacts apply does — " +
@@ -200,9 +201,12 @@ export function buildFlowSteps(
   // Skipped when something depends on apply, which would then rank above the step it follows.
   const applyStep = steps.find((step) => step.isApply);
   if (applyStep && !steps.some((s) => s.incoming.some((e) => e.from === applyKey))) {
+    // Keyed by `key`, not `id`: a duplicate id collapses the map (second level overwrites first) and
+    // drops apply below the level its own edge produced — a backward arrow. `apply.requires` names
+    // declared ids, which always hold the bare key, so they still resolve.
     applyStep.level =
       applyStepLevel(
-        new Map(steps.filter((s) => !s.isApply).map((s) => [s.id, s.level])),
+        new Map(steps.filter((s) => !s.isApply).map((s) => [s.key, s.level])),
         apply,
       ) ?? applyStep.level;
   }
@@ -241,9 +245,10 @@ export function withArchiveStep(steps: FlowStep[]): FlowStep[] {
       generates: null,
       description:
         "Folds the change's delta specs into openspec/specs/ and moves the change under archive/.",
-      // Display only, and read back from the edges rather than rebuilt in declared-id space — two
-      // steps can share an id, so a leaf's id does not always name the step the edge points at.
-      requires: leaves.map((s) => s.id),
+      // Display only, deduped by id: two leaves can share a displayed id (a declared `apply` artifact
+      // plus the apply phase), and "requires apply, apply" reads as a bug. Edges stay distinct — they
+      // key by `key`, not id.
+      requires: [...new Set(leaves.map((s) => s.id))],
       incoming: leaves.map((s) => ({ from: s.key, origin: "declared" as const })),
       instruction: null,
       isApply: false,

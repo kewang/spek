@@ -256,6 +256,17 @@ test("buildFlowSteps: a schema declaring an artifact named apply keeps both step
   assert.ok((declaredApply?.level ?? 0) > (phase?.level ?? 0));
 });
 
+test("buildFlowSteps: a duplicate declared id does not drop apply below its edge", () => {
+  // apply's edge comes from the first `x` (level 2), so apply is level 3. A level map keyed by id
+  // collapses both `x`s and would recompute apply at 2 — beside its own parent, a backward arrow.
+  const steps = buildFlowSteps(
+    [artifact("p"), artifact("x", { requires: ["p"] }), artifact("x", { requires: [] })],
+    { requires: ["x"], tracks: null, instruction: null },
+  );
+  const apply = steps.find((s) => s.isApply);
+  assert.equal(apply?.level, 3);
+});
+
 test("buildFlowSteps: apply requiring nothing the schema declares goes last", () => {
   const steps = buildFlowSteps(
     [artifact("proposal"), artifact("tasks", { requires: ["proposal"] })],

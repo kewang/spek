@@ -33,6 +33,9 @@ export const ARROW_LEN = 9;
 /** Dash of a derived connection, shared with the legend swatch that has to match it. */
 export const DERIVED_DASH = "5 4";
 
+/** Dash of the archive node's border ("not declared by this schema"), shared with its legend swatch. */
+export const ARCHIVE_DASH = "4 3";
+
 /** Smallest clearance between a bypassing curve and the nodes it passes. */
 const LANE_MIN = 20;
 /** Largest bow we will attempt before accepting the widest one we tried. */
@@ -252,9 +255,9 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     return out;
   };
 
-  // Which edges to draw is a graph fact, so it is settled once here rather than inside `buildEdges`,
-  // which runs twice (once to measure the bows, once to draw). Core owns the rule — including why a
-  // derived edge may not imply a declared one away.
+  // Which edges to draw is a graph fact, settled once here rather than inside `buildEdges` (which runs
+  // twice: measure the bows, then draw). Core owns the rule — a plain transitive reduction, declared
+  // and derived hops counted alike.
   const drawable = drawableEdges(
     levels.flatMap((l) => l.steps).map((step) => ({ id: step.key, incoming: step.incoming })),
   );

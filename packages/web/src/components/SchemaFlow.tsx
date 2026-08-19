@@ -1,7 +1,7 @@
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { SchemaGraph } from "./SchemaGraph";
 import { DERIVED_EDGE_MEANING, isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
-import { ARROW_LEN, DERIVED_DASH } from "../utils/schemaLayout";
+import { ARCHIVE_DASH, ARROW_LEN, DERIVED_DASH } from "../utils/schemaLayout";
 
 /**
  * The schema workflow: a diagram of the steps and their dependencies, with the selected step's
@@ -102,7 +102,7 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           )}
           {/* No chip after a possessive: `px-1.5` plus the word space reads as a double space. */}
           {step.incoming.some((edge) => edge.origin === "derived") && (
-            <p className="text-text-muted border-accent/30 mt-2 border-l-2 pl-2 text-xs">
+            <p className="text-text-muted border-accent/40 mt-2 border-l-2 pl-2 text-xs">
               <span className="text-text-secondary font-semibold">
                 Assumed to run after apply.
               </span>{" "}
@@ -197,9 +197,20 @@ export function SchemaFlow({
           implementation
         </span>
         <span className="flex items-center gap-1.5">
-          {/* A miniature of the archive node. At 12x8 with a 1px dash this was present in the DOM
-              and invisible on screen — a legend mark has to read as the thing it stands for. */}
-          <span className="border-text-secondary inline-block h-3.5 w-6 shrink-0 rounded-[3px] border border-dashed" />
+          {/* A miniature of the archive node — same dash (ARCHIVE_DASH) and border colour, so the
+              legend mark reads as the node it stands for rather than a third dash pattern. */}
+          <svg width="24" height="14" viewBox="0 0 24 14" aria-hidden="true" className="shrink-0">
+            <rect
+              x="0.5"
+              y="0.5"
+              width="23"
+              height="13"
+              rx="3"
+              fill="none"
+              stroke="var(--color-border)"
+              strokeDasharray={ARCHIVE_DASH}
+            />
+          </svg>
           not declared by this schema
         </span>
         <span>same row = either order</span>
