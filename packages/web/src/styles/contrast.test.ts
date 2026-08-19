@@ -18,6 +18,11 @@ import { fileURLToPath } from "node:url";
  * so a module no one imports would be dead code carrying a type-check bill.
  */
 
+import { MARK_COLOR, MARK_OPACITY } from "../utils/schemaLayout";
+
+/** `var(--color-text-muted)` -> `text-muted`, so a table entry follows the source it measures. */
+const tokenOf = (value: string): string => value.replace(/^var\(--color-|\)$/g, "");
+
 const CSS = readFileSync(fileURLToPath(new URL("./global.css", import.meta.url)), "utf8");
 const SRC = fileURLToPath(new URL("..", import.meta.url));
 
@@ -118,12 +123,28 @@ const TEXT_TOKENS: Record<string, number[]> = {
   "status-warning": [],
 };
 
-/** Graphics that carry their own information (WCAG 1.4.11's 3:1), each against what it is drawn on. */
-const NON_TEXT: Array<{ token: string; on: string; label: string }> = [
+/**
+ * Graphics that carry their own information (WCAG 1.4.11's 3:1), each against what it is drawn on.
+ *
+ * `alpha` is the strength the mark is composited at, where it has one. It lives in an SVG attribute
+ * rather than in a class, so no CSS parse finds it — same as `SPEK_MARKS` below, and declared for the
+ * same reason: this is the one place with the values to multiply it against.
+ */
+const NON_TEXT: Array<{ token: string; on: string; alpha?: number; label: string }> = [
   { token: "status-success", on: "bg-tertiary", label: "progress bar fill on its track" },
   { token: "accent", on: "bg-tertiary", label: "in-progress bar fill on its track" },
   { token: "fold-rule", on: "bg-primary", label: "fold extent mark" },
   { token: "fold-rule", on: "bg-secondary", label: "fold extent mark" },
+  // The schema workflow diagram. An edge is the only thing saying one step depends on another, and a
+  // dash is the only non-colour cue for derived-vs-declared and for the archive step — so these owe
+  // 3:1, and the legend swatches that stand for them are the same value at a fraction of the size.
+  // Taken from the source, not copied from it: re-authoring `MARK_COLOR` or `MARK_OPACITY` re-measures
+  // here instead of leaving this table describing a diagram that has moved on.
+  { token: tokenOf(MARK_COLOR), on: "bg-secondary", alpha: MARK_OPACITY, label: "schema edge, arrowhead, legend swatches" },
+  { token: tokenOf(MARK_COLOR), on: "bg-tertiary", alpha: MARK_OPACITY, label: "schema archive node outline" },
+  { token: "accent", on: "bg-secondary", label: "schema connected edge and arrowhead" },
+  { token: "accent", on: "bg-tertiary", label: "schema selected outline, apply dot" },
+  { token: "text-secondary", on: "bg-tertiary", label: "schema hovered node outline" },
 ];
 
 /**
@@ -134,9 +155,15 @@ const NON_TEXT: Array<{ token: string; on: string; label: string }> = [
  * `SURFACES` counting as "accounted for" in the completeness test below is what left this measured by
  * nothing — and it is exactly the pairing that moves when either colour is re-authored.
  */
-const TEXT_ON_FILL: Array<{ token: string; on: string; label: string }> = [
+const TEXT_ON_FILL: Array<{ token: string; on: string; onAlpha?: number; label: string }> = [
   { token: "bg-primary", on: "accent", label: "primary button label (SelectRepo, empty states)" },
   { token: "bg-primary", on: "accent-hover", label: "primary button label, hovered" },
+  // `onAlpha` is a tint of a **different** token, which `TEXT_TOKENS.tints` cannot express — it asks
+  // only about a token over a tint of itself. That gap is why the schema diagram's `generates` line sat
+  // at 4.45:1 in the light theme, on a selected step, from the day the selection wash was added: the
+  // wash is accent, the text was text-muted, and nothing in this file could put the two together.
+  { token: "text-secondary", on: "accent", onAlpha: 0.1, label: "schema node labels on the selection wash" },
+  { token: "text-primary", on: "accent", onAlpha: 0.1, label: "schema step id on the selection wash" },
 ];
 
 /**
@@ -154,6 +181,37 @@ const TEXT_ON_FILL: Array<{ token: string; on: string; label: string }> = [
 const DECORATIVE_BORDERS: Record<string, string> = {
   "status-warning/40": "jj conflict badge — its text names the conflict",
   "accent/40": "default-schema badge, timeline heading, schema-flow legend — each labelled in text",
+};
+
+/**
+ * Alpha literals allowed to reach an SVG element, each with what accounts for it.
+ *
+ * `1` is not listed: full strength composites to the token itself, so it changes no measurement.
+ *
+ * A **named** alpha needs no entry either — `MARK_OPACITY` is imported into `NON_TEXT` above and
+ * measured at whatever it currently is, which is stronger than an entry here could be. What this
+ * table catches is the other spelling: a bare number typed at an element, which is measured by
+ * nothing and reads as deliberate.
+ */
+const SVG_ALPHAS: Record<string, string> = {
+  "0.1": "schema selection wash — measured in TEXT_ON_FILL as the tint the node labels sit on",
+};
+
+/**
+ * SVG colour that owes nothing, each with why.
+ *
+ * The same shape as `DECORATIVE_BORDERS` and for the same reason: what these record is the judgement
+ * that each *is* decoration, not an exemption from the rule. A token's role does not put it here — a
+ * surface token drawn as an SVG fill still has to say why, because "it is a surface" is precisely the
+ * answer that once left the primary button's label measured by nothing.
+ */
+const DECORATIVE_SVG: Record<string, string> = {
+  border:
+    "schema step outline — trim, not an indicator. The label carries a declared step at better than " +
+    "13:1; the archive step, whose dash *is* the sole carrier, is drawn in text-muted instead.",
+  "bg-tertiary":
+    "schema step fill — a surface, and 1.10:1 against the panel in both themes, so it carries nothing. " +
+    "The text on it is measured by TEXT_TOKENS against the worst surface, which is this one.",
 };
 
 /**
@@ -199,26 +257,39 @@ for (const [theme, tokens] of Object.entries(THEMES)) {
   });
 
   test(`${theme}: a graphic carrying its own information clears ${GRAPHIC_FLOOR}:1`, () => {
-    for (const { token, on, label } of NON_TEXT) {
+    for (const { token, on, alpha, label } of NON_TEXT) {
       const fg = tokens.get(token)!;
       const bg = tokens.get(on)!;
-      const ratio = contrast(fg, bg);
+      // A mark drawn at alpha is composited before it is compared: what the reader has to pick out is
+      // the blend, not the token.
+      const mark = alpha === undefined ? fg : over(fg, alpha, bg);
+      const ratio = contrast(mark, bg);
+      const at = alpha === undefined ? "" : ` at ${alpha * 100}%`;
       assert.ok(
         ratio >= GRAPHIC_FLOOR,
-        `${theme} ${label}: --color-${token} (${fg}) on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
+        `${theme} ${label}: --color-${token} (${fg})${at} on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
       );
     }
   });
 
   test(`${theme}: a surface token used as text on a solid fill clears ${TEXT_FLOOR}:1`, () => {
-    for (const { token, on, label } of TEXT_ON_FILL) {
+    for (const { token, on, onAlpha, label } of TEXT_ON_FILL) {
       const fg = tokens.get(token)!;
-      const bg = tokens.get(on)!;
-      const ratio = contrast(fg, bg);
-      assert.ok(
-        ratio >= TEXT_FLOOR,
-        `${theme} ${label}: --color-${token} (${fg}) on --color-${on} (${bg}) is ${ratio.toFixed(2)}:1`
-      );
+      const fill = tokens.get(on)!;
+      // A tint of another token is not a fill: it composites over whatever surface it lands on, so it
+      // is measured over the worst of them rather than against the token's own value.
+      const backgrounds =
+        onAlpha === undefined
+          ? [fill]
+          : SURFACES.map((surface) => over(fill, onAlpha, tokens.get(surface)!));
+      for (const bg of backgrounds) {
+        const ratio = contrast(fg, bg);
+        const at = onAlpha === undefined ? "" : ` at ${onAlpha * 100}%`;
+        assert.ok(
+          ratio >= TEXT_FLOOR,
+          `${theme} ${label}: --color-${token} (${fg}) on --color-${on}${at} (${bg}) is ${ratio.toFixed(2)}:1`
+        );
+      }
     }
   });
 }
@@ -346,13 +417,27 @@ test("no colour is applied to text by a hard-coded palette class", () => {
  * rather than by its use.
  *
  * **Enumerated**: a hard-coded palette class on text (`text-<family>-<shade>`), a token tint used as a
- * background (`bg-<token>/<alpha>`), a token tint used as a border (`border-<token>/<alpha>`), and
- * `opacity-*` on anything.
+ * background (`bg-<token>/<alpha>`), a token tint used as a border (`border-<token>/<alpha>`),
+ * `opacity-*` on anything, and a `--color-*` token reaching SVG.
  *
- * **Not enumerated**, and each would need its own scan: inline `style={{ color }}`, SVG presentation
- * attributes (the checkmark disc's `opacity="0.2"` — measured by hand, passing), `ring-*` / `outline-*` /
- * gradient utilities, and literal alphas of non-token colours (`bg-black/60` scrims). A mechanism the app
- * begins to use belongs here or in a scan, not in neither.
+ * That last one used to sit in the list below, on the strength of a single decorative occurrence. It
+ * moved when the schema workflow diagram began stating its dependencies, its declared-vs-derived
+ * distinction and its not-declared-by-this-schema mark entirely through SVG — an exclusion is a claim
+ * about how the app uses a mechanism, and the app goes on being written. It is scanned by the **token**,
+ * not by the attribute: the arrowhead colours live in an object literal and reach the element as
+ * `fill={color}`, so an attribute-scoped pattern would have missed them while reporting the diagram as
+ * covered, and matching the token needs no multi-line parse that could bridge two elements.
+ *
+ * The SVG scan is by token, so it forces a decision on a token nobody has classified — not on a second
+ * use of one already classified. That residue is stated with the scan itself.
+ *
+ * **Not enumerated**, and each would need its own scan: inline `style={{ color }}`; a bare `opacity` /
+ * `fill-opacity` / `stroke-opacity` SVG attribute on an element whose colour is *not* a token —
+ * `currentColor` and literal fills, which is the checkmark disc's `opacity="0.2"` in `ChangeDetail` and
+ * the two marks in `Layout`, all measured by hand and passing; `ring-*` / `outline-*` / gradient
+ * utilities; and literal alphas of non-token colours (`bg-black/60` scrims). A mechanism the app begins
+ * to use belongs here or in a scan, not in neither — and one already here belongs in a scan as soon as
+ * the app starts saying something with it.
  */
 
 test("no tint of a text token goes unmeasured", () => {
@@ -402,6 +487,73 @@ test("no alpha of a token reaches the screen through a border unaccounted for", 
     unaccounted,
     [],
     `measure it, or declare it in DECORATIVE_BORDERS with why it owes nothing:\n${unaccounted.join("\n")}`
+  );
+});
+
+test("no --color-* token reaches SVG unaccounted for", () => {
+  // The fifth mechanism. Matched by the token rather than by `stroke=` / `fill=`, because the two
+  // spellings that matter are not attributes: the arrowhead colours sit in an object literal consumed as
+  // `fill={color}`, and the node outline is a six-line ternary an attribute pattern would have to span.
+  //
+  // In this codebase a `--color-*` token reaches a .tsx file only to colour SVG — everything else goes
+  // through Tailwind utilities — so the token is the mechanism. If that stops being true, an occurrence
+  // arrives here needing a declaration rather than a measurement, which is a decision worth forcing.
+  //
+  // Its reach, stated because it is narrower than it looks: this surfaces a token **nobody has decided
+  // about**, not every new use of one already decided. A token measured as a mark in NON_TEXT counts as
+  // accounted for when it later appears as SVG text, where it would owe 4.5 rather than 3. Per-occurrence
+  // accounting would mean carrying source positions in the tables, which rots faster than it catches;
+  // what closes this instead is that the tables name where each entry applies, so a reader adding a use
+  // the label does not describe can see that it is undeclared.
+  const accounted = new Set([
+    ...Object.keys(TEXT_TOKENS),
+    ...NON_TEXT.map((m) => m.token),
+    ...TEXT_ON_FILL.map((m) => m.token),
+    ...Object.keys(DECORATIVE_SVG),
+  ]);
+  const pattern = /var\(--color-([a-z0-9-]+)\)/g;
+  const unaccounted: string[] = [];
+  for (const { path, text } of sources()) {
+    for (const m of text.matchAll(pattern)) {
+      if (!accounted.has(m[1])) unaccounted.push(`${path}: ${m[0]}`);
+    }
+  }
+  assert.deepEqual(
+    unaccounted,
+    [],
+    "measure it in NON_TEXT / TEXT_ON_FILL / TEXT_TOKENS, or declare it in DECORATIVE_SVG with why it " +
+      `owes nothing:\n${unaccounted.join("\n")}`
+  );
+});
+
+test("no alpha reaches an SVG element unaccounted for", () => {
+  // The token scan above surfaces *which* colour reaches SVG and this one surfaces *at what strength*,
+  // because the two are one fact: `--color-text-muted` is 5.17:1 at full strength and 1.39:1 at a quarter,
+  // and only the second of those is a defect. Without this, dropping the edge to `strokeOpacity={0.25}`
+  // passes every check in this file while drawing the diagram fainter than the hairline colour this
+  // change replaced.
+  //
+  // Two spellings, because the marker colours reach the element through an object literal rather than an
+  // attribute: `fillOpacity={opacity}` where `opacity: MARK_OPACITY` was set in a table above it.
+  //
+  // Only *numeric literals* are judged. An identifier is a pass-through — either it is a named constant
+  // measured where the table imports it, or its definition is an `opacity:` property this same scan
+  // reads. Chasing the binding would mean parsing, and the two ends are already covered.
+  const patterns = [/(?:stroke|fill)Opacity=\{([^}]*)\}/g, /\bopacity:\s*([^,}\n]+)/g];
+  const unaccounted: string[] = [];
+  for (const { path, text } of sources()) {
+    for (const pattern of patterns) {
+      for (const m of text.matchAll(pattern)) {
+        for (const literal of m[1].match(/\b\d*\.?\d+\b/g) ?? []) {
+          if (literal !== "1" && !(literal in SVG_ALPHAS)) unaccounted.push(`${path}: ${m[0].trim()}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual(
+    unaccounted,
+    [],
+    `name it (a constant the tables measure) or declare it in SVG_ALPHAS:\n${unaccounted.join("\n")}`
   );
 });
 
