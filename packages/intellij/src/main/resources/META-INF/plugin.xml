@@ -25,17 +25,18 @@
     ]]></description>
 
     <change-notes><![CDATA[
-        <p><b>1.14.0</b></p>
-        <p><b>The light theme is readable.</b> The tool window follows the IDE's theme, so this is what a reader gets rather than a mode they chose, and nearly every colour in the light one failed WCAG AA. An error message measured 2.76:1; the spec diff's added lines 1.70:1, sitting directly beside removed lines that were merely bad. The dark theme was audited on the same terms and carried two failures of its own.</p>
+        <p><b>1.15.0</b></p>
+        <p><b>The schema workflow diagram now says which steps come <i>after</i> implementation &mdash; and its lines can finally be seen.</b> OpenSpec has no way to declare "this artifact is produced once the change is implemented": an artifact's <code>requires</code> may name only other artifacts, so authors point such a step at the last planning artifact and state the real ordering in prose. spek rendered the declared graph faithfully, which put those steps on <code>apply</code>'s own level, reading as its peers.</p>
         <ul>
-            <li><b>Error, success and warning colours are now defined per theme.</b> Each was one shade applied to both, and none of them reaches even 3:1 on a light background &mdash; the spec diff's added and removed lines, every page's error message and the jj conflict badge all failed there.</li>
-            <li><b>Secondary text is readable in both themes.</b> Timestamps, counts and empty states measured 2.34:1 light and 3.54:1 dark.</li>
-            <li><b>Links, the active sidebar item and search highlighting</b> take a deeper amber in the light theme; the previous one was 3.04:1 as text and 3.50:1 behind a search hit's tint.</li>
-            <li><b>A completed task no longer fades its own links and code spans.</b> The row carried 60% opacity, which composites everything beneath it &mdash; its body text measured 3.24:1 dark and 2.77:1 light. Completion is marked by colour now, with the strikethrough and checkmark unchanged.</li>
-            <li><b>The task progress bar's complete state is distinguishable from its track</b> &mdash; 2.02:1 before, in the light theme.</li>
-            <li><b>The graph and the timeline follow the theme.</b> Node fills, legend swatches and the archived timeline bars were hard-coded colours no theme could reach; the graph's spec nodes measured 1.85:1 on a light page and its archived nodes 2.93:1 in the dark one. Edges are now drawn in a colour that can be seen, labels carry a halo where they overlap a node, and the "today" marker is at full strength.</li>
-            <li><b>A CLI failure is no longer remembered for the full cache window.</b> An unreachable <code>openspec</code> binary left the schema pages reporting "unavailable" for 30 seconds after the cause was fixed (issue #46).</li>
-            <li><b>Building from source works on Windows.</b> The <code>@spekjs/core</code> and <code>@spekjs/ui</code> build scripts used Unix-only commands. Thanks to <a href="https://github.com/nthansen">@nthansen</a> (Norman Hansen), PR #47.</li>
+            <li><b>A step that follows implementation is drawn after <code>apply</code>, on a dashed edge captioned as spek's inference.</b> The ordering is derived from the <code>requires</code> graph and is never drawn like a declared one, because <code>openspec status</code> does not block on it. Of the 88 OpenSpec schemas discoverable on GitHub, 18 declare such a step. Thanks to <a href="https://github.com/nthansen">@nthansen</a> (Norman Hansen), PR #48.</li>
+            <li><b><code>apply</code> is a real node in the flow now</b>, so the steps after it hang off it and <code>archive</code> follows the tail. A schema that declares an artifact literally <i>named</i> <code>apply</code> no longer collapses into the apply phase &mdash; both are separate, selectable steps.</li>
+            <li><b>A derived edge is explained once, and never erases a dependency the CLI enforces.</b> Where a declared path already implies the ordering the derived edge is dropped; where the reverse held, an inference used to imply a real <code>requires</code> away.</li>
+            <li><b>An edge no longer detours through the node it exists to go around.</b> Two edges converging on one step were ordered by the other end's column alone, so a tie put the long way round on the inside slot.</li>
+            <li><b>Every line in the diagram is visible in both themes.</b> Edges, arrowheads, the archive step's dashed outline and both legend swatches were drawn in the panel-hairline colour &mdash; 1.22:1 dark and 1.13:1 light at full strength. They now measure 5.52:1 and 5.17:1.</li>
+            <li><b>A selected step's <code>generates</code> label is readable</b> &mdash; over the accent wash a selected step draws it measured 4.45:1 in the light theme.</li>
+            <li><b>A graph node's label stays readable whichever node is drawn next to it.</b> The halo behind each label was painted inside its own node's group, so it survived only the collisions with nodes drawn before it.</li>
+            <li><b>An unreadable response from the OpenSpec CLI is treated as a failure, not as an answer.</b> An exit-0 run whose output could not be parsed was cached as "this schema has no artifact order" for the full cache window.</li>
+            <li><b>An installation that cannot answer the artifact-order query stops costing a process start per change.</b> A refusal is now remembered against the change it was about, instead of being re-run on every open and every refresh.</li>
         </ul>
     ]]></change-notes>
 
