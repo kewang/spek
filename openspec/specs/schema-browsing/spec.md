@@ -479,11 +479,59 @@ The view SHALL state that the connections between steps are the schema's declare
 same dependencies the OpenSpec CLI blocks on — and SHALL make available the fact that a step's
 instructions may impose ordering the dependency graph does not express. Both MAY be expressed as a
 label and its tooltip rather than as running prose; the accumulated caveats on this view had grown
-into a paragraph, and a paragraph nobody reads conveys nothing. The graph SHALL NOT be augmented with edges the CLI does not
-enforce: `superpowers-bridge` declares `verify.requires: [plan]` while its own instruction says
-verify must run after implementation, enforcing that with a runtime precheck rather than through
-the graph, and drawing an inferred `apply → verify` edge would show a constraint that does not
-exist in `openspec status`.
+into a paragraph, and a paragraph nobody reads conveys nothing.
+
+Every edge the diagram draws SHALL carry the source it came from — declared by the schema, or
+derived by spek — and that source SHALL be decided where the edge is produced rather than by the
+step it happens to connect. The diagram MAY draw an edge the schema does not declare **only** where
+that edge is visually distinguishable from a declared one and identified as derived, naming what it
+was derived from. No derived edge SHALL be drawn in a form a reader could mistake for a dependency
+`openspec status` blocks on. An edge the schema *does* declare SHALL be drawn as a declared edge
+whatever it connects, so that an ordering the schema states carries no derived marking. This
+replaces a blanket prohibition on inferred edges. That prohibition was correct that
+an ordinary edge asserts CLI enforcement, but it treated the alternative as neutral, and it is not:
+OpenSpec's format cannot express an artifact produced after implementation — an artifact's
+`requires` may name only other artifacts — so authors point such an artifact at the last planning
+artifact and state the real ordering in prose. Drawing it by its declared dependency alone puts it
+on the apply step's own level, asserting an interchangeability with implementation that is wrong in
+every real instance, and inviting exactly the mistake those schemas' runtime prechecks exist to
+block.
+
+A step's ordering relative to implementation SHALL be taken from the schema wherever the schema
+states it, and derived only where the schema does not. This precedence SHALL hold per step, so a
+schema stating the ordering for one artifact and not another is served without either being
+mishandled. The requirement below is on the ordering that results and on its being marked with the
+source it came from — **not** on any particular means of arriving at it. OpenSpec's format cannot
+currently express such an ordering, so today every such ordering is derived; a later format that can
+express it SHALL be used in preference, and satisfies this requirement without changing it.
+
+Where the ordering is derived, a step SHALL be identified as **post-implementation** when, and only
+when, all of the following hold: the schema declares an apply step; at least one id in
+`apply.requires` resolves to a declared artifact; the artifact graph is acyclic; the step is outside
+the transitive closure of `apply.requires`; and the step's own transitive closure covers every
+resolvable id in `apply.requires`. Together these establish that the step cannot become available
+before apply does and that apply does not require it. The two guards are not decoration: with no
+resolvable requirement the closure test is vacuously true and would identify every artifact, and
+under a cycle the levels are already a positional fallback rather than a reading of the graph.
+
+Each post-implementation step SHALL be given a derived dependency on the apply step, so that it is
+levelled after implementation rather than beside it. Levelling SHALL continue to use the full
+declared `requires`, and the derived edge SHALL be subject to the same transitive reduction as a
+declared one, so that a step whose declared dependency the apply step already covers draws a single
+incoming connection rather than two.
+
+The view SHALL NOT claim more for a derived edge than the derivation supports. The rule establishes
+that apply does not require the step and that the step cannot precede apply; it does not establish
+that the schema's author intended the step to follow implementation. Two kinds of step satisfy it
+without being post-implementation — a planning artifact that happens to depend on everything apply
+requires, and a schema that models implementation as an ordinary artifact instead of through
+`apply` — and no signal in the declared format separates either from a genuine post-implementation
+step. That is why the edge is marked as derived rather than asserted.
+
+Two steps SHALL remain distinct whenever their ids collide. A schema MAY declare an artifact named
+`apply`, which is a different step from the apply phase the schema declares under its `apply:` key,
+and both SHALL be addressable, connectable, and selectable independently. Identifying a step by its
+declared id alone silently discards one of the two and resolves connections to the wrong step.
 
 A step whose output contains a wildcard SHALL NOT carry a separate marker saying so, and the flow
 SHALL NOT carry a standing sentence explaining it: a `generates` value such as `specs/**/*.md`
@@ -539,9 +587,11 @@ the diagram itself and named in its legend.
 
 The archive step SHALL depend on every **leaf** — each step nothing else requires — rather than on
 the last step alone, because a change becomes archivable only once everything it declares is
-finished. It SHALL carry no instruction or output, and any guidance shown for it SHALL be
-identified as spek's own rather than the schema's. It SHALL be excluded from any count of the
-schema's artifacts, which would otherwise be inflated by one for every schema alike.
+finished. A derived dependency counts for this as a declared one does, so a schema whose
+post-implementation steps follow apply leaves apply no longer a leaf. It SHALL carry no instruction
+or output, and any guidance shown for it SHALL be identified as spek's own rather than the
+schema's. It SHALL be excluded from any count of the schema's artifacts, which would otherwise be
+inflated by one for every schema alike.
 
 The apply step SHALL be rendered as a step of the same flow, showing what it requires, what file it
 tracks, and its instruction — because when a change becomes implementable is part of the workflow
@@ -549,14 +599,17 @@ being explained. It SHALL be levelled from its own `requires` exactly as an arti
 NOT be forced to the end of the flow: a schema may declare artifacts that come *after*
 implementation, and pinning apply last would place them before it. Only when apply requires nothing
 the schema declares — leaving no dependency to place it by — SHALL it be placed after every
-artifact. Because apply may therefore share a level with an artifact, its distinguishing marker
-SHALL be carried by the step itself rather than by the level.
+artifact. Apply SHALL be levelled as a full participant in the graph rather than as a step
+positioned after the fact, since steps derived to follow it take their own level from its level.
+Because apply may still share a level with an artifact, its distinguishing marker SHALL be carried
+by the step itself rather than by the level.
 
 Apply SHALL be excluded from the artifact count, by the same rule that excludes archiving: it
 belongs to every schema alike, so counting it adds the same constant everywhere and distinguishes
 nothing. It is also the only work a schema declares outside `artifacts:` — the sole top-level keys
 any surveyed schema uses are `name`, `version`, `description`, `artifacts`, `apply` and `format`
-(parsing configuration, not a step) — so excluding it leaves nothing else uncounted.
+(parsing configuration, not a step) — so excluding it leaves nothing else uncounted. An artifact a
+schema happens to name `apply` is a declared artifact and SHALL be counted as one.
 
 Requesting a schema that does not resolve SHALL render a not-found state naming the schema, not a
 blank or errored page.
@@ -609,7 +662,52 @@ blank or errored page.
 #### Scenario: No edge is inferred beyond what the schema declares
 
 - **WHEN** a schema declares `verify.requires: [plan]` while its instruction says verify must follow implementation
-- **THEN** the diagram draws only the declared edge, placing `verify` by its declared dependency, and adds no inferred edge from the apply step
+- **THEN** the ordering drawn is taken from the declared `requires` graph alone and never from the instruction text, and any connection not itself declared is one the declared graph entails, drawn in the derived form rather than as a declared dependency
+
+#### Scenario: A post-implementation step is placed after apply
+
+- **WHEN** a schema declares `verify` requiring `plan` and `retrospective` requiring `verify`, and its apply step requires only `plan`
+- **THEN** apply appears one level after `plan`, `verify` one level after apply, and `retrospective` after `verify` — rather than `verify` sharing apply's level
+
+#### Scenario: A derived edge is distinguishable from a declared one
+
+- **WHEN** the diagram draws the connection from apply into a post-implementation step
+- **THEN** that connection is rendered differently from a declared `requires` connection and is identified as derived rather than as a dependency the CLI blocks on
+
+#### Scenario: A declared edge the derived edge implies is not drawn twice
+
+- **WHEN** `verify` declares `requires: [plan]`, apply requires `plan`, and `verify` is derived to follow apply
+- **THEN** `verify` draws a single incoming connection, from apply, because the path through apply already carries the declared dependency on `plan`
+
+#### Scenario: A derived edge implied by another path is not drawn
+
+- **WHEN** `retrospective` declares `requires: [verify]` and both `verify` and `retrospective` follow implementation
+- **THEN** only `verify` draws a derived connection from apply, because `retrospective` already reaches apply through `verify` and a second derived edge would state nothing new
+
+#### Scenario: No step is derived when apply has no resolvable requirement
+
+- **WHEN** a schema's apply step requires only ids the schema does not declare
+- **THEN** no step is identified as post-implementation, and every artifact keeps the level its declared `requires` give it
+
+#### Scenario: No step is derived when the graph is cyclic
+
+- **WHEN** a schema's `requires` form a cycle, so levels fall back to positional
+- **THEN** no step is identified as post-implementation and no derived edge is drawn
+
+#### Scenario: A step apply requires is never derived to follow it
+
+- **WHEN** an artifact is inside the transitive closure of `apply.requires`
+- **THEN** it is drawn before apply by its declared dependencies, whatever else it requires
+
+#### Scenario: A step outside apply's closure that can precede it keeps its place
+
+- **WHEN** a schema's apply step requires `proposal`, `specs`, and `verification`, and an artifact outside apply's closure requires only `specs`
+- **THEN** that artifact keeps the level its declared `requires` give it and is not derived to follow apply, because its dependencies do not cover everything apply requires
+
+#### Scenario: An artifact named apply stays distinct from the apply step
+
+- **WHEN** a schema declares an artifact whose id is `apply`, alongside the apply step declared under its `apply:` key
+- **THEN** both appear as separate steps, each selectable on its own, with connections resolving to the intended one and neither replacing the other
 
 #### Scenario: A pattern-generating step is marked as such
 
@@ -668,8 +766,13 @@ blank or errored page.
 
 #### Scenario: Archiving waits for every leaf
 
-- **WHEN** a schema ends with two steps that feed nothing else, such as `apply` and `retrospective`
+- **WHEN** a schema ends with two steps that feed nothing else, such as an apply step and a `glossary` artifact nothing requires
 - **THEN** the archive step depends on both, not on whichever comes last
+
+#### Scenario: Archiving waits for the post-implementation tail
+
+- **WHEN** a schema's `retrospective` is derived to follow `verify`, which is derived to follow apply
+- **THEN** the archive step depends on `retrospective` and not also on apply, because apply is no longer a step that nothing else requires
 
 #### Scenario: Artifacts sharing a dependency level are counted separately
 
@@ -695,6 +798,11 @@ blank or errored page.
 
 - **WHEN** the artifact count is shown for a schema
 - **THEN** it counts only the artifacts the schema declares, and the archive step is not among them
+
+#### Scenario: An artifact named apply is counted as an artifact
+
+- **WHEN** a schema declares 9 artifacts, one of them named `apply`, alongside its apply step
+- **THEN** it reports 9 artifacts — the declared artifact counts, and the apply step remains excluded
 
 #### Scenario: Archiving shows no schema guidance
 

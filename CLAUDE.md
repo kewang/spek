@@ -200,8 +200,10 @@ filesystem read to decide what a schema is, that is the regression.
 
 **`schema-flow.ts` is browser-safe and exported at the `@spekjs/core/schema-flow` subpath** (like `headings`), because
 the SPA needs the graph maths and the package index reaches for `child_process`. It owns facts about the `requires`
-graph — `computeArtifactLevels`, `applyStepLevel`, `schemaArtifactCount`, `drawableRequires` — kept out of the view's
-geometry on purpose. Two rules worth knowing:
+graph — `computeArtifactLevels`, `levelArtifacts`, `applyStepLevel`, `schemaArtifactCount`,
+`drawableEdges` (and `drawableRequires`, its provenance-free delegate), `postApplyArtifacts`,
+`resolveImplementationOrdering` — kept out of the view's
+geometry on purpose. Three rules worth knowing:
 - **`artifactCount` is one per declared artifact, and the noun is OpenSpec's, not ours.** `artifacts:` is the
   `schema.yaml` key, the CLI's enumeration field, and `planningArtifacts` in `status`; spek views OpenSpec content, so a
   synonym would just make a reader translate back. Two artifacts sharing a dependency level count separately — both are
@@ -213,9 +215,35 @@ geometry on purpose. Two rules worth knowing:
   `requires` — enough for the count, so no summary needs a definition read. An earlier `stageCount` defined as *distinct
   dependency levels* needed the whole `requires` graph, which meant a `schema which` per schema on a cold list. If you
   find yourself reaching for a definition to fill a `SchemaSummary` field, that is the regression.
-- **The diagram draws the transitive reduction** (`drawableRequires`). A `requires` entry a longer path already implies
-  states nothing new, and drawing it is worse than redundant — it detours around the very step that implies it. Across
-  eleven community schemas surveyed, *every* curved edge was one of these. Levelling still uses the **full** `requires`.
+- **The diagram draws the transitive reduction** (`drawableEdges`, over origin-carrying edges). A `requires` entry a
+  longer path already implies states nothing new, and drawing it is worse than redundant — it detours around the very
+  step that implies it. Across eleven community schemas surveyed, *every* curved edge was one of these. Levelling still
+  uses the **full** `requires`.
+- **A step that follows implementation is *derived*, and the diagram says so.** OpenSpec cannot express it: an
+  artifact's `requires` may name only other artifacts (the CLI's build-order pass dereferences each entry as a declared
+  artifact), and `status` treats every artifact as a *planning* artifact, telling you to apply once all of them exist.
+  So authors point such an artifact at the last planning artifact and state the truth in prose — `superpowers-bridge`'s
+  `verify` and `anvil`'s both do. `postApplyArtifacts` recovers it: outside the transitive closure of `apply.requires`,
+  and its own closure covers all of `apply.requires` — so it cannot precede apply and apply does not need it. Two
+  guards, each for a real input: **at least one resolvable `apply.requires`** (the superset test is vacuously true
+  against an empty set and would flag everything) and an **acyclic graph** (levels are declaration order under a cycle,
+  so there is no ordering to derive against).
+  This is a **bound, not a reading of intent** — about 82% precise over the ~88 schemas discoverable on GitHub. It
+  misreads planning artifacts that happen to depend on everything apply requires, and schemas that model implementation
+  as an ordinary artifact rather than through `apply`; nothing declared separates those from the real thing. Hence the
+  edge is drawn **dashed and labelled derived**, never as a dependency the CLI blocks on. Ask
+  `resolveImplementationOrdering`, which returns the ordering *and its source* (`declared` | `derived`) per step: when
+  OpenSpec ships a way to declare this (#1456), it is a branch there and nothing else moves — pinned by a test that a
+  schema naming the apply phase in its `requires` renders as an ordinary solid edge. **The derived edge is reduced
+  like a declared one** (`drawableEdges`, a plain transitive reduction counting declared and derived hops alike): a
+  post-implementation step whose declared dependency apply already covers draws **one** edge, from apply, not two —
+  `anvil`'s `verify` declares `requires: [tasks]` and apply requires `tasks`, so `tasks → apply ⇢ verify` carries it
+  and the direct `tasks → verify` edge is dropped. This is the bound the derivation *accepts*, not a fact it hides: on
+  the ~18% misread, the surviving edge is the derived (dashed, captioned) one, so the reader is told it is an inference;
+  the exact `requires` still lives in the panel. Keeping the declared edge alongside — the earlier belt-and-suspenders
+  after `spec-super` showed only a dashed line — drew every correct case with two lines saying one ordering, undoing
+  the simplification this feature exists for. Levelling runs on the **full** graph *before* that reduction, so the
+  levels stay a guarantee rather than a coincidence.
 
 **`openspec-cli.ts`**: one place for spawning the CLI (stderr discarded, `windowsHide`) and for `ttlCached` (256-entry
 cap). The two durations live in **`cli-budget.ts`** — its own browser-safe subpath, because the webview must derive its
@@ -599,6 +627,14 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   a `<Link>` once it contains a link of its own (nested anchors are invalid, and the inner one becomes unreachable), so
   the card is a `relative` container, the title carries an `after:absolute after:inset-0` overlay, and anything that
   must stay clickable sits above it with `relative z-10` — which is why `SchemaBadge` carries those classes
+- **A schema workflow step is identified by `FlowStep.key`, never by its declared id.** A schema may declare an
+  artifact named `apply`, which is a different step from the phase under its `apply:` key — `superspec` does exactly
+  that, as an implementation receipt. Keyed by id, the two collapsed in every map in `schemaLayout` and connections
+  resolved to whichever won; selection could only ever reach one of them. Keys are the declared id **unless already
+  claimed**, so for a schema without a collision the key *is* the id and the drawn graph still reads in the schema's own
+  vocabulary. `id` stays the label and the value a `requires` resolves against. Upstream has the same collision
+  (OpenSpec #1456: `openspec instructions` cannot reach an artifact named `archive`), so be tolerant of the input rather
+  than normalising it away — renaming it would make the view disagree with `openspec status`
 - **Webview CSP**: IIFE + nonce script + unsafe-inline styles (Tailwind needs it)
 - **Host flags**: VS Code sets `window.__vscodeApi` (`acquireVsCodeApi` called once, stored globally), IntelliJ
   `window.__spekIntellij`, Demo `window.__DEMO_DATA__`. `useFileWatcher` picks its refresh channel from these flags, so

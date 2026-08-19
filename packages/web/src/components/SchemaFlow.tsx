@@ -1,6 +1,7 @@
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { SchemaGraph } from "./SchemaGraph";
-import { isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
+import { DERIVED_EDGE_MEANING, isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
+import { ARCHIVE_DASH, ARROW_LEN, DERIVED_DASH } from "../utils/schemaLayout";
 
 /**
  * The schema workflow: a diagram of the steps and their dependencies, with the selected step's
@@ -99,6 +100,17 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
           {step.description && (
             <p className="text-text-secondary mt-1 text-sm">{step.description}</p>
           )}
+          {/* No chip after a possessive: `px-1.5` plus the word space reads as a double space. */}
+          {step.incoming.some((edge) => edge.origin === "derived") && (
+            <p className="text-text-muted border-accent/40 mt-2 border-l-2 pl-2 text-xs">
+              <span className="text-text-secondary font-semibold">
+                Assumed to run after apply.
+              </span>{" "}
+              spek&apos;s guess, since it relies on the same artifacts apply does — not something{" "}
+              <code className="bg-bg-tertiary text-accent rounded px-1.5 py-0.5">openspec</code>{" "}
+              enforces.
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -142,24 +154,29 @@ export function SchemaStepDetail({ step, onClose }: { step: FlowStep; onClose: (
 export function SchemaFlow({
   steps,
   levels,
-  selectedId,
+  selectedKey,
   onSelect,
 }: {
   steps: FlowStep[];
   levels: FlowLevel[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** Step *key*, never a declared id — two steps may share an id, and both must be selectable. */
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
 }) {
   if (steps.length === 0) {
     return <p className="text-text-muted">This schema declares no workflow steps.</p>;
   }
+
+  const hasDerivedEdge = steps.some((step) =>
+    step.incoming.some((edge) => edge.origin === "derived"),
+  );
 
   return (
     // Framed, like the Graph and Timeline views. Both wrap their visualisation in this exact
     // surface; ours floated loose on the page background, which is most of why it read as less
     // finished than they do.
     <div className="bg-bg-secondary border-border rounded border p-4">
-      <SchemaGraph levels={levels} selectedId={selectedId} onSelect={onSelect} />
+      <SchemaGraph levels={levels} selectedKey={selectedKey} onSelect={onSelect} />
 
       {/* One row of labels, no prose. Every caveat here was defensible on its own and together
           they had grown into a paragraph nobody would read. What survives is what a reader cannot
@@ -180,9 +197,20 @@ export function SchemaFlow({
           implementation
         </span>
         <span className="flex items-center gap-1.5">
-          {/* A miniature of the archive node. At 12x8 with a 1px dash this was present in the DOM
-              and invisible on screen — a legend mark has to read as the thing it stands for. */}
-          <span className="border-text-secondary inline-block h-3.5 w-6 shrink-0 rounded-[3px] border border-dashed" />
+          {/* A miniature of the archive node — same dash (ARCHIVE_DASH) and border colour, so the
+              legend mark reads as the node it stands for rather than a third dash pattern. */}
+          <svg width="24" height="14" viewBox="0 0 24 14" aria-hidden="true" className="shrink-0">
+            <rect
+              x="0.5"
+              y="0.5"
+              width="23"
+              height="13"
+              rx="3"
+              fill="none"
+              stroke="var(--color-border)"
+              strokeDasharray={ARCHIVE_DASH}
+            />
+          </svg>
           not declared by this schema
         </span>
         <span>same row = either order</span>
@@ -190,8 +218,29 @@ export function SchemaFlow({
           title="openspec blocks a step until its requires exist. A step's instructions may add ordering the graph does not state."
           className="underline decoration-dotted underline-offset-2"
         >
-          arrows = declared requires
+          solid arrows = declared requires
         </span>
+        {/* Only when the diagram actually contains one. A legend entry for a mark that is not on
+            screen teaches a distinction the reader then goes looking for and cannot find, and most
+            schemas declare nothing after implementation, so most diagrams have no dashed edge. */}
+        {hasDerivedEdge && (
+          <span
+            title={DERIVED_EDGE_MEANING}
+            className="flex items-center gap-1.5 underline decoration-dotted underline-offset-2"
+          >
+            <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true" className="shrink-0">
+              <path
+                d={`M 0 4 H ${24 - ARROW_LEN}`}
+                stroke="var(--color-border)"
+                strokeWidth={1.5}
+                strokeDasharray={DERIVED_DASH}
+                fill="none"
+              />
+              <path d={`M ${24 - ARROW_LEN} 0.5 L 24 4 L ${24 - ARROW_LEN} 7.5 z`} fill="var(--color-border)" />
+            </svg>
+            dashed = order spek derived, not declared
+          </span>
+        )}
       </div>
     </div>
   );

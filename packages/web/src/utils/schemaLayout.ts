@@ -1,4 +1,4 @@
-import { drawableRequires } from "@spekjs/core/schema-flow";
+import { drawableEdges, type OrderingSource } from "@spekjs/core/schema-flow";
 import type { FlowLevel, FlowStep } from "./schemaView";
 
 /**
@@ -30,6 +30,12 @@ const PAD = 8;
  */
 export const ARROW_LEN = 9;
 
+/** Dash of a derived connection, shared with the legend swatch that has to match it. */
+export const DERIVED_DASH = "5 4";
+
+/** Dash of the archive node's border ("not declared by this schema"), shared with its legend swatch. */
+export const ARCHIVE_DASH = "4 3";
+
 /** Smallest clearance between a bypassing curve and the nodes it passes. */
 const LANE_MIN = 20;
 /** Largest bow we will attempt before accepting the widest one we tried. */
@@ -48,12 +54,18 @@ interface LayoutNode {
 }
 
 interface LayoutEdge {
-  /** Step id the edge comes from (a prerequisite). */
+  /** Step key the edge comes from (a prerequisite). */
   from: string;
-  /** Step id the edge goes to (the dependent step). */
+  /** Step key the edge goes to (the dependent step). */
   to: string;
   /** Cubic bezier from the bottom of `from` to the top of `to`. */
   path: string;
+  /**
+   * Whose authority this connection rests on. `derived` is an ordering spek worked out because the
+   * schema had no way to state it, and the view must draw it so a reader can tell it apart from a
+   * dependency the CLI blocks on.
+   */
+  origin: OrderingSource;
 }
 
 // Not exported: callers destructure what layoutGraph returns rather than naming its type, so
@@ -171,17 +183,17 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
   if (levels.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
 
   const levelOf = new Map<string, number>();
-  levels.forEach((level, i) => level.steps.forEach((step) => levelOf.set(step.id, i)));
+  levels.forEach((level, i) => level.steps.forEach((step) => levelOf.set(step.key, i)));
 
-  const declared = new Set(levels.flatMap((l) => l.steps.map((s) => s.id)));
+  const present = new Set(levels.flatMap((l) => l.steps.map((s) => s.key)));
   const parentsOf = new Map<string, string[]>();
   const childrenOf = new Map<string, string[]>();
   for (const level of levels) {
     for (const step of level.steps) {
-      const parents = step.requires.filter((id) => declared.has(id));
-      parentsOf.set(step.id, parents);
+      const parents = step.incoming.map((edge) => edge.from).filter((key) => present.has(key));
+      parentsOf.set(step.key, parents);
       for (const parent of parents) {
-        childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), step.id]);
+        childrenOf.set(parent, [...(childrenOf.get(parent) ?? []), step.key]);
       }
     }
   }
@@ -193,7 +205,7 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
   const xOf = new Map<string, number>();
   for (const level of levels) {
     const startX = (widest - levelWidth(level.steps.length)) / 2;
-    level.steps.forEach((step, i) => xOf.set(step.id, startX + i * (NODE_W + X_GAP)));
+    level.steps.forEach((step, i) => xOf.set(step.key, startX + i * (NODE_W + X_GAP)));
   }
   const centreOf = (id: string) => (xOf.get(id) ?? 0) + NODE_W / 2;
 
@@ -208,9 +220,9 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     for (const level of order) {
       const desired = level.steps.map((step) => {
         const neighbours = downward
-          ? (parentsOf.get(step.id) ?? [])
-          : (childrenOf.get(step.id) ?? []);
-        if (neighbours.length === 0) return centreOf(step.id);
+          ? (parentsOf.get(step.key) ?? [])
+          : (childrenOf.get(step.key) ?? []);
+        if (neighbours.length === 0) return centreOf(step.key);
         return neighbours.reduce((sum, id) => sum + centreOf(id), 0) / neighbours.length;
       });
 
@@ -224,7 +236,7 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
       const drift =
         desired.reduce((sum, centre, i) => sum + (centre - NODE_W / 2 - packed[i]), 0) /
         desired.length;
-      level.steps.forEach((step, i) => xOf.set(step.id, packed[i] + drift));
+      level.steps.forEach((step, i) => xOf.set(step.key, packed[i] + drift));
     }
   }
 
@@ -235,7 +247,7 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
       for (const step of level.steps) {
         out.push({
           step,
-          x: (xOf.get(step.id) ?? 0) - minX + padLeft,
+          x: (xOf.get(step.key) ?? 0) - minX + padLeft,
           y: PAD + row * (NODE_H + Y_GAP),
         });
       }
@@ -243,9 +255,16 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     return out;
   };
 
+  // Which edges to draw is a graph fact, settled once here rather than inside `buildEdges` (which runs
+  // twice: measure the bows, then draw). Core owns the rule — a plain transitive reduction, declared
+  // and derived hops counted alike.
+  const drawable = drawableEdges(
+    levels.flatMap((l) => l.steps).map((step) => ({ id: step.key, incoming: step.incoming })),
+  );
+
   const passedBy = (nodes: LayoutNode[], fromLevel: number, toLevel: number): LayoutNode[] =>
     nodes.filter((n) => {
-      const l = levelOf.get(n.step.id) ?? 0;
+      const l = levelOf.get(n.step.key) ?? 0;
       return l > fromLevel && l < toLevel;
     });
 
@@ -258,16 +277,13 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
    * Everything here is translation-invariant, so the second run finds the same bows as the first.
    */
   const buildEdges = (nodes: LayoutNode[]) => {
-    const byId = new Map(nodes.map((n) => [n.step.id, n]));
+    const byKey = new Map(nodes.map((n) => [n.step.key, n]));
 
-    // What each step really adds, from core: an entry a longer path already implies is not drawn.
-    // A `requires` naming something the schema does not declare is dropped there too.
-    const drawable = drawableRequires(nodes.map((n) => n.step));
-    const pairs: Array<{ parent: LayoutNode; child: LayoutNode }> = [];
+    const pairs: Array<{ parent: LayoutNode; child: LayoutNode; origin: OrderingSource }> = [];
     for (const node of nodes) {
-      for (const requiredId of drawable.get(node.step.id) ?? []) {
-        const parent = byId.get(requiredId);
-        if (parent) pairs.push({ parent, child: node });
+      for (const edge of drawable.get(node.step.key) ?? []) {
+        const parent = byKey.get(edge.from);
+        if (parent) pairs.push({ parent, child: node, origin: edge.origin });
       }
     }
 
@@ -278,6 +294,14 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
      * other — `specs` and `design` both arriving at `tasks` looked like a single smudged arrow.
      * Slots are ordered by the other end's position so the fan does not cross itself.
      *
+     * Ties are broken by **how far away the other end is, nearest first**. Two ends in the same
+     * column say nothing about left and right, so the order was whatever the edge list happened to
+     * hold — which put the long way round on the inside slot and crossed it over the short one. A
+     * distant end is the one that has to travel around whatever sits between, so it takes the outer
+     * slot and its detour stays outside the direct edge instead of cutting through it. (The
+     * derived-edge case that first exposed this — a step drawn after apply beside its declared
+     * parent in the same column — no longer arises now that the redundant declared edge is reduced
+     * away; the tiebreak stays for any same-column convergence that survives reduction.)
      */
     const anchor = (
       key: (p: { parent: LayoutNode; child: LayoutNode }) => LayoutNode,
@@ -285,15 +309,18 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     ) => {
       const groups = new Map<string, Array<{ parent: LayoutNode; child: LayoutNode }>>();
       for (const pair of pairs) {
-        const id = key(pair).step.id;
+        const id = key(pair).step.key;
         groups.set(id, [...(groups.get(id) ?? []), pair]);
       }
       const at = new Map<string, number>();
       for (const [, group] of groups) {
-        const sorted = [...group].sort((a, b) => other(a).x - other(b).x);
+        const base = levelOf.get(key(group[0]).step.key) ?? 0;
+        const span = (p: { parent: LayoutNode; child: LayoutNode }) =>
+          Math.abs((levelOf.get(other(p).step.key) ?? 0) - base);
+        const sorted = [...group].sort((a, b) => other(a).x - other(b).x || span(a) - span(b));
         sorted.forEach((pair, i) => {
           at.set(
-            `${pair.parent.step.id}->${pair.child.step.id}`,
+            `${pair.parent.step.key}->${pair.child.step.key}`,
             key(pair).x + (NODE_W * (i + 1)) / (sorted.length + 1),
           );
         });
@@ -313,8 +340,8 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
     const columnLeft = Math.min(...nodes.map((n) => n.x));
     const columnRight = Math.max(...nodes.map((n) => n.x + NODE_W));
 
-    for (const { parent, child } of pairs) {
-      const edgeKey = `${parent.step.id}->${child.step.id}`;
+    for (const { parent, child, origin } of pairs) {
+      const edgeKey = `${parent.step.key}->${child.step.key}`;
       const p0: Point = [exitX.get(edgeKey) ?? parent.x + NODE_W / 2, parent.y + NODE_H];
       // Stops short so the arrowhead fills the remaining gap rather than sitting on top of the
       // stroke. The arrow's tip lands on the node's edge.
@@ -322,8 +349,8 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
       const dy = p3[1] - p0[1];
       const passed = passedBy(
         nodes,
-        levelOf.get(parent.step.id) ?? 0,
-        levelOf.get(child.step.id) ?? 0,
+        levelOf.get(parent.step.key) ?? 0,
+        levelOf.get(child.step.key) ?? 0,
       );
 
       let p1: Point = [p0[0], p0[1] + dy * TANGENT];
@@ -353,9 +380,10 @@ export function layoutGraph(levels: FlowLevel[]): GraphLayout {
       }
 
       edges.push({
-        from: parent.step.id,
-        to: child.step.id,
+        from: parent.step.key,
+        to: child.step.key,
         path: `M ${p0[0]} ${p0[1]} C ${p1[0]} ${p1[1]}, ${p2[0]} ${p2[1]}, ${p3[0]} ${p3[1]}`,
+        origin,
       });
     }
 

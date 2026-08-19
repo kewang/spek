@@ -185,6 +185,12 @@ Each maps to one or more specs under `openspec/specs/`; that directory is author
 - **Timeline** — horizontal Gantt-style chart of every change's lifecycle, with optional spec-topic
   grouping, status filters, and an auto-scaling time axis.
 - **Graph view** — force-directed spec↔change dependency graph, aggregation-aware.
+- **Workflow schemas** — the schemas available to a repo, each rendered as a diagram of its steps
+  grouped by dependency level, with the implementation and archive steps shown as part of the flow.
+  Which schemas exist is only ever asked of the OpenSpec CLI. Where a schema declares an artifact
+  produced *after* implementation — something the format cannot state, so authors express it in
+  prose — spek derives the ordering from the dependency graph and draws it as a **dashed edge
+  marked as derived**, never as a dependency the CLI blocks on.
 - **Full-text search** — `Cmd/Ctrl+K`, across specs and changes, with context previews.
 - **BDD syntax highlighting** — WHEN/GIVEN, THEN, AND, MUST/SHALL, and a badge for each delta
   operation (ADDED / MODIFIED / REMOVED / RENAMED).
