@@ -12,6 +12,7 @@ import {
   isSafeSchemaName,
   listSchemas,
   listSchemasUncached,
+  readSchema,
   parseSchemaYaml,
   parseSchemasList,
   readSchemaUncached,
@@ -21,6 +22,7 @@ import {
   type CliResult,
   type OpenspecRunner,
 } from "./schemas.js";
+import type { SchemaReadResult } from "./types.js";
 import { schemaArtifactCount } from "./schema-flow.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -235,6 +237,14 @@ function stubRunner(answers: Record<string, CliResult>): OpenspecRunner {
   return async (args) => answers[args.slice(0, 2).join(" ")] ?? { ok: false, reason: "cli-failed" };
 }
 
+/**
+ * The read reports whether its result is worth caching; these tests are about the result itself.
+ * The classification is asserted separately, down in the caching section.
+ */
+async function readSchemaValue(repo: string, name: string): Promise<SchemaReadResult> {
+  return (await readSchemaUncached(repo, name)).value;
+}
+
 let restore: OpenspecRunner | null = null;
 function useRunner(r: OpenspecRunner): void {
   const prev = setOpenspecRunner(r);
@@ -343,7 +353,7 @@ test("readSchema: a name the CLI cannot resolve is not resolved from disk", asyn
   writeProjectSchema(repo, "house-style");
   useRunner(stubRunner({ "schema which": { ok: false, reason: "cli-unavailable" } }));
 
-  const result = await readSchemaUncached(repo, "house-style");
+  const result = await readSchemaValue(repo, "house-style");
   assert.equal(result.ok, false);
   assert.equal(result.ok === false && result.reason, "cli-unavailable");
 });
@@ -413,7 +423,7 @@ test("readSchema: reads the definition at the CLI-resolved path, with shadows", 
     }),
   );
 
-  const result = await readSchemaUncached(repo, "fixture-workflow");
+  const result = await readSchemaValue(repo, "fixture-workflow");
   assert.ok(result.ok);
   assert.equal(result.schema.name, "fixture-workflow");
   assert.equal(result.schema.source, "project");
@@ -437,7 +447,7 @@ test("readSchema: unsafe name is rejected before any spawn or read", async () =>
   });
 
   for (const bad of ["../../etc", "..", "a/b", "spec-driven\n", ""]) {
-    const result = await readSchemaUncached(repo, bad);
+    const result = await readSchemaValue(repo, bad);
     assert.equal(result.ok, false);
     assert.equal(result.ok === false && result.reason, "not-found");
   }
@@ -448,7 +458,7 @@ test("readSchema: a CLI that could not be asked reports its reason, not not-foun
   const repo = tempRepo();
   useRunner(stubRunner({ "schema which": { ok: false, reason: "cli-failed" } }));
 
-  const result = await readSchemaUncached(repo, "no-such-schema");
+  const result = await readSchemaValue(repo, "no-such-schema");
   // Nothing on disk either, and the CLI said nothing → the CLI reason wins over "not-found",
   // because "we could not look" is a different problem from "it does not exist".
   assert.equal(result.ok, false);
@@ -471,7 +481,7 @@ test("readSchema: a non-zero exit that still answers in JSON is not-found, not a
     }),
   );
 
-  const result = await readSchemaUncached(repo, "no-such-schema");
+  const result = await readSchemaValue(repo, "no-such-schema");
   assert.equal(result.ok, false);
   assert.equal(result.ok === false && result.reason, "not-found");
 });
@@ -480,7 +490,7 @@ test("readSchema: package schema unreachable without the CLI is distinguished fr
   const repo = tempRepo();
   useRunner(stubRunner({ "schema which": { ok: false, reason: "cli-unavailable" } }));
 
-  const result = await readSchemaUncached(repo, "spec-driven");
+  const result = await readSchemaValue(repo, "spec-driven");
   assert.equal(result.ok, false);
   assert.equal(result.ok === false && result.reason, "cli-unavailable");
 });
@@ -672,6 +682,81 @@ test("clearSchemaCache: a repo whose path prefixes another is not caught by it",
   clearSchemaCache(repo);
   await listSchemas(sibling);
   assert.equal(calls, 2, "the sibling survived");
+});
+
+// --- what the cache keeps ---------------------------------------------------
+// An answer is remembered for the lifetime; a failure the next read could find gone is not. The
+// pairs below are the four judgements, one per case: the value alone cannot tell them apart, which
+// is why each is decided where the CLI was consulted.
+
+test("listSchemas: an unreachable CLI is not remembered, so the next request retries", async () => {
+  const repo = tempRepo();
+  let calls = 0;
+  useRunner(async () => {
+    calls++;
+    return calls === 1
+      ? { ok: false, reason: "cli-unavailable" }
+      : { ok: true, json: [{ name: "spec-driven", artifacts: ["a"], source: "package" }] };
+  });
+
+  const first = await listSchemas(repo);
+  assert.equal(first.degradedReason, "cli-unavailable");
+  // The reported case: a host that resolves `PATH` after startup recovers on the next read rather
+  // than being told "unavailable" for the rest of the window.
+  const second = await listSchemas(repo);
+  assert.equal(second.degradedReason, null);
+  assert.deepEqual(second.schemas.map((s) => s.name), ["spec-driven"]);
+  assert.equal(calls, 2);
+});
+
+test("listSchemas: a CLI that ran and answered unusably is remembered", async () => {
+  const repo = tempRepo();
+  let calls = 0;
+  useRunner(async () => {
+    calls++;
+    return { ok: false, reason: "cli-failed" };
+  });
+
+  assert.equal((await listSchemas(repo)).degradedReason, "cli-failed");
+  // Nothing about the next read can change this answer, and this view re-reads on every watcher
+  // event — re-asking would spawn a process per refetch to be told the same thing.
+  assert.equal((await listSchemas(repo)).degradedReason, "cli-failed");
+  assert.equal(calls, 1);
+});
+
+test("readSchema: a name the CLI reports no schema for stays cached", async () => {
+  const repo = tempRepo();
+  let calls = 0;
+  useRunner(async () => {
+    calls++;
+    return { ok: false, reason: "cli-failed", json: { error: "Schema 'ghost' not found" } };
+  });
+
+  for (let i = 0; i < 2; i++) {
+    const result = await readSchema(repo, "ghost");
+    assert.equal(result.ok === false && result.reason, "not-found");
+  }
+  assert.equal(calls, 1, "the CLI answered; asking again would learn nothing");
+});
+
+test("readSchema: a definition whose schema.yaml cannot be read is re-read", async () => {
+  // Reported as not-found like the three other paths that produce it, and indistinguishable from
+  // them by the time the cache sees it — so the read itself says this one is not worth keeping.
+  const repo = tempRepo();
+  const dir = path.join(repo, "openspec", "schemas", "house-style");
+  fs.mkdirSync(dir, { recursive: true });
+  useRunner(
+    stubRunner({
+      "schema which": { ok: true, json: { path: dir, source: "project" } },
+    }),
+  );
+
+  const missing = await readSchema(repo, "house-style");
+  assert.equal(missing.ok === false && missing.reason, "not-found");
+
+  fs.writeFileSync(path.join(dir, "schema.yaml"), "name: house-style\nartifacts:\n  - id: only\n");
+  const found = await readSchema(repo, "house-style");
+  assert.equal(found.ok, true, "the failed read was remembered instead of being retried");
 });
 
 // --- usage counting --------------------------------------------------------

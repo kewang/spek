@@ -55,7 +55,7 @@ export function SchemaDetail() {
   );
 
   if (loading) return <p className="text-text-muted">Loading...</p>;
-  if (error) return <p className="text-red-400">Error: {error}</p>;
+  if (error) return <p className="text-status-error">Error: {error}</p>;
 
   if (!data || !data.ok) {
     return (

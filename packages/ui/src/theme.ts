@@ -1,7 +1,7 @@
 /**
  * 顏色契約。
  *
- * 這個套件的所有顏色都經由這 8 個 CSS 變數表達，`styles.css` 為它們宣告了深色預設值。
+ * 這個套件的所有顏色都經由這 9 個 CSS 變數表達，`styles.css` 為它們宣告了深色預設值。
  * **宿主換膚 = 在自己的 `:root` 覆寫它們**，不需要用 Tailwind，也不需要與套件共用任何 token 命名。
  *
  * 這些元件原本讀的是 spek web 的 Tailwind token（`--color-border` / `--color-text-primary` …）。
@@ -17,6 +17,7 @@ export const CSS_VARS = {
   textSecondary: "--spek-text-secondary",
   textMuted: "--spek-text-muted",
   accent: "--spek-accent",
+  nodeActive: "--spek-node-active",
 } as const;
 
 /** `styles.css` 未被載入時的最後防線 —— 讓圖至少畫得出來，而不是一片黑。 */
@@ -27,8 +28,9 @@ const FALLBACKS: Record<string, string> = {
   [CSS_VARS.border]: "#2a2d35",
   [CSS_VARS.textPrimary]: "#e2e8f0",
   [CSS_VARS.textSecondary]: "#94a3b8",
-  [CSS_VARS.textMuted]: "#64748b",
+  [CSS_VARS.textMuted]: "#8595aa",
   [CSS_VARS.accent]: "#f59e0b",
+  [CSS_VARS.nodeActive]: "#22c55e",
 };
 
 /**
@@ -38,7 +40,10 @@ const FALLBACKS: Record<string, string> = {
  * （宿主換膚時要重繪，見 `SpecGraph` 的 `themeKey`）。React 渲染的部分則直接用 `var()`，不走這裡。
  */
 export function resolveColor(name: string): string {
-  if (typeof document === "undefined") return FALLBACKS[name] ?? "#94a3b8";
+  // The last resort is a contract value, not a literal: a colour written here would be one more thing a
+  // host cannot reach, which is the defect this contract exists to prevent.
+  const lastResort = FALLBACKS[CSS_VARS.textSecondary];
+  if (typeof document === "undefined") return FALLBACKS[name] ?? lastResort;
   const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || FALLBACKS[name] || "#94a3b8";
+  return value || FALLBACKS[name] || lastResort;
 }

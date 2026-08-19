@@ -4,11 +4,15 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import { readRepoSchema } from "./scanner.js";
 import {
+  answered,
   cliErrorMessage,
+  failed,
+  isTransient,
   runOpenspec,
   setOpenspecRunner,
   ttlCached,
   type CacheEntry,
+  type CliOutcome,
   type CliResult,
   type OpenspecRunner,
 } from "./openspec-cli.js";
@@ -373,26 +377,44 @@ export async function resolveSchemaPath(
   return { ok: false, reason: "not-found" };
 }
 
-/** Read one schema's full definition. */
+/**
+ * Read one schema's full definition, saying whether the result is worth remembering.
+ *
+ * The judgement is made here because this is the last place that still holds it. Four different
+ * things leave this function as `{ ok: false, reason: "not-found" }` — a name we refuse to pass on,
+ * the CLI reporting no such schema, a resolution missing its fields, and a `schema.yaml` that could
+ * not be opened — and only the last is about the environment. By the time `readSchema` consults the
+ * cache they are one value, so a classification made there could only guess.
+ *
+ * What the caller is told is unchanged; only whether it survives to the next read.
+ */
 export async function readSchemaUncached(
   repoRoot: string,
   name: string,
-): Promise<SchemaReadResult> {
+): Promise<CliOutcome<SchemaReadResult>> {
   // Only reached for a name OpenSpec resolved, so the parse below reads a file it has accepted —
   // spek never renders a workflow from its own reading of one OpenSpec would not run.
   const resolved = await resolveSchemaPath(repoRoot, name);
-  if (!resolved.ok) return resolved;
+  if (!resolved.ok) {
+    // "not-found" is the CLI's answer about this repo; a degraded reason is about the CLI, and only
+    // the transient half of that is worth re-asking.
+    const settled = resolved.reason === "not-found" || !isTransient(resolved.reason);
+    return settled ? answered(resolved) : failed(resolved);
+  }
 
   let text: string;
   try {
     text = fs.readFileSync(path.join(resolved.dir, "schema.yaml"), "utf-8");
   } catch {
-    return { ok: false, reason: "not-found" };
+    // A permission error, or a file being rewritten as it was read. Reported as not-found like the
+    // rest, but the next read may well find it — so it is not remembered.
+    return failed({ ok: false, reason: "not-found" });
   }
   const parsed = parseSchemaYaml(text);
-  if (!parsed) return { ok: false, reason: "not-found" };
+  // A file OpenSpec would refuse to run: read successfully, and it says the same thing next time.
+  if (!parsed) return answered({ ok: false, reason: "not-found" });
 
-  return {
+  return answered({
     ok: true,
     schema: {
       // The requested name is authoritative over schema.yaml's own `name`: it is what resolved, and
@@ -410,7 +432,7 @@ export async function readSchemaUncached(
     },
     // No changes were read, so there is nothing to count; hosts fill this via countSchemaUsage.
     usage: null,
-  };
+  });
 }
 
 /** The single-schema counterpart to `groupSchemaUsage`, counted off `ChangeInfo.schema` alone. */
@@ -426,17 +448,29 @@ export function countSchemaUsage(
 // Caching
 // ---------------------------------------------------------------------------
 
-// Policy (TTL, size cap, and why failures must not be remembered forever) lives on `ttlCached` in
+// Policy (TTL, size cap, and which failures are worth remembering) lives on `ttlCached` in
 // openspec-cli.ts, shared with schema-order.ts. Only the two stores are local.
 const catalogCache = new Map<string, CacheEntry<SchemaCatalog>>();
 const definitionCache = new Map<string, CacheEntry<SchemaReadResult>>();
 
-/** The schemas available to a repo. Cached per repo. */
+/**
+ * The schemas available to a repo. Cached per repo.
+ *
+ * A catalog degraded because the CLI could not be reached is not remembered — the next request is
+ * how a host that has since resolved its `PATH` recovers. One degraded because the CLI *ran* and
+ * answered unusably is remembered like any other answer: it will say the same thing next time, and
+ * this view re-reads on every watcher event.
+ */
 export function listSchemas(repoRoot: string): Promise<SchemaCatalog> {
-  return ttlCached(catalogCache, repoRoot, () => listSchemasUncached(repoRoot));
+  return ttlCached(catalogCache, repoRoot, async () => {
+    const catalog = await listSchemasUncached(repoRoot);
+    return catalog.degradedReason && isTransient(catalog.degradedReason)
+      ? failed(catalog)
+      : answered(catalog);
+  });
 }
 
-/** One schema's full definition. Cached per (repo, name). */
+/** One schema's full definition. Cached per (repo, name); the read classifies its own result. */
 export function readSchema(repoRoot: string, name: string): Promise<SchemaReadResult> {
   return ttlCached(definitionCache, `${repoRoot}::${name}`, () =>
     readSchemaUncached(repoRoot, name),

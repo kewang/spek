@@ -3,5 +3,5 @@ schema: spec-driven
 context: |
   Project: spek — OpenSpec Viewer
   Tech stack: TypeScript, React 19, Vite, Express, Tailwind CSS v4
-  Purpose: 本地唯讀 Web 應用，瀏覽包含 openspec/ 的 repo 內容
-  Conventions: 程式碼英文，註解與文件繁體中文
+  Purpose: A local read-only web app for browsing the contents of a repo that has an openspec/ directory
+  Conventions: English is the single source of truth for everything committed — code, comments, openspec/ artifacts, docs

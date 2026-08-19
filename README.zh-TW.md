@@ -380,6 +380,7 @@ spek 會監看 `openspec/` 並在檔案變更時即時重載。在不傳遞原�
   - 使用者可選的 artifact 分頁排序（最後修改 / Schema order / A–Z），其中 Schema order 取自 OpenSpec CLI
   - Changes 列表、Dashboard 與 Change 詳情頁的 schema badge，與 repo 預設相同時自動隱藏
   - 網路掛載 / 無原生檔案事件檔案系統（devcontainer / WSL）的 polling 即時重載 fallback
+  - `@spekjs/core` 與 `@spekjs/ui` 的跨平台建置指令 —— 從原始碼建置在 Windows `cmd.exe` 下也能運作
   - 跨 worktree 聚合時的 schema 基準 —— 每個 change 對照自己所在 worktree 的預設 schema 判斷 badge，掃描時每個 worktree 的 config 只讀一次而非每個 change 讀一次
   - TOC 與 `#hash` 導覽把目標標題捲到 sticky header 下方，而不是被它遮住
   - 開啟 change 不再每個都查一次 OpenSpec CLI —— 權威 artifact 順序改以 schema 為單位快取，因為共用同一 schema 的 change 得到的答案完全相同

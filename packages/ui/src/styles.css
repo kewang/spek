@@ -3,7 +3,7 @@
  *
  * 宿主 `import '@spekjs/ui/styles.css'` 即可。這裡做兩件事：
  *
- * 1. 宣告顏色契約的 8 個變數（深色預設值）。**宿主換膚就是在自己的 `:root` 覆寫它們。**
+ * 1. 宣告顏色契約的 9 個變數（深色預設值）。**宿主換膚就是在自己的 `:root` 覆寫它們——全部 9 個。**
  * 2. 提供元件的版面樣式，class 一律以 `spekui-` 為前綴，不與宿主的樣式衝突。
  *
  * 之所以不用 Tailwind 產這份 CSS：那會要求宿主也裝 Tailwind、且用同一套 token 命名。
@@ -17,8 +17,26 @@
   --spek-border: #2a2d35;
   --spek-text-primary: #e2e8f0;
   --spek-text-secondary: #94a3b8;
-  --spek-text-muted: #64748b;
+  /*
+   * Re-authored from #64748b, which measured 3.90:1 against `--spek-bg-secondary` — the surface this file
+   * puts under the timeline panel and the tooltip. Under the package's own defaults that value carries the
+   * tooltip body, the timeline's empty state, its section labels and its axis ticks, so an un-themed
+   * consumer was reading all of them below the floor. #8595aa is 6.08:1 there.
+   */
+  --spek-text-muted: #8595aa;
   --spek-accent: #f59e0b;
+  /*
+   * The graph's active-change node. It is the one colour the other seven cannot express, which is why it is
+   * here and why nothing else was added beside it: **a host that already overrides the properties it knows
+   * will not override this one**, and takes this default silently. That is the same defect this change is
+   * fixing, in a new place, so the count of new properties is kept to what cannot be derived and the default
+   * is picked to be legible rather than merely dark-correct (6.41:1 at the node's own fill-opacity here).
+   *
+   * Named for the mark, not the state: the timeline draws the same "this change is active" fact from
+   * `--spek-accent`. A property called `--spek-change-active` would invite a host to map its own "active"
+   * colour and get a green node beside an amber bar for one fact.
+   */
+  --spek-node-active: #22c55e;
 }
 
 /* ── SpecGraph ─────────────────────────────────────────────────────────── */
@@ -59,19 +77,27 @@
   flex-shrink: 0;
 }
 
-/* 節點的配色是這個視覺化自己的調色盤，不是宿主的主題色 —— 因此寫死，不走顏色契約。 */
+/*
+ * A swatch reads the same contract property as the node kind it explains.
+ *
+ * What stood here was "the node palette is this visualisation's own, not the host's theme — so it is
+ * hard-coded, outside the colour contract". That premise was wrong in both halves. A literal cannot follow
+ * a theme: the spec node measured 1.85:1 on a light page, and the archived node — holding a copy of
+ * `--spek-text-muted`'s former value — stayed at 2.93:1 after the host corrected that token. And a legend
+ * drawn from its own literals explains the graph in colours the graph may no longer be using.
+ */
 .spekui-legend-swatch--spec {
   height: 0.75rem;
   border-radius: 9999px;
-  background-color: #f59e0b;
+  background-color: var(--spek-accent);
 }
 
 .spekui-legend-swatch--active {
-  background-color: #22c55e;
+  background-color: var(--spek-node-active);
 }
 
 .spekui-legend-swatch--archived {
-  background-color: #64748b;
+  background-color: var(--spek-text-muted);
 }
 
 /* ── ChangeTimeline ────────────────────────────────────────────────────── */
@@ -209,8 +235,19 @@
   color: var(--spek-text-secondary);
 }
 
+/*
+ * "(ongoing)" is set apart by style, not by opacity.
+ *
+ * It inherits `--spek-text-muted` from `.spekui-tooltip`, so the old `opacity: 0.8` composited *that*
+ * colour — 4.32:1 dark and 3.68:1 light with a host's values, 2.94:1 under this file's own defaults. It was
+ * a live failure, and because the colour already comes from the parent, removing the opacity would have
+ * deleted the distinction rather than moved it.
+ *
+ * Italic carries it instead: it costs nothing in contrast, which is the whole reason a lighter weight is
+ * not used here — that would dim the smallest text in the product to buy the same distinction back.
+ */
 .spekui-tooltip-ongoing {
-  opacity: 0.8;
+  font-style: italic;
 }
 
 .spekui-tooltip-topics {

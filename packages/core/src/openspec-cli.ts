@@ -8,11 +8,13 @@ import type { SchemaDegradedReason } from "./types.js";
  * Both of the things here were written twice before this module existed — once in `schema-order.ts`
  * and again in `schemas.ts` — and the duplication was not free: the cache's original "remember
  * failures forever" bug had to be found once and then hand-copied as a fix into the second copy.
- * The 10s timeout, the spawn options, and the 30s/256-entry cache policy are each stated once, here.
+ * The 10s timeout, the spawn options, the 30s/256-entry cache policy, and which failures are worth
+ * remembering at all are each stated once, here.
  */
 
 // Stryker disable all: thin integration layer over a child process. The parsing it feeds is
-// unit-tested; this only spawns, times out, and classifies failure.
+// unit-tested; this only spawns, times out, and classifies failure. The cache below is the
+// exception — it holds policy, and `openspec-cli.test.ts` covers it.
 
 // Defined in cli-budget.ts so browser bundles can read them without pulling in child_process.
 export { CLI_TIMEOUT_MS } from "./cli-budget.js";
@@ -30,6 +32,24 @@ export { CLI_TIMEOUT_MS } from "./cli-budget.js";
 export type CliResult =
   | { ok: true; json: unknown }
   | { ok: false; reason: SchemaDegradedReason; json?: unknown };
+
+/**
+ * Reasons a second read could plausibly come out differently — the ones a running host repairs by
+ * itself. `cli-unavailable` is a binary not on `PATH` *yet* (a desktop app resolving the user's
+ * shell `PATH` at startup is the reported case, issue #46); `cli-timeout` is load easing.
+ *
+ * The other two are not: a non-zero exit with no body, or output that cannot be parsed, is the
+ * *installed CLI* answering — a version too old for a command it still marks experimental, a wrapper
+ * printing a banner — and a read a second later finds it identical. Retrying those on every read
+ * buys nothing and costs a full process start each time (~0.65-1.3s here, against ~5ms for a missing
+ * binary), on views that re-read whenever the watched tree changes.
+ *
+ * One rule rather than a list per caller, and it reads `SchemaDegradedReason`, so a reason added
+ * later has to be placed on one side of it.
+ */
+export function isTransient(reason: SchemaDegradedReason): boolean {
+  return reason === "cli-unavailable" || reason === "cli-timeout";
+}
 
 /**
  * The CLI's own error message, when a failed run still produced a structured `{ error: string }`
@@ -118,9 +138,16 @@ export function runOpenspec(args: string[], cwd: string): Promise<CliResult> {
 // Caching
 // ---------------------------------------------------------------------------
 
-/** TTL and its floor are stated in cli-budget.ts; the size cap is local and depends on nothing. */
+/**
+ * TTL and its floor are stated in cli-budget.ts; the size cap depends on nothing and is stated here.
+ *
+ * Both are exported because a caller may need a second, differently-keyed store beside the one it
+ * memoises through — `schema-order.ts` keeps one — and such a store has to age and be bounded on the
+ * same terms. A second copy of either number is a second thing to keep in step, which is the whole
+ * reason this module exists.
+ */
 export const CACHE_TTL_MS = CLI_CACHE_TTL_MS;
-const CACHE_MAX = 256;
+export const CACHE_MAX = 256;
 
 export interface CacheEntry<T> {
   at: number;
@@ -128,24 +155,88 @@ export interface CacheEntry<T> {
 }
 
 /**
+ * A result, plus whether it is worth remembering.
+ *
+ * The cache cannot work this out from the value, because the value has usually already lost it: a
+ * null schema order means both "the CLI answered and there is no order" and "the CLI could not be
+ * reached", and a definition read reports "no such schema" both for a name the CLI refused and for a
+ * `schema.yaml` it could not open. So whoever still holds the two apart says which this is, and says
+ * it *there* — a predicate taking the value could only re-derive a judgement that has already been
+ * thrown away.
+ */
+export interface CliOutcome<T> {
+  value: T;
+  remember: boolean;
+}
+
+/** An answer: cached for the bounded lifetime, like any successful read. */
+export function answered<T>(value: T): CliOutcome<T> {
+  return { value, remember: true };
+}
+
+/** A failure the next read could find gone: returned to the caller, but not remembered. */
+export function failed<T>(value: T): CliOutcome<T> {
+  return { value, remember: false };
+}
+
+/**
  * Memoise `compute` under `key`, holding the **Promise** rather than the resolved value — so
  * concurrent callers arriving mid-flight share one run instead of starting a second.
+ *
+ * `compute` must classify its own result. There is deliberately no default: every call site that
+ * existed when this was added had got it wrong (a failure was remembered exactly as long as an
+ * answer, so one unreachable CLI meant half a minute of stale "unavailable" — issue #46), and a
+ * default is how the next one would get it wrong without saying anything.
+ *
+ * A failure is dropped **after** it resolves, not skipped: while it is in flight it is a run like
+ * any other, and joiners must share it. Not remembering a failure must not become not deduping one,
+ * or a host with no `openspec` on `PATH` spawns a process per concurrent reader.
  */
+/**
+ * What `key` currently holds, or `undefined` — **without installing anything**.
+ *
+ * `ttlCached` cannot answer this: asking it is asking it to compute. A caller that has something
+ * cheaper than a CLI call to do when there is no current entry needs to find that out without
+ * creating one, and creating one is exactly what would make the cheaper path wrong (see
+ * `schema-order.ts`, which replays a settled failure only when the bucket has no answer to serve).
+ *
+ * An expired entry reads as absent and is left in place: dropping it is `ttlCached`'s to do, on the
+ * call that replaces it, and a peek that deleted could race a run installed since.
+ */
+export function peekCached<T>(store: Map<string, CacheEntry<T>>, key: string): Promise<T> | undefined {
+  const hit = store.get(key);
+  if (!hit || Date.now() - hit.at > CACHE_TTL_MS) return undefined;
+  return hit.promise;
+}
+
 export function ttlCached<T>(
   store: Map<string, CacheEntry<T>>,
   key: string,
-  compute: () => Promise<T>,
+  compute: () => Promise<CliOutcome<T>>,
 ): Promise<T> {
   const hit = store.get(key);
   if (hit && Date.now() - hit.at <= CACHE_TTL_MS) return hit.promise;
   if (hit) store.delete(key);
 
-  const promise = compute();
+  const outcome = compute();
+  const promise = outcome.then((o) => o.value);
   if (store.size >= CACHE_MAX) {
     const oldest = store.keys().next().value; // Map keeps insertion order
     if (oldest !== undefined) store.delete(oldest);
   }
-  store.set(key, { at: Date.now(), promise });
+  const entry: CacheEntry<T> = { at: Date.now(), promise };
+  store.set(key, entry);
+
+  // Identity-checked, so an entry installed since — by a caller that arrived after this one was
+  // dropped, or after the TTL — is not deleted by this run's late verdict.
+  const forget = (): void => {
+    if (store.get(key) === entry) store.delete(key);
+  };
+  // A rejection is forgotten too. A thrown error held for the full lifetime hands every caller in
+  // the window the same failure, which is this bug with an exception in place of a value.
+  outcome.then((o) => {
+    if (!o.remember) forget();
+  }, forget);
   return promise;
 }
 

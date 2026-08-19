@@ -8,9 +8,31 @@
   --color-border: #2a2d35;
   --color-text-primary: #e2e8f0;
   --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
+  /*
+   * Re-authored from #64748b, the one dark value measured failing: 3.54:1 on `bg-tertiary` (4.11:1 on
+   * `bg-primary`, which is how it read as "nearly passing" for so long). It is also used as a tint under
+   * itself — `bg-text-muted/10 text-text-muted` on the inactive status pill — which is the binding
+   * constraint here, not the bare page: this value clears that composite by 4.78:1.
+   */
+  --color-text-muted: #8595aa;
   --color-accent: #f59e0b;
   --color-accent-hover: #d97706;
+
+  /*
+   * Status colours. Every value here is measured against the *worst* of the theme's three surfaces
+   * (`bg-primary` / `bg-secondary` / `bg-tertiary`) and, where the colour is also used as a tint behind
+   * its own text, against that composite. There is no map of which text lands on which surface, and a
+   * per-usage one would be wrong the moment a component moves.
+   *
+   * The dark values are the shades the hard-coded `text-red-400` / `text-green-400` / `text-amber-400`
+   * classes already named — they pass here (5.84 / 9.48 / 9.79) and are kept unchanged. They failed only
+   * in the light theme, where no 400 shade in any family reaches even 3:1, so the fix is a light value
+   * rather than a new dark one. `text-yellow-400` folded into `warning`: it differed from amber by ΔEok
+   * 0.034, a distinction nobody chose and nobody can see.
+   */
+  --color-status-error: #ff6467;
+  --color-status-success: #05df72;
+  --color-status-warning: #ffb900;
 
   /*
    * BDD marks. Dark values are exactly what shipped before; the tokens exist so the light theme can
@@ -43,10 +65,11 @@
 }
 
 /*
- * `@spekjs/ui` 的顏色契約 —— 把套件的 8 個變數接到 web 既有的 token 上。
+ * `@spekjs/ui` 的顏色契約 —— 把套件的 9 個變數接到 web 既有的 token 上。
  *
  * 套件擁有自己的變數名（`--spek-*`），不讀宿主的 token —— 否則換一個 token 命名不同的宿主
- * （下游的 Electron app 就是），圖會完全沒有顏色。這裡是「宿主換膚」的那一步：**只需覆寫這 8 個**。
+ * （下游的 Electron app 就是），圖會完全沒有顏色。這裡是「宿主換膚」的那一步：**這 9 個都要覆寫**——
+ * 漏掉任何一個，那個變數就會留在套件的深色預設值上。
  *
  * 必須在套件的 `styles.css` 之後（同為 `:root`，後者勝出），且因為值是 `var(--color-*)`，
  * 淺色主題的切換會自動跟著走 —— 不必為 `[data-theme="light"]` 再寫一份。
@@ -60,6 +83,10 @@
   --spek-text-secondary: var(--color-text-secondary);
   --spek-text-muted: var(--color-text-muted);
   --spek-accent: var(--color-accent);
+  /* The contract's ninth member: the graph's active-change node. The other eight map onto tokens this theme
+     already had; this green had no equivalent. A host that does not map it takes the package's dark default
+     silently, which is the standing cost of adding a member and the reason only one was added. */
+  --spek-node-active: var(--color-status-success);
 }
 
 [data-theme="light"] {
@@ -69,9 +96,32 @@
   --color-border: #e2e8f0;
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
-  --color-accent: #d97706;
-  --color-accent-hover: #b45309;
+  /* 2.34:1 before this (on `bg-tertiary`). The floor is its own /10 tint, which it clears by 4.548:1 —
+     the tightest margin in the palette, and deliberately not tightened further: every step darker also
+     narrows the gap to `text-secondary`, which this theme has already given up more of than the dark one. */
+  --color-text-muted: #576882;
+  /*
+   * The accent's binding constraint is `bg-accent/20` (the search highlight, and `@spekjs/ui`'s spec
+   * badge), not plain link text. Amber-700 #b45309 clears 4.58:1 as text — the obvious fix — and drops to
+   * 3.50:1 on that tint. This value is the one the theme already carries as `--color-code-text`, so the
+   * light theme reuses its amber rather than gaining a second one: 6.47:1 plain, 4.75:1 on the tint,
+   * 6.78:1 for `text-bg-primary` on a solid `bg-accent` fill (3.04:1 before, which nobody had noticed).
+   */
+  --color-accent: #92400e;
+  --color-accent-hover: #7b3306;
+
+  /*
+   * `error` and `success` are the values this theme already uses for `kw-normative` and `kw-then`: the
+   * roles match, and one red and one green per theme beats two of each drifting apart. `warning` sits one
+   * ramp step brighter than the accent, which is the relationship the dark theme already has. The darker
+   * ambers score better in isolation (#973c00 reaches 6.47:1) and collapse into the accent — ΔEok 0.011
+   * against 0.090 here — and a warning that is the link colour is not a warning. 4.59:1 is a thin pass and
+   * is the price of that separation; it has no tinted usage, and the contrast test will say so if one
+   * appears (on a /10 tint this value would be 4.01:1).
+   */
+  --color-status-error: #c10007;
+  --color-status-success: #016630;
+  --color-status-warning: #bb4d00;
 
   /* Same hue families, dark enough to clear 4.5:1 over each mark's own composited background
      (5.17–6.47:1). `kw-then` and `kw-normative` were also picked to widen the red/green pair under

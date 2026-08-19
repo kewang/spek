@@ -1,10 +1,10 @@
 package com.spek.intellij.core
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 
 /** schema 中單一 artifact 的權威參照（由 openspec CLI 提供） */
 data class SchemaArtifactRef(
@@ -27,37 +27,98 @@ fun interface SchemaOrderProvider {
 object SchemaOrder {
     private val json = Json { ignoreUnknownKeys = true }
 
-    // 快取策略（TTL、size cap、CHM 併發性、可快取 null 值）都在 TtlCache 上，與 SchemaCatalog 共用
-    // 同一份實作——這段原本在兩個檔案各寫一次。
-    // schema 為 null/空（本地解析不出）時的分桶哨兵：這類 change 由 CLI 解析出同一 repo 級預設順序，
-    // 故全部共用此桶。NUL 字元前綴確保絕不與真實 schema 名撞。對齊 @spekjs/core。
+    // The cache policy — TTL, size cap, CHM concurrency, which failures are worth keeping — all lives
+    // on TtlCache, shared with SchemaCatalog. It used to be written once in each file.
+    // The bucket sentinel for a schema that is null/empty (unresolvable locally): the CLI resolves the
+    // same repo-level default order for all of them, so they share this one bucket. The NUL prefix
+    // makes it unforgeable by a real schema name. Aligned with @spekjs/core.
     private const val DEFAULT_SCHEMA_BUCKET = "\u0000default"
-    // 值型別可為 null——「已查過、但沒有權威順序」也必須是可快取的結果。
+    // The value type is nullable: "consulted, and there is no authoritative order" is an answer like
+    // any other and is cached; only what was never obtained is left out.
     private val cache = TtlCache<String, List<SchemaArtifactRef>?>()
 
     /**
-     * 由 `openspec status --change <slug> --json` 輸出萃取權威順序：
-     * actionContext.planningArtifacts 提供順序，artifactPaths[id].outputPath 提供產出路徑。
-     * 純函式，方便單元測試；解析不出任何 artifact 時回 null。
+     * Changes the installed CLI has already settled against.
+     *
+     * The bucket above holds **answers**, and no unsuccessful run may be held there whatever its
+     * cause: its key names a schema while the query names a change, so an outcome that may be about
+     * the change would deny the order to every other change sharing that schema. That is why it is
+     * not kept there — not a finding that it is worthless. A refusal of one change is worth keeping
+     * *against that change*, and dropping it entirely is what made an installation that cannot answer
+     * at all cost a process start on every read of every change detail.
+     *
+     * Only what the installed CLI produced is marked ([OpenspecCli.isTransient] false): the absent
+     * binary and the timeout are what a running host repairs by itself. Keyed under the same NUL
+     * prefix the default bucket uses, because the two key spaces are built the same way and a slug
+     * that happens to equal a schema name must not be able to name a bucket entry.
      */
-    fun parseOrderFromStatus(jsonText: String): List<SchemaArtifactRef>? {
-        return try {
-            val root = json.parseToJsonElement(jsonText).jsonObject
-            val order = root["actionContext"]?.jsonObject?.get("planningArtifacts")?.jsonArray ?: return null
-            val paths = root["artifactPaths"]?.jsonObject ?: return null
-            val refs = mutableListOf<SchemaArtifactRef>()
-            // 逐一以安全轉型跳過壞元素（非字串 id、outputPath 非物件/非字串），與 TS 版一致：
-            // 單一壞元素只被略過而非讓整份解析回 null（`?.` / `as?` 不 throw，故不觸發外層 catch）
-            for (el in order) {
-                val id = (el as? JsonPrimitive)?.takeIf { it.isString }?.content ?: continue
-                val outputPath = (paths[id] as? JsonObject)?.get("outputPath")
-                    ?.let { it as? JsonPrimitive }?.takeIf { it.isString }?.content ?: continue
-                refs.add(SchemaArtifactRef(id, outputPath))
-            }
-            if (refs.isNotEmpty()) refs else null
+    private const val SETTLED_PREFIX = "\u0000settled\u0000"
+
+    private val settled = TtlMarks<String>()
+
+    /**
+     * The injection point for the CLI runner, so tests need not spawn anything. `internal` rather than
+     * private: the same approach [SchemaCatalog]'s `cliRunner` takes, and the only way to reach the
+     * slug allowlist below — a security boundary — from a test.
+     */
+    internal var cliRunner: (List<String>, String) -> OpenspecCli.Outcome =
+        { args, cwd -> OpenspecCli.run(args, cwd) }
+
+    /**
+     * What `openspec status --change <slug> --json` said, classified.
+     *
+     * The two cases must be told apart **here**, because nothing downstream can: both deliver a null
+     * schema order, so a caller reading the value alone cannot recover which it had, and the cheap
+     * wrong answer is to treat an unreadable response as the schema's answer and hold it for the
+     * whole window — which is what this side did.
+     */
+    sealed interface OrderResponse {
+        /** The CLI's output parsed. [refs] is null when it names no artifact order — an answer. */
+        data class Readable(val refs: List<SchemaArtifactRef>?) : OrderResponse
+
+        /** The output could not be parsed at all: the installed CLI answering unusably. */
+        data object Unreadable : OrderResponse
+    }
+
+    /**
+     * Read the authoritative order out of the CLI's output.
+     *
+     * **The readability boundary is `parseToJsonElement` and nothing more.** TypeScript's is
+     * `JSON.parse` alone, so a body of `null`, `42`, `"str"` or `[1,2]` parses there, finds no order,
+     * and is an *answer*. Taking the `.jsonObject` cast as part of the boundary would make those four
+     * failures on this side and answers on the other — the divergence this classification exists to
+     * close, one layer down. Anything the extractor cannot find an order in is a readable response
+     * reporting none.
+     */
+    fun readOrderFromStatus(jsonText: String): OrderResponse {
+        val root = try {
+            json.parseToJsonElement(jsonText)
         } catch (_: Exception) {
-            null
+            return OrderResponse.Unreadable
         }
+        return OrderResponse.Readable(extractOrder(root))
+    }
+
+    /**
+     * `actionContext.planningArtifacts` gives the order, `artifactPaths[id].outputPath` the output
+     * path. Pure, and never throws: a root that is not an object, or one without those fields, simply
+     * yields no order.
+     */
+    private fun extractOrder(root: JsonElement): List<SchemaArtifactRef>? {
+        val obj = root as? JsonObject ?: return null
+        val order = (obj["actionContext"] as? JsonObject)?.get("planningArtifacts") as? JsonArray ?: return null
+        val paths = obj["artifactPaths"] as? JsonObject ?: return null
+        val refs = mutableListOf<SchemaArtifactRef>()
+        // Bad elements are skipped one by one via safe casts (a non-string id, an outputPath that is
+        // not a string), matching the TS side: one bad element is skipped rather than voiding the
+        // whole read.
+        for (el in order) {
+            val id = (el as? JsonPrimitive)?.takeIf { it.isString }?.content ?: continue
+            val outputPath = (paths[id] as? JsonObject)?.get("outputPath")
+                ?.let { it as? JsonPrimitive }?.takeIf { it.isString }?.content ?: continue
+            refs.add(SchemaArtifactRef(id, outputPath))
+        }
+        return if (refs.isNotEmpty()) refs else null
     }
 
     /** 將 openspec artifact 的 outputPath 對應到已知 artifact id；對不到回 null（glob 僅支援 specs tree） */
@@ -96,34 +157,94 @@ object SchemaOrder {
     }
 
     /**
-     * 預設 SchemaOrderProvider：呼叫 openspec CLI 取得權威順序。
-     * openspec 未安裝 / 非 0 結束 / archived change / 解析失敗時一律回 null。
+     * The default SchemaOrderProvider: consults the `openspec` CLI for the authoritative order.
+     * Returns null when openspec is absent, exits non-zero, answers unreadably, or times out.
      */
     val cli = SchemaOrderProvider { repoRoot, slug, schema ->
-        // 權威順序（planningArtifacts + artifactPaths）是 schema 的屬性、非個別 change 的屬性，
-        // 故以 schema 分桶：同一 repo 內共用該 schema 的所有 change 至多 spawn 一次 CLI（issue #15）。
-        // schema 為 null/空（本地解析不出名稱）→ 共用 repo 級預設桶：CLI 會解析出同一內建預設順序。
-        val key = "$repoRoot::${if (schema.isNullOrEmpty()) DEFAULT_SCHEMA_BUCKET else schema}"
-        // TTL ≥ CLI timeout：TTL 內的 hit 必已完成計算（CLI 至多 10s），復用安全、不重複 spawn。
-        // 過期後（openspec 之後才安裝、artifact 順序改變）自動重查，避免 null / 舊順序被永久快取。
-        cache.getOrCompute(key) {
-            // slug 來自資料夾名稱。Windows 上以 ProcessBuilder 啟動 openspec.cmd 時，argv 會再經
-            // cmd.exe 解析（BatBadBut / CVE-2024-27980），ProcessBuilder 不會像 Node 的 cross-spawn
-            // 那樣自動轉義 —— 故此處必須以白名單限定安全字元擋掉 argument injection。此為安全邊界，
-            // 勿為「對齊 TS 版」而刪除：TS 改用 cross-spawn 已由結構排除注入，兩邊刻意不同。
-            if (!Regex("""^[\w.-]+$""").matches(slug)) {
+        // The slug comes from a directory name. On Windows, ProcessBuilder's argv is re-parsed by
+        // cmd.exe when launching openspec.cmd (BatBadBut / CVE-2024-27980) and, unlike Node's
+        // cross-spawn on the TypeScript side, it does not escape for us — so an allowlist of safe
+        // characters here is what blocks argument injection. A security boundary, not tidiness: do
+        // not delete it to "align with the TS side", which excludes injection structurally instead.
+        //
+        // It sits **outside** the cache: it refuses this one slug while the key is schema-level.
+        // Inside `getOrCompute`, a concurrent read of another change in the same bucket would join
+        // this entry and take a refusal that is not its own — and it spawns nothing, so there is no
+        // run worth sharing. scanner.ts's empty-slug guard sits outside the provider for the same
+        // reason, and so does the settlement replay below.
+        if (!Regex("""^[\w.-]+$""").matches(slug)) {
+            null
+        } else {
+            // The authoritative order (planningArtifacts + artifactPaths) is a property of the
+            // schema, not of the individual change, so the bucket is keyed by schema: every change
+            // in a repo sharing that schema spawns the CLI at most once (issue #15). A schema that
+            // is null/empty locally shares a repo-level default bucket — the CLI resolves the same
+            // built-in default for all of them.
+            val key = "$repoRoot::${if (schema.isNullOrEmpty()) DEFAULT_SCHEMA_BUCKET else schema}"
+            val settledKey = "$SETTLED_PREFIX$repoRoot::$slug"
+            // TTL >= CLI timeout, so a hit inside the window is a completed computation (the CLI has
+            // at most 10s) and reuse never re-spawns. After it expires the order is re-read, so a
+            // changed artifact order is never cached forever.
+            //
+            // The bucket is consulted first, and that order is the whole rule: a settled change is
+            // still owed its schema's order. Once the bucket holds one — typically fetched by a
+            // sibling change after this one was refused — it is this change's too, and
+            // resolveSchemaOrder maps it onto this change's own artifacts. The mark replaces a
+            // **consultation**, never an answer.
+            val held = cache.peek(key)
+            if (held != null) {
+                held.value
+            } else if (settled.isMarked(settledKey)) {
                 null
             } else {
-                // 逾時 / 非 0 結束 / 解析失敗一律回 null：此呼叫端只有一種退路（前端退回敘事順序），
-                // 故 CLI 的失敗分類在這裡沒有用處，全部收斂成同一個「沒有權威順序」。
-                when (val outcome = OpenspecCli.run(listOf("status", "--change", slug, "--json"), repoRoot)) {
-                    is OpenspecCli.Outcome.Completed ->
-                        if (outcome.exitCode == 0) parseOrderFromStatus(outcome.stdout) else null
-                    else -> null
+                cache.getOrCompute(key) {
+                    // A timeout, a non-zero exit and an unreadable body all collapse to null in the
+                    // **value**: this caller has one fallback (the frontend's narrative order)
+                    // whatever went wrong, so the CLI's failure taxonomy buys nothing there.
+                    //
+                    // It buys something in the **cache**, so the reason is reconstructed here —
+                    // nothing on this side produces one, and without it `isTransient` has no caller.
+                    val outcome = cliRunner(listOf("status", "--change", slug, "--json"), repoRoot)
+                    val response = when (outcome) {
+                        is OpenspecCli.Outcome.Completed ->
+                            if (outcome.exitCode == 0) readOrderFromStatus(outcome.stdout) else null
+                        else -> null
+                    }
+                    // A readable body is an answer even when it names no order: the two nulls are
+                    // indistinguishable downstream, so they are told apart here.
+                    if (response is OrderResponse.Readable) {
+                        TtlCache.Outcome.answered(response.refs)
+                    } else {
+                        val reason = when {
+                            outcome is OpenspecCli.Outcome.StartFailed -> SchemaDegradedReason.CLI_UNAVAILABLE
+                            outcome is OpenspecCli.Outcome.TimedOut -> SchemaDegradedReason.CLI_TIMEOUT
+                            outcome is OpenspecCli.Outcome.Completed && outcome.exitCode != 0 ->
+                                SchemaDegradedReason.CLI_FAILED
+                            else -> SchemaDegradedReason.CLI_UNPARSABLE
+                        }
+                        // Marked *inside* the compute — the mirror of reading it outside, and the
+                        // opposite answer. This is the only place holding both the reason and the
+                        // slug the argv actually named; marked by whoever awaits the provider, a
+                        // reader that legitimately joined an in-flight run about another change
+                        // would take that run's null and mark itself.
+                        if (!OpenspecCli.isTransient(reason)) settled.mark(settledKey)
+                        // Never held in the bucket, whatever the reason — see `settled` above.
+                        TtlCache.Outcome.failed(null)
+                    }
                 }
             }
         }
     }
 
-    fun clearCache() = cache.clear()
+    /**
+     * Drop every cached order and every settled change.
+     *
+     * Both, or a manual Refresh invalidates less than the automatic one beside it: `SpekCaches`
+     * drives this from the resync route *and* the file watcher, and a mark surviving it would deny
+     * the one change it names a consultation the cache would already have re-run.
+     */
+    fun clearCache() {
+        cache.clear()
+        settled.clear()
+    }
 }

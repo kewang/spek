@@ -52,19 +52,22 @@ HTTP, and the Electron workspace passes it over IPC.
 
 ## Colours (3.)
 
-Every colour the package draws with comes from one of eight CSS custom properties. `styles.css`
-declares dark defaults for all of them; **to re-theme, override them in your own `:root`**:
+Every colour the package draws with comes from one of nine CSS custom properties. `styles.css`
+declares dark defaults for all of them; **to re-theme, override every one of them in your own
+`:root`** — a property you leave out keeps the package's *dark* default, which in a light theme is
+the one failure this list exists to prevent:
 
 | Variable | Used for |
 | --- | --- |
-| `--spek-bg-primary` | (reserved for host chrome) |
+| `--spek-bg-primary` | the surface the graph is mounted on — drawn as the halo behind node labels, so a label stays readable when the layout drifts a node under it. Map it to whatever your graph container's background actually is |
 | `--spek-bg-secondary` | timeline surface, tooltip background |
 | `--spek-bg-tertiary` | timeline row hover, tooltip topic chips |
-| `--spek-border` | graph edges, timeline grid lines and borders |
+| `--spek-border` | timeline grid lines and borders |
 | `--spek-text-primary` | highlighted graph edges, tooltip slug |
 | `--spek-text-secondary` | graph node labels, timeline row labels |
-| `--spek-text-muted` | axis labels, archived bars, tooltip body |
-| `--spek-accent` | active bars, the *today* line |
+| `--spek-text-muted` | graph edges, archived change nodes, axis labels, archived bars, tooltip body |
+| `--spek-accent` | spec nodes, active bars, the *today* line |
+| `--spek-node-active` | active change nodes in the graph |
 
 ```css
 :root {
@@ -78,8 +81,10 @@ The package deliberately owns these names rather than reading yours. A host whos
 differently would otherwise get a graph with **no colours at all** — which is exactly what happened
 before this package existed.
 
-Node colours in the graph (spec = amber circle, active change = green box, archived = slate) are the
-visualization's own palette, not theme colours, and are fixed.
+The graph's node shapes are the visualization's own vocabulary — a spec is a circle, a change is a
+rounded box — but their **colours** are contract properties like everything else: a spec node is
+`--spek-accent`, an active change `--spek-node-active`, an archived one `--spek-text-muted`. Nothing
+the package draws is a fixed colour.
 
 ### Theme switching
 

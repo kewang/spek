@@ -57,9 +57,10 @@ change to those still needs manual verification — a temporary `workflow_dispat
   only runtime dep is `cross-spawn`. In-repo consumers resolve it locally via `"*"` workspaces, so development is
   independent of core's release cadence.
 - **`@spekjs/ui`** — reusable visual components (`SpecGraph`, `ChangeTimeline`). Published to npm. **Purely
-  presentational**: data in via props, selection out via callbacks; no router / adapter / CSS framework. Colors are 8
-  `--spek-*` CSS variables (its own names, never the host's tokens). The web `/graph` and `/timeline` pages are thin
-  shells (fetch / loading / navigation / theme).
+  presentational**: data in via props, selection out via callbacks; no router / adapter / CSS framework. Colors are 9
+  `--spek-*` CSS variables (its own names, never the host's tokens) and **nothing else** — see the colour-contract
+  entry under Key Design Decisions. The web `/graph` and `/timeline` pages are thin shells (fetch / loading /
+  navigation / theme).
 - React 19 + Vite + TS + Tailwind v4; Express (REST); VS Code Webview + esbuild; IntelliJ Kotlin + JCEF + built-in
   server; react-markdown + remark-gfm (BDD highlighting); search = server-side full-text + Fuse.js; React Router v7
   (Web BrowserRouter / webview MemoryRouter).
@@ -253,6 +254,44 @@ exits 1, so discarding stdout there reports a working CLI as broken. The Kotlin 
 (`OpenspecCli.kt`, `SchemaCatalog.kt`, `SpekCaches.kt`) — but **not** `schema-flow.ts`, which has no Kotlin caller: no
 Kotlin host draws the diagram, since the IntelliJ tool window loads the same React SPA.
 
+**The cache remembers answers, not every failure** — `compute` returns `{value, remember}` (`answered` / `failed`), and
+a failure is dropped once it resolves, so the next read retries. It is required, with no default: every call site that
+existed when this landed had got it wrong, and one unreachable CLI meant 30s of stale "unavailable" even after `PATH`
+was fixed (issue #46, reported by an Electron consumer that resolves the user's shell `PATH` at startup). Three things
+about it:
+- **The cache cannot judge the value, because the value has already lost the distinction.** A null schema order is both
+  "the CLI answered and there is no order" and "the CLI could not be reached"; a definition read reports "no such
+  schema" for a name the CLI refused *and* for a `schema.yaml` it could not open. So `readSchemaUncached` classifies
+  inside itself — it is the last place holding the two apart — while `listSchemas` reads the reason off the catalog.
+- **Not every failure is worth retrying**, and `isTransient` is the one rule: `cli-unavailable` / `cli-timeout` yes,
+  `cli-failed` / `cli-unparsable` no. The second pair is the *installed CLI* answering, identical a second later, and it
+  is also the expensive pair (~0.65–1.3s against ~5ms for a missing binary) on views that refetch per watcher event.
+  Forgetting those turned a 30s wrong answer into a permanent ~1s tax per read. A reason added later must be placed on
+  one side of it.
+- **`schema-order` is the exception, and not for the environment's sake**: no unsuccessful run is held in the
+  *bucket*, because the key names a schema while the argv names a change — a refusal of one slug is not the bucket's to
+  keep, and holding it denied the order to every other change sharing the schema. Not the bucket's to keep is not the
+  same as not worth keeping, so a **settled** failure (`isTransient` false) is remembered against the change it was
+  about, in a second, slug-keyed store: dropping it entirely made an installation that answers nothing — one too old for
+  `status --change --json` — cost a process start on every change-detail read. Three rules hold that store in place, and
+  each is a bug that was reasoned through rather than found:
+  - **The bucket is consulted first.** A settled change is still owed its schema's order: the sequence is a property of
+    the schema, so once a sibling has fetched it, a plain cache hit serves the refused change too — which is what
+    already happened, at zero spawns. The mark replaces a *consultation*, never an answer, and a mark read ahead of the
+    bucket is a regression wearing a fix's clothes.
+  - **The mark is read outside the cache and written inside `compute`.** Read inside, a concurrent read of a different
+    change joins an entry that never spawned and inherits a settlement that was not about it. Written outside, a reader
+    that legitimately *joined* another change's run takes that run's null and marks itself. Only `compute` holds both
+    the reason and the slug the argv named. For the same reason the Kotlin unsafe-slug allowlist (a Windows
+    argument-injection boundary with no TS counterpart) sits **outside** `getOrCompute`: it spawns nothing, so there is
+    no run to share.
+  - **`cli-unparsable` is marked per change too**, though it is a property of the installation rather than the change —
+    a repo-scoped mark would cost one consultation per window instead of one per change. A second scope is a second
+    lifetime and a second invalidation site, and `isTransient` is the rule a new reason is already required to be placed
+    against. If it ever moves, it is that reason alone.
+An entry is still installed while in flight — not remembering a failure must not become not deduping one — and a
+rejection is dropped too (Kotlin does this in a `finally`, since a compute that throws leaves no outcome to inspect).
+
 **Artifact sort**: the rule is `sortArtifacts(artifacts, mode, schemaOrder?)` in **core**, beside `DEFAULT_ORDER` /
 `defaultRank` on the `@spekjs/core/artifact-order` subpath — `modified` (the order given, i.e. mtime; default) /
 `schema` (`schemaOrder`, falling back to the narrative order when it is absent, which is what archived changes always
@@ -444,7 +483,73 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   Heading levels and ids are untouched, because levels decide where folded sections end. In the Specs
   tab the delta spec's topic header is the section's dominant element — it used to be a `text-sm` `h3`
   *sibling* of the content's `h2`s, so it was terminated by the first one rather than containing them
-- **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0
+- **Dark theme**: bg #0a0c0f family, accent amber #f59e0b, text #e2e8f0. Light: bg #f8fafc family, accent
+  #92400e, text #0f172a
+- **Palette contrast is a stated obligation with a test behind it** (`theme-toggle`, generalising what #42
+  stated for the renderer's own marks). Every colour applied to text clears 4.5:1 **in both themes**, and a
+  graphic that is the only carrier of its information clears 3:1. Three things about how it is measured, all
+  of which change what a "passing" value is:
+  - **Against the worst of the theme's three surfaces**, not a nominal one. There is no map of which text
+    lands on which surface and a hand-written one is wrong the moment a component moves. Half the original
+    figures in this repo were quoted against `bg-primary`, which is the *easiest* surface in both themes.
+  - **Plus its own tint, where it has one.** `bg-accent/20 text-accent` (search highlight, and `@spekjs/ui`'s
+    badge) is what forces the light accent two ramp steps darker than plain link text needs — a tint moves
+    the background *toward* the text.
+  - **Opacity counts as part of the colour.** `opacity-60` on a completed task row put everything under it
+    below the floor, including the links and code spans that set their own colour, and no token value can
+    compensate — the multiply happens after the colour is chosen. De-emphasise with a token; `disabled:` is
+    the only exemption (WCAG 1.4.3).
+
+  `contrast.test.ts` parses **both blocks** of `global.css` and measures a declared table, then scans the
+  source for the four ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
+  alpha the table doesn't list, a `border-<token>/<alpha>` that is neither measured nor in
+  `DECORATIVE_BORDERS`, and a bare `opacity-*`. **Adding a colour token means adding a table row or an
+  exclusion** — a test fails on any `--color-*` that is neither, and **a token's role does not exempt it**:
+  a surface token applied as text on a solid fill (`bg-accent text-bg-primary`, the primary call to action)
+  is measured by `TEXT_ON_FILL`, because counting it as accounted-for by being in `SURFACES` is what left it
+  measured by nothing. **The enumeration is stated with the scan, including what it does not cover** — an
+  unstated enumeration reads as a complete one, which is how both of those gaps survived. Outside it: SVG
+  presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded), inline
+  `style`, `ring-*` / `outline-*` / gradients, literal alphas of non-token colours, and the BDD marks, whose
+  fills are Tailwind palette values that would have to be pinned here and would drift on upgrade.
+- **`@spekjs/ui` carries the same obligation, stated in terms it can actually check.** The package has no
+  theme — a host maps its tokens onto the contract — so "per-theme token" is not a rule it can hold. Its rule
+  is that **the contract is the only source of colour**: no literal outside the `:root` defaults and
+  `FALLBACKS`, with exactly two exemptions, both written into `ui-package` (`transparent`, which renders
+  nothing and is how a tint of a contract colour is expressed; and a shadow's black, which is the absence of
+  light rather than a chosen colour). Eleven literals had grown beside the contract and most were **copies of
+  a contract value** — the archived graph node held `--spek-text-muted`'s former dark default and stayed at
+  2.93:1 after the host re-authored that token, which is the whole argument in one number.
+  Three consequences worth knowing:
+  - **Adding a contract member is the one change existing hosts do not inherit.** A host overrides the names
+    it knows, so a new one silently takes the package's dark default. That is why only `--spek-node-active`
+    was added (the graph's active-change green is the one colour the others cannot express) and why the two
+    node strokes take their fill's colour instead of becoming members ten and eleven. It is named for the
+    *mark*, not the state: the timeline draws the same "active" fact from `--spek-accent`.
+  - **The guard is split, because neither side can do it alone.** The package cannot measure ratios (it has
+    no values) and the host cannot see the alphas (they are `fill-opacity` / `stroke-opacity` attributes d3
+    writes at draw time). So `packages/ui` asserts *no literal outside the contract* plus *its own defaults
+    are legible* (the un-themed host, the only case it has values for), and `contrast.test.ts` parses the
+    `--spek-*` → `--color-*` mapping and measures what the package draws, at alphas declared in its table.
+  - **`--spek-border` cannot draw anything that carries meaning** — 1.22:1 dark / 1.13:1 light at *full*
+    strength, so no opacity of it helps. Graph edges use `--spek-text-muted` at 0.85; the timeline's grid
+    lines and topic separators keep it and are stated as decoration in `timeline-view`, since a bar's dates
+    come from the axis labels.
+  `theme-toggle`'s opacity clause now carries a second exemption for a **reader-caused transient emphasis
+  state** (the graph's hover dimming, at 0.1). A conforming dimming does exist — a label clears 4.5:1 down to
+  α ≈ 0.81 — but nobody would perceive it as dimming; the exemption is a judgement, and it is recorded with
+  that measurement so it can be argued with. Node labels carry a `--spek-bg-primary` halo (`paint-order:
+  stroke`) because a force layout drifts nodes under them: against a fill a label is 1.06–1.84:1, and giving
+  the fills their missing saturation made the light case worse before the halo fixed both themes at once.
+  **The halo is worth nothing without paint order, so labels are a layer of their own, appended after the
+  nodes.** Nested in its own node's `<g>` — where they shipped in v1.14.0 — a label was painted over, halo
+  included, by every node drawn *after* it: the protection held for one direction of each collision and not
+  the other, at no cost to any colour, so nothing measurable could see it. Two consequences, both
+  load-bearing: the hover de-emphasis is applied to the labels **directly** (it is written onto the node
+  group, and `graph-view` records "dim the graphics, leave the labels at full strength" as the alternative it
+  rejected — so lifting them out without carrying the dim silently adopts it), and `--spek-bg-primary` now
+  means *the surface the graph is mounted on*, which is a fact about the host and is stated as such in the
+  package's README
 - **tasks.md parsing**: `- [x]` / `- [ ]` + `##` sections → `{ total, completed, sections }`. A task's
   **continuation lines are folded into `TaskItem.text`** (newline-joined, each dedented by up to 2 chars
   — the `- ` marker's CommonMark content offset), and the Tasks tab renders that text as Markdown. The
@@ -540,7 +645,10 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 - **Refresh invariant**: a resync (cache-invalidation) failure **must not block the refetch** — it's best-effort,
   enforced in the single spot `runManualRefresh` (one 404 from IntelliJ's missing resync route once made the whole
   button go dead — issue #18). resync means "invalidate stale server-side state this host actually holds": Web/VS Code
-  clear the git-timestamp cache, IntelliJ has no such cache (`timestamp` is always null) so it clears the schema-order cache
+  clear the git-timestamp cache, IntelliJ has no such cache (`timestamp` is always null) so it clears the schema-order
+  cache — **both of its stores**, the per-schema answers and the settled changes, since a mark surviving invalidation
+  makes a manual Refresh weaker than the automatic one beside it. The TypeScript core has no invalidation seam at all:
+  its bucket is bounded by the TTL alone, so a mark there ages exactly as an answer does
 - **live-status**: `liveStatus` (live/offline/unsupported) only speaks up when `offline` — no always-on "everything's
   fine" light (an always-lit light is noise and dulls the real signal). VS Code/IntelliJ have no observable failure
   signal, so they always report `live` (lying `offline` is worse than not reporting)

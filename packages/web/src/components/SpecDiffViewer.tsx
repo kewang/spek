@@ -25,8 +25,8 @@ export function SpecDiffViewer({ oldContent, newContent, oldLabel, newLabel }: S
     <div className="rounded-lg border border-border overflow-hidden">
       {(oldLabel || newLabel) && (
         <div className="flex items-center gap-4 px-4 py-2 bg-bg-secondary border-b border-border text-xs text-text-muted">
-          {oldLabel && <span className="text-red-400">--- {oldLabel}</span>}
-          {newLabel && <span className="text-green-400">+++ {newLabel}</span>}
+          {oldLabel && <span className="text-status-error">--- {oldLabel}</span>}
+          {newLabel && <span className="text-status-success">+++ {newLabel}</span>}
         </div>
       )}
       <div className="overflow-x-auto">
@@ -88,8 +88,8 @@ function DiffBlock({ change }: { change: Change }) {
     );
   }
 
-  const bgClass = change.added ? "bg-green-400/10" : "bg-red-400/10";
-  const textClass = change.added ? "text-green-400" : "text-red-400";
+  const bgClass = change.added ? "bg-status-success/10" : "bg-status-error/10";
+  const textClass = change.added ? "text-status-success" : "text-status-error";
   const prefix = change.added ? "+" : "-";
 
   return (
