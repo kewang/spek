@@ -1,7 +1,7 @@
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { SchemaGraph } from "./SchemaGraph";
 import { DERIVED_EDGE_MEANING, isFilePattern, type FlowLevel, type FlowStep } from "../utils/schemaView";
-import { ARCHIVE_DASH, ARROW_LEN, DERIVED_DASH } from "../utils/schemaLayout";
+import { ARCHIVE_DASH, ARROW_LEN, DERIVED_DASH, MARK_COLOR, MARK_OPACITY } from "../utils/schemaLayout";
 
 /**
  * The schema workflow: a diagram of the steps and their dependencies, with the selected step's
@@ -197,8 +197,10 @@ export function SchemaFlow({
           implementation
         </span>
         <span className="flex items-center gap-1.5">
-          {/* A miniature of the archive node — same dash (ARCHIVE_DASH) and border colour, so the
-              legend mark reads as the node it stands for rather than a third dash pattern. */}
+          {/* A miniature of the archive node — same dash (ARCHIVE_DASH), same colour and same
+              opacity, so the legend mark reads as the node it stands for. A swatch is the mark at a
+              fraction of its size, so it is the first thing to disappear when the value is too
+              faint, and a swatch nobody can see leaves the sentence beside it with no referent. */}
           <svg width="24" height="14" viewBox="0 0 24 14" aria-hidden="true" className="shrink-0">
             <rect
               x="0.5"
@@ -207,7 +209,8 @@ export function SchemaFlow({
               height="13"
               rx="3"
               fill="none"
-              stroke="var(--color-border)"
+              stroke={MARK_COLOR}
+              strokeOpacity={MARK_OPACITY}
               strokeDasharray={ARCHIVE_DASH}
             />
           </svg>
@@ -231,12 +234,17 @@ export function SchemaFlow({
             <svg width="24" height="8" viewBox="0 0 24 8" aria-hidden="true" className="shrink-0">
               <path
                 d={`M 0 4 H ${24 - ARROW_LEN}`}
-                stroke="var(--color-border)"
+                stroke={MARK_COLOR}
+                strokeOpacity={MARK_OPACITY}
                 strokeWidth={1.5}
                 strokeDasharray={DERIVED_DASH}
                 fill="none"
               />
-              <path d={`M ${24 - ARROW_LEN} 0.5 L 24 4 L ${24 - ARROW_LEN} 7.5 z`} fill="var(--color-border)" />
+              <path
+                d={`M ${24 - ARROW_LEN} 0.5 L 24 4 L ${24 - ARROW_LEN} 7.5 z`}
+                fill={MARK_COLOR}
+                fillOpacity={MARK_OPACITY}
+              />
             </svg>
             dashed = order spek derived, not declared
           </span>

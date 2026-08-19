@@ -36,6 +36,30 @@ export const DERIVED_DASH = "5 4";
 /** Dash of the archive node's border ("not declared by this schema"), shared with its legend swatch. */
 export const ARCHIVE_DASH = "4 3";
 
+/**
+ * Opacity of a mark drawn in `--color-text-muted` — the edges, the arrowhead, the archive node's
+ * outline, and the legend swatches that stand for them.
+ *
+ * The colour, not the opacity, is what the mark owes its legibility to: `--color-text-muted` is
+ * 5.52:1 dark and 5.17:1 light against the worst surface it lands on, and 0.85 of it is still 4.37
+ * and 3.82 — clear of the 3:1 a mark that is the only carrier of its information answers to. It
+ * exists to keep the lines from reading as heavily as the labels, and it is the value `@spekjs/ui`
+ * already draws its graph at, so the two graphs in this app read as one system.
+ *
+ * Below about 0.72 the light theme drops under 3:1, so this is not a free dial.
+ */
+export const MARK_OPACITY = 0.85;
+
+/**
+ * Colour of those same marks, shared for the same reason the dashes are.
+ *
+ * The legend swatch is required to be drawn in the colour of the mark it explains — a key in a
+ * colour the diagram is not using states nothing. The dash and the opacity were already shared and
+ * the colour was not, which is the one field left able to drift, and the drift it invites is
+ * precisely the one the legend was last fixed for.
+ */
+export const MARK_COLOR = "var(--color-text-muted)";
+
 /** Smallest clearance between a bypassing curve and the nodes it passes. */
 const LANE_MIN = 20;
 /** Largest bow we will attempt before accepting the widest one we tried. */

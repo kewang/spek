@@ -6,6 +6,8 @@ import {
   DERIVED_DASH,
   fitLabel,
   layoutGraph,
+  MARK_COLOR,
+  MARK_OPACITY,
   NODE_H,
   NODE_W,
 } from "../utils/schemaLayout";
@@ -86,9 +88,9 @@ export function SchemaGraph({
             stroke width, so a highlighted edge's thicker stroke would inflate its arrowhead too.
           */}
           {[
-            { id: "schema-arrow", color: "var(--color-border)" },
-            { id: "schema-arrow-active", color: "var(--color-accent)" },
-          ].map(({ id, color }) => (
+            { id: "schema-arrow", color: MARK_COLOR, opacity: MARK_OPACITY },
+            { id: "schema-arrow-active", color: "var(--color-accent)", opacity: 1 },
+          ].map(({ id, color, opacity }) => (
             <marker
               key={id}
               id={id}
@@ -99,7 +101,11 @@ export function SchemaGraph({
               refY={3.5}
               orient="auto"
             >
-              <path d={`M 0 0 L ${ARROW_LEN} 3.5 L 0 7 z`} fill={color} />
+              <path
+                d={`M 0 0 L ${ARROW_LEN} 3.5 L 0 7 z`}
+                fill={color}
+                fillOpacity={opacity}
+              />
             </marker>
           ))}
         </defs>
@@ -123,7 +129,8 @@ export function SchemaGraph({
                 <path
                   d={edge.path}
                   fill="none"
-                  stroke={connected ? "var(--color-accent)" : "var(--color-border)"}
+                  stroke={connected ? "var(--color-accent)" : MARK_COLOR}
+                  strokeOpacity={connected ? 1 : MARK_OPACITY}
                   strokeWidth={connected ? 2 : 1.5}
                   strokeDasharray={derived ? DERIVED_DASH : undefined}
                   markerEnd={connected ? "url(#schema-arrow-active)" : "url(#schema-arrow)"}
@@ -149,6 +156,21 @@ export function SchemaGraph({
         {nodes.map(({ step, x, y }) => {
           const selected = step.key === selectedKey;
           const isHovered = step.key === hovered;
+          // One place for what the outline is, because four of its five inputs disagree about why.
+          // Archive rests on a legible colour: its dash is the only thing saying "not declared by
+          // this schema", so it answers the 3:1 a sole carrier owes. Every other step's outline is
+          // trim — the label carries the step, at better than 13:1, and the fill carries nothing
+          // (bg-tertiary on the panel is 1.10:1 in both themes) — so it stays a hairline.
+          // Hover is text-secondary rather than text-muted so that it is still a step *up* from
+          // archive's resting colour; against text-muted the one node most likely to be hovered
+          // for an explanation would be the one that stopped responding.
+          const outline = selected
+            ? { stroke: "var(--color-accent)", opacity: 1 }
+            : isHovered
+              ? { stroke: "var(--color-text-secondary)", opacity: 1 }
+              : step.isArchive
+                ? { stroke: MARK_COLOR, opacity: MARK_OPACITY }
+                : { stroke: "var(--color-border)", opacity: 1 };
           const labelWidth = NODE_W - TEXT_X - 12 - (step.isApply ? 14 : 0);
           return (
             <g
@@ -185,13 +207,8 @@ export function SchemaGraph({
                 strokeDasharray={step.isArchive ? ARCHIVE_DASH : undefined}
                 // Hover brightens the node's own outline. Without it the only feedback was other
                 // nodes fading, so the one under the pointer was the one that never reacted.
-                stroke={
-                  selected
-                    ? "var(--color-accent)"
-                    : isHovered
-                      ? "var(--color-text-muted)"
-                      : "var(--color-border)"
-                }
+                stroke={outline.stroke}
+                strokeOpacity={outline.opacity}
                 strokeWidth={selected ? 2 : 1}
               />
               {/* Selection reads as a lit surface, not just a ring — a 1px border change is a weak
@@ -221,7 +238,13 @@ export function SchemaGraph({
                 <text
                   x={step.isApply ? TEXT_X + 10 : TEXT_X}
                   y={38}
-                  fill="var(--color-text-muted)"
+                  // text-secondary, not text-muted: a selected step is washed in accent at 0.10,
+                  // and text-muted over that wash is 4.45:1 in the light theme — under the text
+                  // floor, for the ordinary case of selecting a step that declares an output.
+                  // Lightening the wash instead buys ~0.2 of margin, because text-muted measures
+                  // 5.17 against the bare fill and that is its ceiling; moving the text clears it
+                  // at 5.96.
+                  fill="var(--color-text-secondary)"
                   fontSize={SUB_SIZE}
                   // Monospace for a path, matching how <code> renders everywhere else in the app.
                   fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
