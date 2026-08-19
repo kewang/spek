@@ -144,7 +144,16 @@ mechanism the application begins to use SHALL be added to the enumeration or dec
 verification that quietly enumerates only the mechanisms someone thought of reports a palette as
 conforming on the strength of the cases it happened to look at.
 
-Two consequences follow, and each is a gap the enumeration had:
+Declaring a mechanism outside the enumeration SHALL rest on how the application uses it, and SHALL
+therefore be revisited when that use changes. It is available while the mechanism carries nothing the
+reader depends on; it ceases to be available once the application states meaning through it, and the
+mechanism SHALL then be enumerated. A declaration is not a permanent property of the mechanism: SVG
+presentation attributes were outside the enumeration on the strength of one decorative occurrence, and
+stayed outside while a diagram came to state its dependencies, its declared/derived distinction and its
+not-declared-by-this-schema mark entirely through them — so the check reported a conforming palette while
+every line in that diagram sat at 1.13:1.
+
+Three consequences follow, and each is a gap the enumeration had:
 
 - **A token's role in the palette SHALL NOT exempt its occurrences.** A token named for a surface still
   answers to the text floor wherever it is *applied to text* — a label on a solid accent fill is text on
@@ -155,6 +164,10 @@ Two consequences follow, and each is a gap the enumeration had:
   already listed.** Text colour, background tint and opacity were enumerated; a border alpha was not,
   and so an alpha of a text token could reach the screen at any value without being surfaced either as
   measured or as excluded.
+- **An exclusion SHALL be re-decided when the use that justified it changes.** An exclusion is a claim
+  about what the application does with a mechanism, and the application goes on being written. Left as a
+  standing fact, it is the one entry in the enumeration that gets quieter as it gets wronger: the check
+  keeps passing, and it keeps passing *because* of the sentence that has stopped being true.
 
 Declaring an occurrence as owing nothing SHALL state why, so the declaration can be argued with. The
 substantive rule is unchanged — decoration owes nothing, an indicator owes 3:1, text owes 4.5:1 — and
@@ -184,4 +197,11 @@ this requirement is only that the check can see the occurrence in order to apply
 - **WHEN** the check is read to learn what it covers
 - **THEN** the mechanisms it enumerates are stated with it, together with the ones it does not cover, so a
   mechanism the application begins to use can be recognised as unenumerated
+
+#### Scenario: A mechanism that begins to carry meaning is enumerated
+
+- **WHEN** the application states something a reader depends on through a mechanism the check declares as
+  outside its enumeration
+- **THEN** the mechanism is enumerated and its occurrences are each measured or declared, rather than the
+  exclusion continuing to stand on the use that no longer describes the application
 

@@ -503,17 +503,36 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
     the only exemption (WCAG 1.4.3).
 
   `contrast.test.ts` parses **both blocks** of `global.css` and measures a declared table, then scans the
-  source for the four ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
+  source for the six ways to bypass it: a hard-coded `text-<family>-<shade>`, a `bg-<token>/<alpha>` at an
   alpha the table doesn't list, a `border-<token>/<alpha>` that is neither measured nor in
-  `DECORATIVE_BORDERS`, and a bare `opacity-*`. **Adding a colour token means adding a table row or an
+  `DECORATIVE_BORDERS`, a bare `opacity-*`, a `--color-*` token reaching SVG, and an alpha reaching an SVG
+  element. **Adding a colour token means adding a table row or an
   exclusion** — a test fails on any `--color-*` that is neither, and **a token's role does not exempt it**:
   a surface token applied as text on a solid fill (`bg-accent text-bg-primary`, the primary call to action)
   is measured by `TEXT_ON_FILL`, because counting it as accounted-for by being in `SURFACES` is what left it
   measured by nothing. **The enumeration is stated with the scan, including what it does not cover** — an
-  unstated enumeration reads as a complete one, which is how both of those gaps survived. Outside it: SVG
-  presentation attributes (`opacity="0.2"` on the checkmark disc — measured, passing, unguarded), inline
-  `style`, `ring-*` / `outline-*` / gradients, literal alphas of non-token colours, and the BDD marks, whose
-  fills are Tailwind palette values that would have to be pinned here and would drift on upgrade.
+  unstated enumeration reads as a complete one, which is how both of those gaps survived. Outside it: inline
+  `style`, `ring-*` / `outline-*` / gradients, literal alphas of non-token colours, a bare `opacity` /
+  `fill-opacity` / `stroke-opacity` attribute on an element whose colour is **not** a token (`currentColor`
+  and literal fills — the checkmark disc's `opacity="0.2"`, measured by hand, passing), and the BDD marks,
+  whose fills are Tailwind palette values that would have to be pinned here and would drift on upgrade.
+
+  **The two SVG scans were the third gap, and the one that shows what an exclusion costs.** SVG presentation
+  attributes sat in that "outside it" list on the strength of one decorative occurrence, and stayed there
+  while the schema diagram came to state its dependencies, its declared-vs-derived distinction and its
+  archive mark entirely through them — every line of it at 1.13:1 light, under a check reporting the palette
+  as conforming. `theme-toggle` now holds that an exclusion rests on how the app *uses* a mechanism and is
+  re-decided when that use changes. Two things about the scans that are not the obvious shape:
+  - **Colour is matched by the token, not by the attribute.** The arrowhead colours live in an object
+    literal and reach the element as `fill={color}`, so a `stroke=`/`fill=`-scoped pattern misses them while
+    reporting the diagram as covered — and matching the token needs no multi-line parse that could bridge
+    one element's attribute to the next element's value.
+  - **Alpha is scanned too, and only numeric literals are judged.** `--color-text-muted` is 5.17:1 at full
+    strength and 1.39:1 at a quarter; declaring the accounted alphas without surfacing the unaccounted ones
+    left `strokeOpacity={0.25}` passing everything. An identifier is a pass-through: a named constant is
+    measured where the tables import it — they take `MARK_COLOR` / `MARK_OPACITY` from
+    `schemaLayout.ts` rather than restating them — and its definition is an `opacity:` property the same
+    scan reads.
 - **`@spekjs/ui` carries the same obligation, stated in terms it can actually check.** The package has no
   theme — a host maps its tokens onto the contract — so "per-theme token" is not a rule it can hold. Its rule
   is that **the contract is the only source of colour**: no literal outside the `:root` defaults and
