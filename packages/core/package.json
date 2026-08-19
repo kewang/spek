@@ -1,6 +1,6 @@
 {
   "name": "@spekjs/core",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "description": "Framework-agnostic engine for reading OpenSpec repositories — scanner, tasks parser, worktree aggregation and shared types.",
   "keywords": [
     "openspec",

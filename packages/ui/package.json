@@ -1,6 +1,6 @@
 {
   "name": "@spekjs/ui",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Reusable OpenSpec visualizations — a force-directed spec/change graph and a Gantt-style change timeline. Presentational React components with no router, no data layer and no CSS framework.",
   "keywords": [
     "openspec",

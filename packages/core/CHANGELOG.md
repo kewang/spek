@@ -3,6 +3,49 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.10.0
+
+### Added
+
+- **`postApplyArtifacts` and `resolveImplementationOrdering`** — which of a schema's artifacts are
+  produced *after* implementation, and each step's ordering together with the authority it rests on
+  (`declared` | `derived`). OpenSpec's format cannot express the ordering: an artifact's `requires`
+  may name only other artifacts, so an author points a post-implementation step at the last planning
+  artifact and states the truth in prose. `postApplyArtifacts` recovers it from the `requires` graph
+  alone — an artifact outside the transitive closure of `apply.requires` whose own closure covers all
+  of `apply.requires` — and runs only when apply has at least one resolvable requirement and the
+  graph is acyclic. It is a **bound, not a reading of intent**: about 82% precise over the ~88
+  schemas discoverable on GitHub, which is why `resolveImplementationOrdering` returns the source
+  alongside the ordering and a consumer must present a derived one as an inference.
+- **`levelArtifacts`** — `computeArtifactLevels`'s map *plus* whether it fell back to declaration
+  order because `requires` contains a cycle. Anything deriving an ordering from levels has to refuse
+  to run in that case; the boolean is the only way to know. `computeArtifactLevels` is unchanged and
+  remains the answer when the map is all you want.
+- **`drawableEdges`, with `OriginEdge` / `OriginNode`**, on the `@spekjs/core/schema-flow` subpath —
+  the transitive reduction over edges that carry provenance, counting declared and derived hops
+  alike. `drawableRequires` is now its provenance-free delegate and behaves exactly as before.
+- **`OrderingSource`, `RequiresNode` and `ArtifactLevelling` are exported from the package root.**
+  `RequiresNode` is a parameter of the levelling functions and `ArtifactLevelling` is
+  `levelArtifacts`'s return; both were previously unnameable by a root importer.
+
+### Changed
+
+- **`computeArtifactLevels` accepts `readonly RequiresNode[]`** instead of `SchemaArtifactDef[]`.
+  A widening — every existing call still type-checks — and anything with an `id` and a `requires` can
+  now be levelled.
+
+### Fixed
+
+- **A settled artifact-order failure is remembered against the change it was about.** `schemaOrder`'s
+  cache is keyed by schema while the query names a change, so no unsuccessful run may be held in that
+  bucket: a refusal of one slug would deny the order to every other change sharing the schema. It was
+  therefore dropped entirely — which made an installation that can never answer, one too old for
+  `openspec status --change --json`, cost a process start on every change-detail read and on every
+  refetch a watcher triggers. Such a change is now marked in a second, slug-keyed store for the same
+  TTL. The schema bucket is still consulted **first**, so a sibling change's answer still serves a
+  marked change at zero spawns, and only what the installed CLI produced is marked — an absent binary
+  or a timeout is still retried on the next read.
+
 ## 1.9.1
 
 - **A cached CLI failure no longer outlives its cause.** `ttlCached` — behind `schemaOrder`, the schema

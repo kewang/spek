@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+
+- **A node label is drawn above every node, not only the ones before it.** 1.3.0 gave each label a
+  `--spek-bg-primary` halo so it stays readable where the force layout drifts a node underneath it,
+  but the label was appended inside its own node's `<g>` — so every node drawn *after* it painted
+  over the label and its halo alike, and the guarantee held in one direction of each collision only.
+  Labels are now a layer of their own above all nodes, and the hover de-emphasis is applied to them
+  directly, so a dimmed node's label still dims.
+- **The README describes the contract that actually ships.** It stated eight properties and tabulated
+  eight rows where the contract has nine, so a host following it silently takes the package's dark
+  default for `--spek-node-active` — which is the exact bug 1.3.0 was released to fix. Two further
+  rows were stale: `--spek-border` was listed as the graph's edge colour (edges moved to
+  `--spek-text-muted` at 0.85 in 1.3.0), and `--spek-bg-primary` as "reserved for host chrome" when
+  it is now the halo behind every node label — that is, **the surface the graph is mounted on**, which
+  a host mounting the graph on a secondary panel has to map accordingly. No code change; if you
+  re-themed against 1.3.0's README, it is worth re-reading.
+
 ## 1.3.0
 
 ### Added
