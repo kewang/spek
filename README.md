@@ -35,7 +35,7 @@ All are **read-only** and **local-only**. No server deployment, no authenticatio
 - **Dashboard** — Overview of specs count, changes count, task completion rates, plus lifecycle stats (avg archived lifecycle, stale active changes)
 - **Specs Browser** — Alphabetical listing with detail view and revision history; requirements and scenarios fold in place, so a spec opens as an outline that still carries its normative sentences
 - **Changes Browser** — Active and archived changes with tabbed views (Proposal / Design / Tasks / Specs); each row surfaces creation and archive dates plus lifecycle duration
-- **Schemas Browser** — Every workflow schema available to the repo, with its source and the artifacts it defines; the detail view renders one schema as a readable flow — each artifact in dependency order with the file it generates, what it requires before it can be written, and its full instruction text. The repo's default schema is marked, and each schema links through to the active changes using it
+- **Schemas Browser** — Every workflow schema available to the repo, with its source and the artifacts it defines; the detail view renders one schema as a readable flow — each artifact in dependency order with the file it generates, what it requires before it can be written, and its full instruction text. The repo's default schema is marked, and each schema links through to the active changes using it. A step a schema produces only *after* implementation is drawn after `apply` on a dashed edge marked as spek's own inference — OpenSpec's format has no way to declare that ordering, so the diagram states it without claiming the CLI enforces it
 - **Worktree Aggregation** — Discovers every git worktree of a repo and merges their in-flight changes into one view, deduplicated so each change appears once — built for the AI-agent era of parallel worktrees. Jujutsu (jj) workspaces are supported too, as an experimental opt-in
 - **Timeline** — Horizontal Gantt-style chart of every change's lifecycle, with optional spec-topic grouping, status filters, and an auto-scaling time axis
 - **BDD Syntax Highlighting** — Visual distinction for WHEN/GIVEN, THEN, AND, MUST/SHALL keywords, plus a badge for each delta operation (ADDED / MODIFIED / REMOVED / RENAMED)
@@ -393,6 +393,7 @@ Thanks to everyone who has contributed to spek:
   - Task text in the Tasks tab renders as Markdown, and a task's continuation lines — sub-bullets, paragraphs, code blocks — are kept instead of being discarded by the parser before they reach any surface
   - Removal of the web server's unreferenced `server/lib/` copies of the core scanning logic, which shadowed `@spekjs/core` as a second place the same rules could drift
   - Workflow schema browsing on every surface — a Schemas page listing what each schema defines, and a detail view rendering its artifacts in dependency order as a readable flow
+  - Schema steps that follow implementation — derived from the `requires` graph and drawn after `apply` on an edge marked as inferred, since OpenSpec's format cannot declare that ordering
 
 - [@david-lutz](https://github.com/david-lutz) (David Lutz)
   - Deduplication of active changes shared across git worktrees, in both the Changes list and the dependency graph — the surviving copy is elected from git divergence rather than file timestamps, which a fresh checkout rewrites
