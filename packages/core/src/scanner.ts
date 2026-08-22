@@ -5,7 +5,8 @@ import { parseTasks } from "./tasks.js";
 import { getTimestamps } from "./git-cache.js";
 import { listWorkspaces, toWorktreeSource } from "./worktrees.js";
 import { jjCurrentChangeSlugs } from "./jj-workspaces.js";
-import { discoverArtifacts, countArtifacts, changeDirMtime } from "./artifacts.js";
+import { discoverArtifacts } from "./artifact-discovery.js";
+import { countArtifacts, changeDirMtime } from "./artifact-files.js";
 import {
   cliDivergence,
   committedDivergedSlugs,

@@ -121,6 +121,18 @@ const TEXT_TOKENS: Record<string, number[]> = {
   "status-error": [0.1], // spec diff removed rows
   "status-success": [0.1], // spec diff added rows, timeline active status pill
   "status-warning": [],
+  // Syntax-highlight tokens (fenced code blocks and data artifacts). Code is meaningful text, so each
+  // is measured as text with no tint. It is not exempt the way the BDD marks are. The values map from
+  // hljs-* classes in global.css. The worst surface is the one closest to the text colour, which gives
+  // the lowest contrast. For dark text this is the darkest surface. For light text it is the lightest.
+  // Both are bg-tertiary (#f1f5f9 light, #1a1d24 dark, the lightest of the dark trio). This test
+  // measures all three surfaces anyway.
+  "hl-base": [],
+  "hl-keyword": [],
+  "hl-string": [],
+  "hl-number": [],
+  "hl-comment": [],
+  "hl-punctuation": [],
 };
 
 /**

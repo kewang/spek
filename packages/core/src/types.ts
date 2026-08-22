@@ -83,7 +83,7 @@ export interface ChangeInfo {
 }
 
 /** 一個 change artifact 的 kind，決定解析與渲染方式 */
-export type ArtifactKind = "markdown" | "tasks" | "specs";
+export type ArtifactKind = "markdown" | "tasks" | "specs" | "data";
 
 /** 動態探索到的單一 change artifact；預設依檔案 mtime 由新到舊排序（見 discoverArtifacts），
  *  openspec CLI 只餵給選用的 schema 順序（ChangeDetail.schemaOrder），非此處的預設排序 */
@@ -93,7 +93,7 @@ export interface ChangeArtifact {
   /** 顯示標題（由檔名 humanize） */
   title: string;
   kind: ArtifactKind;
-  /** kind === "markdown"：原始 Markdown 內容 */
+  /** kind === "markdown" | "data"：原始檔案內容（markdown 為 Markdown 文字，data 為 .yaml/.yml/.json 原文） */
   content?: string;
   /** kind === "tasks"：解析後的 tasks */
   tasks?: ParsedTasks;

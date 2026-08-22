@@ -13,7 +13,7 @@ import {
   buildGraphDataAggregated,
   listWorkspaces,
   toWorktreeSource,
-  listChangeMarkdownFiles,
+  listChangeArtifactFiles,
   listSchemas,
   readSchema,
   groupSchemaUsage,
@@ -290,8 +290,10 @@ openspecRouter.get("/search", (req, res) => {
       const changePath = path.join(baseDir, slug);
       if (!fs.statSync(changePath).isDirectory()) continue;
 
-      // 沿用 @spekjs/core 的 listChangeMarkdownFiles，與 discover/count 共用同一 predicate
-      for (const file of listChangeMarkdownFiles(changePath)) {
+      // Index every root artifact file of the change (markdown, tasks, and data), from the same
+      // @spekjs/core list the tabs and the count use. So any tab that comes from a root file is
+      // searchable. The specs delta tree is not indexed here, as before.
+      for (const file of listChangeArtifactFiles(changePath)) {
         documents.push({
           type: "change",
           name: slug,

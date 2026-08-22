@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { Link } from "react-router-dom";
 import { type ReactNode } from "react";
 import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
@@ -210,6 +211,11 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
   //    requirement 的 id 都會變，而走 `extractHeadings`（直接解析原始 markdown）的 TOC 與 VS Code
   //    側欄仍然產出原本的 slug —— 兩邊從此指向不同的錨點，畫面上完全看不出來，只是連結再也跳不到。
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+    // Syntax highlighting for fenced blocks with a language hint. `detect: false` keeps a
+    // language-less fence plain (no auto-detect); an unknown language degrades to a warning and
+    // renders plain, never throwing. It is orthogonal to the heading/fold plugins below (it only
+    // touches `pre > code`), so its position ahead of them does not affect heading-id dedup.
+    [rehypeHighlight, { detect: false }],
     [rehypeSpekHeadingIds, { idPrefix }],
   ];
   if (specShaped) rehypePlugins.push([rehypeSpekElideHeadingKeyword]);
@@ -274,10 +280,22 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
           },
           // 程式碼區塊 — 不做 BDD 高亮
           code({ className, children }) {
-            const isBlock = className?.startsWith("language-");
+            // A fenced block carries a `language-*` class. rehype-highlight also unshifts `hljs` to
+            // the FRONT of the class list, so test for `language-` anywhere, not with startsWith —
+            // otherwise a highlighted block (`hljs language-json`) reads as inline and its token
+            // spans render as `[object Object]`. The `hljs` fallback covers a highlighted block
+            // whose language class the highlighter dropped.
+            const classList = className?.split(/\s+/) ?? [];
+            const isBlock = classList.some((c) => c.startsWith("language-")) || classList.includes("hljs");
             if (isBlock) {
+              // `bg-bg-tertiary` is required, not decorative. The VS Code webview injects its own
+              // stylesheet onto a bare `<code>`. That paints the editor's code background, which is
+              // dark even under a light theme. It shows through a highlighted block that sets no
+              // background, and the block then reads dark on a light panel. The inline chip below uses
+              // the same fix. This does not reproduce in a browser, which has no host stylesheet.
+              // See CLAUDE.md.
               return (
-                <code className={`${className} block`}>
+                <code className={`${className} block bg-bg-tertiary`}>
                   {children}
                 </code>
               );

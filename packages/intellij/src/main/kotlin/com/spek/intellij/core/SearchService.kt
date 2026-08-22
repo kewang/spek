@@ -54,11 +54,11 @@ object SearchService {
             ?.filter { it.isDirectory && it.name != "archive" && !it.name.startsWith(".") }
             ?.forEach { changeDir ->
                 val slug = changeDir.name
-                // 索引每個 change 內所有 root *.md artifact（含自訂 schema 的 brainstorm/plan/verify 等）
-                val files = changeDir.listFiles()
-                    ?.filter { it.isFile && !it.name.startsWith(".") && it.name.lowercase().endsWith(".md") }
-                    ?.sortedBy { it.name }
-                    ?: emptyList()
+                // Index every root artifact file of the change (markdown, tasks, and data, including
+                // custom-schema files like brainstorm/plan/verify), from the same ArtifactFiles list the
+                // tabs and the count use. So any tab that comes from a root file is searchable. The specs
+                // delta tree is not indexed here, as before.
+                val files = ArtifactFiles.artifactFiles(changeDir)
                 for (file in files) {
                     val content = file.readText()
                     if (slug.lowercase().contains(lowerQuery) ||

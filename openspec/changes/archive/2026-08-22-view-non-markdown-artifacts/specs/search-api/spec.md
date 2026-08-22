@@ -1,7 +1,5 @@
-## Purpose
+## MODIFIED Requirements
 
-Provide server-side full-text search across all OpenSpec specs and changes, returning ranked matches with surrounding context.
-## Requirements
 ### Requirement: Full-text search endpoint
 The system SHALL provide `GET /api/openspec/search` that searches across all specs and changes content. A change's searchable content SHALL include its markdown artifacts and its `data` artifacts (root-level `.yaml`, `.yml`, and `.json` files). These come from the same source of truth used for discovery and counting, on every host. Any artifact shown as a tab in the change-detail view is therefore also searchable, whichever host renders it.
 
@@ -21,11 +19,3 @@ The system SHALL provide `GET /api/openspec/search` that searches across all spe
 #### Scenario: Data artifact content is searchable
 - **WHEN** a change contains a `data` artifact (for example `asyncapi.yaml`) whose text matches the query
 - **THEN** that change appears in the results, consistent with the artifact being shown as a tab
-
-### Requirement: Search context preview
-Each search result SHALL include surrounding context to help users identify the relevant content.
-
-#### Scenario: Result includes context
-- **WHEN** a search matches text within a Markdown file
-- **THEN** the match includes up to 100 characters before and after the matched text as context preview
-

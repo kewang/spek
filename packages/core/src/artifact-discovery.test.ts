@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { discoverArtifacts, countArtifacts } from "./artifacts.js";
+import { discoverArtifacts } from "./artifact-discovery.js";
+import {
+  countArtifacts,
+  changeDirMtime,
+  listChangeArtifactFiles,
+} from "./artifact-files.js";
 
 function mkRepo(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "spek-artifacts-test-"));
@@ -333,4 +338,110 @@ test("countArtifacts: a specs dir of many files is one artifact, matching a sche
     discoverArtifacts(changePath).map((a) => a.id).sort(),
     ["design", "proposal", "specs", "tasks"],
   );
+});
+
+// --- data artifacts (.yaml / .yml / .json) ---
+
+test("discoverArtifacts: root .yaml / .yml / .json surface as data artifacts, titled with extension", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "event-change", {
+    "proposal.md": "## Why\n",
+    "asyncapi.yaml": "asyncapi: 3.0.0\n",
+    "config.yml": "a: 1\n",
+    "schema.json": '{"x":1}\n',
+  });
+  const arts = discoverArtifacts(changePath);
+  const async = arts.find((a) => a.title === "asyncapi.yaml")!;
+  assert.equal(async.kind, "data");
+  assert.equal(async.id, "asyncapi"); // id is the stem; title keeps the extension
+  assert.equal(async.content, "asyncapi: 3.0.0\n"); // raw text, correct encoding
+  const yml = arts.find((a) => a.title === "config.yml")!;
+  assert.equal(yml.kind, "data");
+  const json = arts.find((a) => a.title === "schema.json")!;
+  assert.equal(json.kind, "data");
+  assert.equal(json.content, '{"x":1}\n');
+  // markdown still classified as markdown; four artifacts total
+  assert.equal(arts.find((a) => a.id === "proposal")!.kind, "markdown");
+  assert.equal(arts.length, 4);
+});
+
+test("discoverArtifacts: the change's own .openspec.yaml (a dotfile) is never a data artifact", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "## Why\n",
+    ".openspec.yaml": "schema: spec-driven\n",
+  });
+  const arts = discoverArtifacts(changePath);
+  assert.deepEqual(arts.map((a) => a.id), ["proposal"]); // no data artifact for the dotfile
+  assert.equal(arts.some((a) => a.kind === "data"), false);
+});
+
+test("discoverArtifacts: a .json inside a subdirectory is not discovered (root-only)", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "## Why\n",
+    "nested/data.json": '{"deep":true}\n',
+  });
+  const arts = discoverArtifacts(changePath);
+  assert.deepEqual(arts.map((a) => a.id), ["proposal"]); // subdir json ignored
+});
+
+test("discoverArtifacts: spec.md and spec.json get different ids (markdown wins the stem)", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "spec.md": "## markdown\n",
+    "spec.json": '{"data":1}\n',
+  });
+  const arts = discoverArtifacts(changePath);
+  const md = arts.find((a) => a.kind === "markdown")!;
+  const data = arts.find((a) => a.kind === "data")!;
+  assert.equal(md.id, "spec"); // markdown producer runs before data → keeps the bare stem
+  assert.equal(data.id, "spec-2"); // data disambiguated, no content lost
+  assert.equal(data.title, "spec.json"); // and its tab label keeps the extension
+  assert.equal(arts.length, 2);
+});
+
+test("discoverArtifacts / countArtifacts: data artifacts are counted, count equals tab count", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "## Why\n",
+    "asyncapi.yaml": "asyncapi: 3.0.0\n",
+    "specs/foo/spec.md": "## ADDED\n",
+  });
+  const arts = discoverArtifacts(changePath);
+  assert.equal(arts.length, 3); // proposal (markdown) + asyncapi (data) + specs
+  assert.equal(countArtifacts(changePath), 3); // count matches the number of tabs
+});
+
+test("listChangeArtifactFiles: includes markdown + tasks + data, excludes dotfiles and subdirs", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "## Why\n",
+    "tasks.md": "- [ ] a\n",
+    "asyncapi.yaml": "asyncapi: 3.0.0\n",
+    "schema.json": "{}\n",
+    ".openspec.yaml": "schema: spec-driven\n",
+    "nested/data.json": "{}\n",
+    // the specs/ delta tree contributes no root files to the artifact file set (rootArtifacts covers
+    // root files only); change delta specs are not part of the full-text index, and never were
+    "specs/foo/spec.md": "## ADDED\n",
+  });
+  assert.deepEqual(listChangeArtifactFiles(changePath), [
+    "asyncapi.yaml",
+    "proposal.md",
+    "schema.json",
+    "tasks.md",
+  ]);
+});
+
+test("changeDirMtime: an edit to only a data file bumps the change mtime", () => {
+  const repo = mkRepo();
+  const changePath = writeChange(repo, "c", {
+    "proposal.md": "## Why\n",
+    "asyncapi.yaml": "asyncapi: 3.0.0\n",
+  });
+  setMtime(changePath, "proposal.md", 1000);
+  setMtime(changePath, "asyncapi.yaml", 5000); // data file is the newest edit
+  const dataMtime = fs.statSync(path.join(changePath, "asyncapi.yaml")).mtimeMs;
+  assert.equal(changeDirMtime(changePath), dataMtime); // the data file's mtime, not ignored
 });

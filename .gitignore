@@ -10,6 +10,9 @@ packages/vscode/webview/
 *.vsix
 .idea/
 
+# Throwaway UI review screenshots (Playwright captures). Not part of the tracked README assets.
+review-screenshots/
+
 # Scratch corpus written by scripts/generate-task-parser-corpus.ts. Generated fixtures are
 # throwaway input for a differential run; adjudicated findings are committed to
 # test-fixtures/task-parser/ as authored fixtures instead.

@@ -16,6 +16,7 @@ import { FoldControls } from "../components/FoldControls";
 import { foldOptionsFor, useSpecFold, type SpecFold } from "../hooks/useSpecFold";
 import { sortArtifacts, type ArtifactSortMode } from "@spekjs/core/artifact-order";
 import { scrollToAnchorId } from "../utils/scrollOffset";
+import { isMarkdownLike, dataLanguage, fencedBlock } from "../utils/dataArtifact";
 
 const TOC_MIN_HEADINGS = 3;
 
@@ -25,9 +26,10 @@ function slugTitle(slug: string): string {
   return (m ? m[1] : slug).replace(/-/g, " ");
 }
 
-// 某個 artifact 是否可渲染為 markdown 並支援 TOC（markdown / specs 可，tasks 不可）
-function isMarkdownLike(kind: ChangeArtifact["kind"]): boolean {
-  return kind === "markdown" || kind === "specs";
+// exhaustive switch guard：新增一種 ArtifactKind 卻忘了在 renderArtifact 補分支時，這裡型別報錯，
+// 而不是像過去那樣悄悄落進 tasks 分支。
+function assertNever(kind: never): never {
+  throw new Error(`Unhandled artifact kind: ${String(kind)}`);
 }
 
 function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: SpecFold) {
@@ -35,6 +37,14 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: Sp
     // proposal / design 等 markdown artifact 不摺疊 —— 只有 spec 形狀的內容摺
     return artifact.content ? (
       <MarkdownRenderer content={artifact.content} specTopics={specTopics} />
+    ) : (
+      <p className="text-text-muted text-sm">No content</p>
+    );
+  }
+  if (artifact.kind === "data") {
+    // data artifact（.yaml/.yml/.json）走同一條 highlight 管線的 fenced block；無 TOC、不摺疊。
+    return artifact.content != null ? (
+      <MarkdownRenderer content={fencedBlock(artifact.content, dataLanguage(artifact.title))} />
     ) : (
       <p className="text-text-muted text-sm">No content</p>
     );
@@ -50,7 +60,8 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: Sp
       <p className="text-text-muted text-sm">No delta specs</p>
     );
   }
-  // tasks
+  // 到這裡只可能是 tasks；若日後新增 kind 卻沒補分支，assertNever 會在型別層報錯。
+  if (artifact.kind !== "tasks") return assertNever(artifact.kind);
   return artifact.tasks ? (
     <div className="space-y-4">
       <TaskProgress completed={artifact.tasks.completed} total={artifact.tasks.total} />
