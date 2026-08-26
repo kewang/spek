@@ -174,7 +174,8 @@ code, pre {
 /* No `code` background rule here on purpose — each `<code>` sets its own. See CLAUDE.md. */
 
 /*
- * Syntax highlighting. rehype-highlight (highlight.js) writes `hljs-*` classes. This maps them to the
+ * Syntax highlighting. The rehypeHighlightNarrow plugin (highlight.js via lowlight) writes `hljs-*`
+ * classes. This maps them to the
  * `--color-hl-*` tokens. It does not import the highlight.js theme, on purpose. That theme is a set of
  * hard-coded, non-tokenized colours. It would bypass the site-wide contrast discipline (see D5). A
  * scope with no mapping falls to the `.hljs` base colour, which is always readable.

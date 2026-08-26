@@ -76,7 +76,9 @@ data class ChangeInfo(
     val taskStats: TaskStats?,
 )
 
-// 動態探索到的單一 change artifact；kind 為 "markdown" | "tasks" | "specs"
+// 動態探索到的單一 change artifact；kind 為 "markdown" | "tasks" | "specs" | "data"
+// (kind is a free-form String because the type cannot enforce the set. This comment is the only
+//  statement of what the field may hold. Keep it complete when a new kind is added.)
 @Serializable
 data class ChangeArtifact(
     val id: String,

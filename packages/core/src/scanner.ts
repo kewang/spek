@@ -287,7 +287,12 @@ export async function readChange(
   // 只對 active change 查 CLI（archived 無 planningArtifacts）。schema 為 null 不代表無權威順序——
   // CLI 會自行解析出內建預設並回傳（provider 內以 repo 級預設桶快取），故 null schema 仍要查。
   const refs = status === "active" ? await orderProvider(repoDir, slug, schema) : null;
-  const schemaOrder = resolveSchemaOrder(refs, artifacts.map((a) => a.id)) ?? undefined;
+  // A data artifact's title is its exact filename, so this maps a declared data outputPath to the right id
+  // even when a markdown sibling shares its stem (asyncapi.md + asyncapi.yaml).
+  const dataFileToId = new Map(
+    artifacts.filter((a) => a.kind === "data").map((a) => [a.title, a.id] as const),
+  );
+  const schemaOrder = resolveSchemaOrder(refs, artifacts.map((a) => a.id), dataFileToId) ?? undefined;
 
   const createdDate = readCreatedDate(changePath);
   const archivedDate = status === "archived" ? parseSlug(slug).date : null;

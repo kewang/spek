@@ -7,8 +7,10 @@ import path from "node:path";
  * content. discoverArtifacts in artifact-discovery.ts builds the ChangeArtifact objects on top of this list.
  */
 
-/** The root-level extensions of a data artifact. */
-const DATA_EXTENSIONS = [".yaml", ".yml", ".json"];
+/** The root-level extensions of a data artifact. Exported so a file watcher can build the set of
+ *  extensions worth reacting to (`.md` + these) from one source. Re-listing them would drift when a new
+ *  data extension is added here. */
+export const DATA_EXTENSIONS = [".yaml", ".yml", ".json"];
 
 /** The kind of a root-level artifact file. specs is not here: it is a tree, not a root file. */
 export type RootKind = "tasks" | "markdown" | "data";
@@ -51,17 +53,24 @@ function listRootFiles(changePath: string, match: (nameLower: string) => boolean
  */
 export function rootArtifacts(changePath: string): { file: string; kind: RootKind }[] {
   if (!fs.existsSync(changePath)) return [];
-  const md: string[] = [];
-  const data: string[] = [];
+  // The file-only, non-dotfile rules are the same ones listRootFiles states. They are kept here because
+  // this walk also needs each entry's kind. Carry {file, kind} through the partition, so the kind is
+  // computed once and not recomputed behind a non-null assertion after the sort.
+  const md: { file: string; kind: RootKind }[] = [];
+  const data: { file: string; kind: RootKind }[] = [];
   for (const e of fs.readdirSync(changePath, { withFileTypes: true })) {
     if (!e.isFile() || e.name.startsWith(".")) continue;
     const kind = rootKind(e.name.toLowerCase());
-    if (kind === "data") data.push(e.name);
-    else if (kind) md.push(e.name);
+    if (!kind) continue;
+    (kind === "data" ? data : md).push({ file: e.name, kind });
   }
-  md.sort();
-  data.sort();
-  return [...md, ...data].map((file) => ({ file, kind: rootKind(file.toLowerCase())! }));
+  // Default string order per bucket (matches the prior `.sort()` on names), so spec.md still precedes
+  // spec.yaml within data and the id-dedup precedence in discoverArtifacts is unchanged.
+  const byName = (a: { file: string }, b: { file: string }) =>
+    a.file < b.file ? -1 : a.file > b.file ? 1 : 0;
+  md.sort(byName);
+  data.sort(byName);
+  return [...md, ...data];
 }
 
 /**
@@ -80,9 +89,18 @@ export function listSpecFiles(changePath: string): { topic: string; file: string
   return out.sort((a, b) => a.topic.localeCompare(b.topic));
 }
 
-/** True if specs/ holds at least one spec.md. It reads no content. */
+/** True if specs/ holds at least one spec.md. It reads no content and returns on the first hit. This is
+ *  the changes-list hot path (countArtifacts, called per change during a scan). So it does not build the
+ *  full listSpecFiles list only to ask `.length > 0`. It walks the same specs/<topic>/spec.md shape as
+ *  listSpecFiles. Keep the two in step. */
 function hasSpecsTree(changePath: string): boolean {
-  return listSpecFiles(changePath).length > 0;
+  const specsDir = path.join(changePath, "specs");
+  if (!fs.existsSync(specsDir) || !fs.statSync(specsDir).isDirectory()) return false;
+  for (const topic of fs.readdirSync(specsDir)) {
+    if (topic.startsWith(".")) continue;
+    if (fs.existsSync(path.join(specsDir, topic, "spec.md"))) return true;
+  }
+  return false;
 }
 
 /** The sort time of the specs artifact: the newest mtime of every spec.md file (0 if none). */

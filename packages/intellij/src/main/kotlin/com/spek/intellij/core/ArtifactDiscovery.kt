@@ -19,8 +19,11 @@ object ArtifactDiscovery {
             .joinToString(" ") { w -> if (w.isEmpty()) w else w.replaceFirstChar { it.uppercase() } }
     }
 
-    /** Remove the last extension (`asyncapi.yaml` to `asyncapi`, `proposal.md` to `proposal`). */
-    private fun stripExt(file: String): String = file.replace(Regex("""\.[^.]+$"""), "")
+    /** Remove the last extension (`asyncapi.yaml` to `asyncapi`, `proposal.md` to `proposal`). Anchored
+     *  with `\z` to follow the repo's filename convention (#33), where Java's `$` can match before a
+     *  trailing line terminator. For this pattern the greedy `[^.]+` already consumes any trailing
+     *  newline, so `\z` and `$` coincide here. `\z` is used for consistency, not to fix an active bug. */
+    private fun stripExt(file: String): String = file.replace(Regex("""\.[^.]+\z"""), "")
 
     /** Assign an id that is not yet used. If base is taken, try base-2, base-3, and so on, then record it.
      *  This resolves the clash between a root specs.md and the specs delta tree over the "specs" id. */

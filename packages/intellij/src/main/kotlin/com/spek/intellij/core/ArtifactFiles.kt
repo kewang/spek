@@ -10,7 +10,9 @@ import java.io.File
  */
 object ArtifactFiles {
 
-    private val DATA_EXTENSIONS = listOf(".yaml", ".yml", ".json")
+    // internal, not private: WatchPolling builds its snapshot's watched-extension set (`.md` + these)
+    // from this one source. A new data extension then cannot land here and be silently ignored there.
+    internal val DATA_EXTENSIONS = listOf(".yaml", ".yml", ".json")
 
     /** The kind of a root-level artifact file. specs is not here: it is a tree, not a root file. */
     enum class RootKind { TASKS, MARKDOWN, DATA }
@@ -38,19 +40,21 @@ object ArtifactFiles {
      * and partitions the entries by kind.
      */
     fun rootArtifacts(changeDir: File): List<Pair<File, RootKind>> {
-        val md = mutableListOf<File>()
-        val data = mutableListOf<File>()
+        // Carry (file, kind) through the partition so the kind is computed once, not recomputed behind a
+        // !! after the sort.
+        val md = mutableListOf<Pair<File, RootKind>>()
+        val data = mutableListOf<Pair<File, RootKind>>()
         changeDir.listFiles()?.forEach { f ->
             if (!f.isFile || f.name.startsWith(".")) return@forEach
-            when (rootKind(f.name.lowercase())) {
-                RootKind.DATA -> data.add(f)
-                RootKind.TASKS, RootKind.MARKDOWN -> md.add(f)
+            when (val kind = rootKind(f.name.lowercase())) {
+                RootKind.DATA -> data.add(f to kind)
+                RootKind.TASKS, RootKind.MARKDOWN -> md.add(f to kind)
                 null -> {}
             }
         }
-        md.sortBy { it.name }
-        data.sortBy { it.name }
-        return (md + data).map { it to rootKind(it.name.lowercase())!! }
+        md.sortBy { it.first.name }
+        data.sortBy { it.first.name }
+        return md + data
     }
 
     /**
@@ -71,8 +75,16 @@ object ArtifactFiles {
             ?: emptyList()
     }
 
-    /** True if specs/ holds at least one spec.md. It reads no content. */
-    private fun hasSpecsTree(changeDir: File): Boolean = listSpecFiles(changeDir).isNotEmpty()
+    /** True if specs/ holds at least one spec.md. It reads no content and returns on the first hit. This
+     *  is the changes-list hot path (count, called per change during a scan). So it does not build the full
+     *  listSpecFiles list only to ask isNotEmpty(). It walks the same specs/<topic>/spec.md shape. */
+    private fun hasSpecsTree(changeDir: File): Boolean {
+        val specsDir = File(changeDir, "specs")
+        if (!specsDir.isDirectory) return false
+        return specsDir.listFiles()
+            ?.any { it.isDirectory && !it.name.startsWith(".") && File(it, "spec.md").exists() }
+            ?: false
+    }
 
     /** The sort time of the specs artifact: the newest mtime of every spec.md file (0 if none). */
     fun specsMtime(changeDir: File): Long =

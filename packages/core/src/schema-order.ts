@@ -62,15 +62,31 @@ export function parseOrderFromStatus(json: unknown): SchemaArtifactRef[] | null 
   return refs.length > 0 ? refs : null;
 }
 
-/** 將 openspec artifact 的 outputPath 對應到已知 artifact id；對不到回 null（glob 僅支援 specs tree） */
-function idForOutputPath(outputPath: string, knownIds: Set<string>): string | null {
+/**
+ * Map an openspec artifact's outputPath to a known artifact id, or null if none matches (a glob only
+ * resolves the specs tree). `dataFileToId` maps a data artifact's exact filename to its id.
+ */
+function idForOutputPath(
+  outputPath: string,
+  knownIds: Set<string>,
+  dataFileToId: Map<string, string>,
+): string | null {
   const g = outputPath.trim();
   if (g.includes("*")) {
     if (/(^|\/)specs(\/|$)/.test(g) && knownIds.has("specs")) return "specs";
     return null;
   }
   const base = g.split(/[\\/]/).pop() || g;
-  const stem = base.replace(/\.md$/i, "");
+  // An exact filename match wins first. Discovery gives a markdown file the bare stem, and a same-stem
+  // data file the `-2` suffix (`asyncapi.md` -> `asyncapi`, `asyncapi.yaml` -> `asyncapi-2`). A data
+  // artifact's title IS its filename. So a data outputPath resolves to the data id, not the markdown
+  // sibling that claimed the bare stem. The stem path below already resolves the markdown side correctly.
+  const byFile = dataFileToId.get(base);
+  if (byFile) return byFile;
+  // Otherwise strip the last extension, exactly as discoverArtifacts' stripExt (`\.[^.]+$`) does when it
+  // assigns the id, so a declared artifact inverts to the same id discovery produced (`asyncapi.yaml` ->
+  // `asyncapi`), not only `.md`. knownIds gates the result, so a non-artifact path cannot match.
+  const stem = base.replace(/\.[^.]+$/, "");
   if (knownIds.has(stem)) return stem;
   // 指向 specs/<topic>/spec.md 之類的字面路徑也對應到 specs artifact
   if (/^spec\.md$/i.test(base) && /specs/i.test(g) && knownIds.has("specs")) return "specs";
@@ -85,13 +101,15 @@ function idForOutputPath(outputPath: string, knownIds: Set<string>): string | nu
 export function resolveSchemaOrder(
   refs: SchemaArtifactRef[] | null,
   knownIds: string[],
+  dataFileToId?: Map<string, string>,
 ): string[] | null {
   if (!refs) return null;
   const known = new Set(knownIds);
+  const byFile = dataFileToId ?? new Map<string, string>();
   const ordered: string[] = [];
   const used = new Set<string>();
   for (const ref of refs) {
-    const id = idForOutputPath(ref.outputPath, known);
+    const id = idForOutputPath(ref.outputPath, known, byFile);
     if (id && !used.has(id)) {
       ordered.push(id);
       used.add(id);

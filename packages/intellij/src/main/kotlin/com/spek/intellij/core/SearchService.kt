@@ -55,10 +55,16 @@ object SearchService {
             ?.forEach { changeDir ->
                 val slug = changeDir.name
                 // Index every root artifact file of the change (markdown, tasks, and data, including
-                // custom-schema files like brainstorm/plan/verify), from the same ArtifactFiles list the
-                // tabs and the count use. So any tab that comes from a root file is searchable. The specs
-                // delta tree is not indexed here, as before.
-                val files = ArtifactFiles.artifactFiles(changeDir)
+                // custom-schema files like brainstorm/plan/verify), so any tab that comes from a root file
+                // is searchable. The specs delta tree is not indexed here, as before.
+                //
+                // Iterate in rootArtifacts order (markdown before data), NOT the name-sorted artifactFiles
+                // list. This loop breaks on the first file whose slug OR content matches. A slug always
+                // matches, whatever the file, so the reported snippet comes from the first file iterated.
+                // Name-sorting put `asyncapi.yaml` ahead of `design.md`, so a slug search previewed raw
+                // YAML instead of the design prose it used to show. Markdown-first restores that, and still
+                // reaches data files for a content-only match.
+                val files = ArtifactFiles.rootArtifacts(changeDir).map { it.first }
                 for (file in files) {
                     val content = file.readText()
                     if (slug.lowercase().contains(lowerQuery) ||

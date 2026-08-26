@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { extractHeadings } from "@spekjs/core/headings";
 import type { ChangeArtifact } from "@spekjs/core";
@@ -16,7 +16,7 @@ import { FoldControls } from "../components/FoldControls";
 import { foldOptionsFor, useSpecFold, type SpecFold } from "../hooks/useSpecFold";
 import { sortArtifacts, type ArtifactSortMode } from "@spekjs/core/artifact-order";
 import { scrollToAnchorId } from "../utils/scrollOffset";
-import { isMarkdownLike, dataLanguage, fencedBlock } from "../utils/dataArtifact";
+import { isMarkdownLike, dataLanguage, dataTabNames, fencedBlock } from "../utils/dataArtifact";
 
 const TOC_MIN_HEADINGS = 3;
 
@@ -26,11 +26,13 @@ function slugTitle(slug: string): string {
   return (m ? m[1] : slug).replace(/-/g, " ");
 }
 
-// exhaustive switch guard：新增一種 ArtifactKind 卻忘了在 renderArtifact 補分支時，這裡型別報錯，
-// 而不是像過去那樣悄悄落進 tasks 分支。
-function assertNever(kind: never): never {
-  throw new Error(`Unhandled artifact kind: ${String(kind)}`);
-}
+// Compile-time exhaustiveness guard: if a new ArtifactKind is added without a branch in renderArtifact,
+// `kind` is not `never` at the call site and this fails to type-check. It does not throw, on purpose.
+// renderArtifact runs for the mounted tab, and a host can present a kind this bundle predates. IntelliJ's
+// ChangeArtifact.kind is a free-form String, its webview bundle is a build artifact that goes stale, and
+// @spekjs/core's ArtifactKind is on its own published line. Throwing here unmounts the whole page, because
+// there is no error boundary. So the caller returns a graceful fallback instead.
+function assertNever(_kind: never): void {}
 
 function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: SpecFold) {
   if (artifact.kind === "markdown") {
@@ -60,8 +62,12 @@ function renderArtifact(artifact: ChangeArtifact, specTopics: string[], fold: Sp
       <p className="text-text-muted text-sm">No delta specs</p>
     );
   }
-  // 到這裡只可能是 tasks；若日後新增 kind 卻沒補分支，assertNever 會在型別層報錯。
-  if (artifact.kind !== "tasks") return assertNever(artifact.kind);
+  // 到這裡只可能是 tasks；若日後新增 kind 卻沒補分支，assertNever 會在型別層報錯（不 throw）。
+  // 執行期則優雅退場：顯示提示而非讓未知 kind 讓整頁崩掉。
+  if (artifact.kind !== "tasks") {
+    assertNever(artifact.kind);
+    return <p className="text-text-muted text-sm">Unsupported artifact type</p>;
+  }
   return artifact.tasks ? (
     <div className="space-y-4">
       <TaskProgress completed={artifact.tasks.completed} total={artifact.tasks.total} />
@@ -235,11 +241,31 @@ export function ChangeDetail() {
   if (error) return <p className="text-status-error">Error: {error}</p>;
   if (!data) return <p className="text-text-muted">Change not found</p>;
 
-  const tabs = artifacts.map((artifact) => ({
-    id: artifact.id,
-    label: artifact.title,
-    content: renderArtifact(artifact, specTopics, fold),
-  }));
+  // A data tab shows its stem as the label plus a format badge, not the raw filename (dataTabNames owns the
+  // stem/collision rule).
+  const dataNames = dataTabNames(artifacts);
+  const tabs = artifacts.map((artifact) => {
+    let label: ReactNode = artifact.title;
+    const dataName = dataNames.get(artifact.id);
+    if (dataName) {
+      label = (
+        <span className="inline-flex items-center gap-1.5">
+          {dataName.name}
+          <span className="rounded bg-bg-tertiary px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-text-muted">
+            {dataName.format}
+          </span>
+        </span>
+      );
+    }
+    return {
+      id: artifact.id,
+      label,
+      // Only the mounted tab renders. TabView shows just activeTab.content. Building content for every
+      // artifact ran each data tab's fencedBlock scan on every re-render (tab switch, sort, fold, watcher
+      // refresh). Rendering only the active one bounds that scan to one artifact.
+      content: artifact.id === activeTab ? renderArtifact(artifact, specTopics, fold) : null,
+    };
+  });
 
   const lifecycleBanner = formatLifecycleBanner(data, todayIso());
   const title = slug ? slugTitle(slug) : "";

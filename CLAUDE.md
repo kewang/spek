@@ -406,7 +406,9 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 ## Key Design Decisions
 
 - **Security**: **no arbitrary file access.** For repo-local reads that is achieved by containment —
-  Express only reads `.md` / `.yaml` files under `openspec/`. Schema reading is the one path that
+  Express only reads markdown and data-artifact files (`.md` / `.yaml` / `.yml` / `.json`) under
+  `openspec/` (search reads every root artifact file a change holds, data artifacts included). Schema
+  reading is the one path that
   reaches outside it: a package schema lives wherever npm installed the CLI, so the path comes from
   `openspec schema which <name> --json` and the `schema.yaml` there is read directly. Containment
   cannot be the guard there, so **name validation is** — an explicit allowlist

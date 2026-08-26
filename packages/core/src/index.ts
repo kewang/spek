@@ -48,7 +48,7 @@ export { extractHeadings, slugifyHeading, specHeadingLabel } from "./headings.js
 export type { Heading } from "./headings.js";
 // 同時由 ./graph-node-id subpath 匯出（node-free），供 browser bundle / 宿主 main process 使用。
 export { changeNodeSlug } from "./graph-node-id.js";
-export { listChangeMarkdownFiles, listChangeArtifactFiles } from "./artifact-files.js";
+export { listChangeMarkdownFiles, listChangeArtifactFiles, DATA_EXTENSIONS } from "./artifact-files.js";
 export { shouldUsePolling, pollingInterval, withAuthoritativeChokidarEnv } from "./watch-polling.js";
 
 export type {

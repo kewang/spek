@@ -12,6 +12,8 @@ import { openspecRouter } from "./openspec.js";
 // listen() at import time. Search is pure filesystem + Fuse, so it needs no CLI runner stub.
 let server: Server;
 let base: string;
+// Every tempRepo() tree, removed in after() so a test run leaves no spek-search-test-* dirs behind.
+const tempRepos: string[] = [];
 
 before(async () => {
   const app = express();
@@ -24,10 +26,12 @@ before(async () => {
 
 after(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  for (const repo of tempRepos) fs.rmSync(repo, { recursive: true, force: true });
 });
 
 function tempRepo(files: Record<string, string>): string {
   const repo = fs.mkdtempSync(path.join(os.tmpdir(), "spek-search-test-"));
+  tempRepos.push(repo);
   for (const [rel, content] of Object.entries(files)) {
     const full = path.join(repo, "openspec", rel);
     fs.mkdirSync(path.dirname(full), { recursive: true });

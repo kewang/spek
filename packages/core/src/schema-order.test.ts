@@ -136,6 +136,46 @@ test("resolveSchemaOrder: outputPath is trimmed before matching", () => {
   assert.deepEqual(order, ["design"]);
 });
 
+test("resolveSchemaOrder: a data artifact's outputPath maps to its id (extension stripped, not only .md)", () => {
+  // A schema that declares a data artifact (`asyncapi`, generates `asyncapi.yaml`) must sort it into its
+  // schema position, not trail it as if undeclared. The stem strip mirrors discoverArtifacts' stripExt.
+  const order = resolveSchemaOrder(
+    refs(
+      ["proposal", "proposal.md"],
+      ["asyncapi", "asyncapi.yaml"],
+      ["specs", "specs/**/*.md"],
+      ["tasks", "tasks.md"],
+    ),
+    ["proposal", "asyncapi", "specs", "tasks"],
+  );
+  assert.deepEqual(order, ["proposal", "asyncapi", "specs", "tasks"]);
+});
+
+test("resolveSchemaOrder: .yml and .json data outputPaths map to their ids", () => {
+  const order = resolveSchemaOrder(
+    refs(["retry-policy", "retry-policy.yml"], ["payload-example", "payload-example.json"]),
+    ["retry-policy", "payload-example"],
+  );
+  assert.deepEqual(order, ["retry-policy", "payload-example"]);
+});
+
+test("resolveSchemaOrder: a data outputPath resolves to the data id, not a same-stem markdown sibling", () => {
+  // Discovery gives `asyncapi.md` the id "asyncapi" (bare stem) and `asyncapi.yaml` the id "asyncapi-2".
+  // The schema declares the data artifact with outputPath `asyncapi.yaml`; it must map to the DATA id,
+  // not the markdown sibling that claimed the bare stem. The data-file map carries the exact filename.
+  const order = resolveSchemaOrder(
+    refs(["proposal", "proposal.md"], ["asyncapi", "asyncapi.yaml"]),
+    ["proposal", "asyncapi", "asyncapi-2"],
+    new Map([["asyncapi.yaml", "asyncapi-2"]]),
+  );
+  assert.deepEqual(order, ["proposal", "asyncapi-2"]);
+});
+
+test("resolveSchemaOrder: without the data-file map, an outputPath still resolves by stem (back-compat)", () => {
+  const order = resolveSchemaOrder(refs(["asyncapi", "asyncapi.yaml"]), ["asyncapi"]);
+  assert.deepEqual(order, ["asyncapi"]);
+});
+
 test("resolveSchemaOrder: refs pointing at unknown ids are skipped", () => {
   const order = resolveSchemaOrder(
     refs(["ghost", "ghost.md"], ["proposal", "proposal.md"]),

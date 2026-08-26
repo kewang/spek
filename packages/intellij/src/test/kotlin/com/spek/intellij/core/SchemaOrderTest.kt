@@ -148,6 +148,42 @@ class SchemaOrderTest {
     }
 
     @Test
+    fun resolveMapsDataOutputPathToDataIdNotSameStemMarkdownSibling() {
+        // Discovery gives `asyncapi.md` the id "asyncapi" (bare stem) and `asyncapi.yaml` the id
+        // "asyncapi-2". The schema declares the data artifact with outputPath `asyncapi.yaml`; it must map
+        // to the DATA id, not the markdown sibling. The data-file map carries the exact filename.
+        val order = SchemaOrder.resolveSchemaOrder(
+            refs("proposal" to "proposal.md", "asyncapi" to "asyncapi.yaml"),
+            listOf("proposal", "asyncapi", "asyncapi-2"),
+            mapOf("asyncapi.yaml" to "asyncapi-2"),
+        )
+        assertEquals(listOf("proposal", "asyncapi-2"), order)
+    }
+
+    @Test
+    fun resolveWithoutDataFileMapStillResolvesByStem() {
+        val order = SchemaOrder.resolveSchemaOrder(refs("asyncapi" to "asyncapi.yaml"), listOf("asyncapi"))
+        assertEquals(listOf("asyncapi"), order)
+    }
+
+    @Test
+    fun resolveMapsDataArtifactOutputPathByStrippingAnyExtension() {
+        // A schema declaring a data artifact (`asyncapi`, generates `asyncapi.yaml`) must sort it into its
+        // position, not trail it. The stem strip mirrors ArtifactDiscovery.stripExt (any extension), not
+        // only `.md`, so TS and Kotlin allocate the same id for one file.
+        val order = SchemaOrder.resolveSchemaOrder(
+            refs(
+                "proposal" to "proposal.md",
+                "asyncapi" to "asyncapi.yaml",
+                "retry-policy" to "retry-policy.yml",
+                "payload-example" to "payload-example.json",
+            ),
+            listOf("proposal", "asyncapi", "retry-policy", "payload-example"),
+        )
+        assertEquals(listOf("proposal", "asyncapi", "retry-policy", "payload-example"), order)
+    }
+
+    @Test
     fun resolveSkipsUnknownIds() {
         val order = SchemaOrder.resolveSchemaOrder(
             refs("ghost" to "ghost.md", "proposal" to "proposal.md"),
