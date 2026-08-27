@@ -400,3 +400,12 @@ Thanks to everyone who has contributed to spek:
 ## License
 
 MIT
+
+## Trademarks and brand assets
+
+The MIT license above applies to the source code. It does **not** grant any right to use the
+spek name, logo, or other brand assets in `logo/`. All rights to those are reserved.
+
+You may use them to refer to the spek project — in an article, a talk, a list of tools. You may
+not use them to identify your own product, service, or a modified distribution, or in any way
+that suggests endorsement by or affiliation with this project.
