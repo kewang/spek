@@ -3,6 +3,39 @@
 `@spekjs/core` has its own version line, independent of the spek product releases tracked in the
 repository root `CHANGELOG.md`.
 
+## 1.11.0
+
+### Added
+
+- **`"data"` is an `ArtifactKind`.** A change's root-level `.yaml`, `.yml` and `.json` files are now
+  discovered as artifacts, alongside the root `*.md` files and the `specs/` tree. `ChangeArtifact`
+  keeps its shape — `content` carries the raw text and every field stays optional — so the addition
+  is source-compatible. A consumer that switches on `kind` needs a branch for it.
+- **`listChangeArtifactFiles`** — every root file of a change that is an artifact, of any kind. It
+  reads no content, so it is the list to build a search index or a count from.
+  `listChangeMarkdownFiles` is unchanged and still returns only the Markdown ones.
+- **`DATA_EXTENSIONS`** — the extensions that make a root file a `data` artifact. Exported so a file
+  watcher can derive the set of extensions worth reacting to from the same source discovery
+  classifies by, rather than re-listing them.
+
+### Changed
+
+- **`artifacts.ts` is split into `artifact-files.ts` and `artifact-discovery.ts`** — the listing and
+  the builder. One `rootKind` classifier now drives `countArtifacts`, `listChangeArtifactFiles` and
+  `discoverArtifacts`, so a file class cannot be visible to one and not the others. Every export
+  keeps its name and its behaviour; the package root re-exports from the new modules.
+- **`changeDirMtime` reads the same file set**, so it reflects a `data` artifact's edits with no
+  per-kind wiring.
+
+### Fixed
+
+- **A schema-declared artifact whose `generates:` is not a `.md` file resolves to its own id.** The
+  authoritative order from `openspec status --change --json` is matched by stripping the output
+  path's extension, which stripped only `.md` — so a schema declaring `generates: asyncapi.yaml`
+  had that entry dropped from `schemaOrder`, leaving the artifact indistinguishable from one the
+  schema never declared. The last extension is stripped now, matching how discovery assigns the id,
+  and an output path resolves to the `data` artifact even when a Markdown sibling shares its stem.
+
 ## 1.10.0
 
 ### Added
