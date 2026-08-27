@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.16.0
+
+**Highlight: a change's non-Markdown artifacts are visible.** A schema sets each artifact's filename through `generates:`, and not every artifact is Markdown — `event-driven` requires `asyncapi.yaml`. spek discovered only root `*.md` and the `specs/` tree, so such a change rendered every tab except the one its schema asks for.
+
+- **Root `.yaml` / `.yml` / `.json` files are artifacts**, shown as syntax-highlighted text. The tab is named for the file's stem with a format badge, using the full filename only when a Markdown artifact shares it. Thanks to [@nthansen](https://github.com/nthansen) (Norman Hansen) ([#50](https://github.com/spekhq/spek/pull/50))
+- **They sort into their schema position**, count in the change-list badge, are reachable by search, and refresh live on edit — on every surface
+- **Discovery stays root-only and skips dotfiles**, so `.openspec.yaml` and subdirectory files never become tabs
+- **Code fences in `proposal.md` / `design.md` are highlighted too.** A fence with no language stays plain
+- *Internal:* `@spekjs/core` 1.11.0 adds the `"data"` kind and the shared file listing behind count, search and discovery
+
 ## 1.15.0
 
 **Highlight: the schema workflow diagram now says which steps come *after* implementation — and its lines can finally be seen.** OpenSpec has no way to declare "this artifact is produced once the change is implemented": an artifact's `requires` may name only other artifacts, so authors point such a step at the last planning artifact and state the real ordering in prose. spek rendered the declared graph faithfully, which put those steps on `apply`'s own level, reading as its peers — in `superpowers-bridge` that placed `verify` beside `apply`, inviting exactly the mistake the schema's own runtime precheck exists to block.
