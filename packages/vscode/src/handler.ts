@@ -13,7 +13,7 @@ import {
   buildGraphDataAggregated,
   listWorkspaces,
   toWorktreeSource,
-  listChangeMarkdownFiles,
+  listChangeArtifactFiles,
   listSchemas,
   readSchema,
   groupSchemaUsage,
@@ -204,9 +204,11 @@ export class MessageHandler {
         if (slug === "archive") continue;
         const changePath = path.join(baseDir, slug);
         if (!fs.statSync(changePath).isDirectory()) continue;
-        // 索引每個 change 內所有 root *.md artifact（含自訂 schema 的 brainstorm/plan/verify 等）；
-        // 沿用 @spekjs/core 的 listChangeMarkdownFiles，與 discover/count 共用同一 predicate
-        for (const file of listChangeMarkdownFiles(changePath)) {
+        // Index every root artifact file of the change (markdown, tasks, and data, including
+        // custom-schema files like brainstorm/plan/verify), from the same @spekjs/core list the tabs
+        // and the count use. So any tab that comes from a root file is searchable. The specs delta tree
+        // is not indexed here, as before.
+        for (const file of listChangeArtifactFiles(changePath)) {
           documents.push({
             type: "change",
             name: slug,

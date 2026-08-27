@@ -85,7 +85,7 @@ object OpenSpecScanner {
             hasDesign = hasDesign,
             hasTasks = hasTasks,
             hasSpecs = hasSpecs,
-            artifactCount = ArtifactDiscovery.count(dir),
+            artifactCount = ArtifactFiles.count(dir),
             schema = readChangeSchema(dir, defaultSchema),
             defaultSchema = defaultSchema,
             taskStats = taskStats,

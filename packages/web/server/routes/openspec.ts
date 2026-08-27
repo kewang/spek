@@ -13,7 +13,8 @@ import {
   buildGraphDataAggregated,
   listWorkspaces,
   toWorktreeSource,
-  listChangeMarkdownFiles,
+  listChangeArtifactFiles,
+  DATA_EXTENSIONS,
   listSchemas,
   readSchema,
   groupSchemaUsage,
@@ -26,6 +27,9 @@ import {
 } from "@spekjs/core";
 
 // --- File watcher 共享管理 ---
+
+/** The file extensions a change edit can touch: markdown plus every data artifact extension. */
+const WATCHED_EXTENSIONS = [".md", ...DATA_EXTENSIONS];
 
 interface WatcherEntry {
   watcher: FSWatcher;
@@ -51,9 +55,12 @@ function getOrCreateWatcher(key: string, watchDirs: string[], repoRoot: string):
   const watcher = withAuthoritativeChokidarEnv(usePolling, interval, () =>
     chokidar.watch(watchPaths, {
       ignored: (filePath: string) => {
-        // 只監聽 .md 和 .yaml 檔案（以及目錄）
+        // Watch markdown and every data artifact extension (.md + DATA_EXTENSIONS), so editing or
+        // adding a .yml / .json artifact fires a refresh. Match lowercased, as discovery classifies, so
+        // a `Config.YAML` still fires. Directories are never ignored (recurse in).
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          return !filePath.endsWith(".md") && !filePath.endsWith(".yaml");
+          const lower = filePath.toLowerCase();
+          return !WATCHED_EXTENSIONS.some((ext) => lower.endsWith(ext));
         }
         return false;
       },
@@ -290,8 +297,10 @@ openspecRouter.get("/search", (req, res) => {
       const changePath = path.join(baseDir, slug);
       if (!fs.statSync(changePath).isDirectory()) continue;
 
-      // 沿用 @spekjs/core 的 listChangeMarkdownFiles，與 discover/count 共用同一 predicate
-      for (const file of listChangeMarkdownFiles(changePath)) {
+      // Index every root artifact file of the change (markdown, tasks, and data), from the same
+      // @spekjs/core list the tabs and the count use. So any tab that comes from a root file is
+      // searchable. The specs delta tree is not indexed here, as before.
+      for (const file of listChangeArtifactFiles(changePath)) {
         documents.push({
           type: "change",
           name: slug,

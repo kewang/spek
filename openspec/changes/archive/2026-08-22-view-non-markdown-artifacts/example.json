@@ -1,0 +1,20 @@
+{
+  "name": "user-signup-service",
+  "version": "1.4.0",
+  "enabled": true,
+  "retries": 3,
+  "timeoutMs": 1500,
+  "fallback": null,
+  "tags": ["events", "kafka", "signup"],
+  "channels": {
+    "userSignedUp": {
+      "address": "user.signedup",
+      "partitions": 12,
+      "compression": "snappy"
+    }
+  },
+  "consumers": [
+    { "id": "welcome-email", "concurrency": 4, "dlq": true },
+    { "id": "analytics-sink", "concurrency": 8, "dlq": false }
+  ]
+}

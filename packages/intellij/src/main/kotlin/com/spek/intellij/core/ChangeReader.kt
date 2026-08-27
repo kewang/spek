@@ -39,7 +39,10 @@ object ChangeReader {
         // 只對 active change 查 CLI（archived 無 planningArtifacts）。schema 為 null 不代表無權威順序——
         // CLI 會自行解析出內建預設並回傳（provider 內以 repo 級預設桶快取），故 null schema 仍要查。
         val refs = if (status == "active") orderProvider.order(projectPath, slug, schema) else null
-        val schemaOrder = SchemaOrder.resolveSchemaOrder(refs, artifacts.map { it.id })
+        // A data artifact's title is its exact filename, so this maps a declared data outputPath to the
+        // right id even when a markdown sibling shares its stem (asyncapi.md + asyncapi.yaml).
+        val dataFileToId = artifacts.filter { it.kind == "data" }.associate { it.title to it.id }
+        val schemaOrder = SchemaOrder.resolveSchemaOrder(refs, artifacts.map { it.id }, dataFileToId)
         // Timeline 生命週期：重用 scanner 的 createdDate 解析；archivedDate 依 status 判定
         val createdDate = OpenSpecScanner.readCreatedDate(changeDir)
         val archivedDate = if (status == "archived") parseSlug(slug).first else null

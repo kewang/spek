@@ -121,15 +121,30 @@ object SchemaOrder {
         return if (refs.isNotEmpty()) refs else null
     }
 
-    /** 將 openspec artifact 的 outputPath 對應到已知 artifact id；對不到回 null（glob 僅支援 specs tree） */
-    private fun idForOutputPath(outputPath: String, knownIds: Set<String>): String? {
+    /**
+     * Map an openspec artifact's outputPath to a known artifact id, or null if none matches (a glob only
+     * resolves the specs tree). `dataFileToId` maps a data artifact's exact filename to its id.
+     */
+    private fun idForOutputPath(
+        outputPath: String,
+        knownIds: Set<String>,
+        dataFileToId: Map<String, String>,
+    ): String? {
         val g = outputPath.trim()
         if (g.contains("*")) {
             if (Regex("""(^|/)specs(/|$)""").containsMatchIn(g) && knownIds.contains("specs")) return "specs"
             return null
         }
         val base = g.split(Regex("""[\\/]""")).last()
-        val stem = base.replace(Regex("""\.md$""", RegexOption.IGNORE_CASE), "")
+        // An exact filename match wins first. Discovery gives a markdown file the bare stem, and a
+        // same-stem data file the `-2` suffix (`asyncapi.md` -> `asyncapi`, `asyncapi.yaml` ->
+        // `asyncapi-2`). A data artifact's title IS its filename. So a data outputPath resolves to the
+        // data id, not the markdown sibling. The stem path below already resolves the markdown side.
+        dataFileToId[base]?.let { return it }
+        // Otherwise strip the last extension, exactly as ArtifactDiscovery.stripExt does when it assigns
+        // the id, so a declared artifact inverts to the same id, not only `.md`. Anchored with `\z` per
+        // the repo's filename convention (#33).
+        val stem = base.replace(Regex("""\.[^.]+\z"""), "")
         if (knownIds.contains(stem)) return stem
         if (Regex("""^spec\.md$""", RegexOption.IGNORE_CASE).matches(base) &&
             Regex("specs", RegexOption.IGNORE_CASE).containsMatchIn(g) && knownIds.contains("specs")
@@ -140,14 +155,19 @@ object SchemaOrder {
     /**
      * 由 refs（schema 權威順序）與已探索的 artifact id 集合，產生排序後的 artifact-id 清單。
      * 每個 ref 依 outputPath 對應到一個已知 id、去重；對不到略過。refs 為 null 或無有效對應時回 null。
+     * `dataFileToId` 把 data artifact 的檔名對應到 id，用於區分同 stem 的 markdown / data 手足。
      */
-    fun resolveSchemaOrder(refs: List<SchemaArtifactRef>?, knownIds: List<String>): List<String>? {
+    fun resolveSchemaOrder(
+        refs: List<SchemaArtifactRef>?,
+        knownIds: List<String>,
+        dataFileToId: Map<String, String> = emptyMap(),
+    ): List<String>? {
         if (refs == null) return null
         val known = knownIds.toSet()
         val ordered = mutableListOf<String>()
         val used = HashSet<String>()
         for (ref in refs) {
-            val id = idForOutputPath(ref.outputPath, known)
+            val id = idForOutputPath(ref.outputPath, known, dataFileToId)
             if (id != null && !used.contains(id)) {
                 ordered.add(id)
                 used.add(id)

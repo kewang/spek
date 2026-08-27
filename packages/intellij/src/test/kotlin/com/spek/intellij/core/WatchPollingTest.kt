@@ -193,15 +193,22 @@ class WatchPollingTest {
     }
 
     @Test
-    fun scanSnapshot_onlyMdAndYaml_skipsDotDirs() {
+    fun scanSnapshot_includesEveryDataExtension_skipsDotDirsAndNonArtifacts() {
         val dir = mkTempOpenspec()
         File(dir, "keep.md").writeText("a")
         File(dir, "keep.yaml").writeText("b")
-        File(dir, "ignore.txt").writeText("c")
-        File(dir, ".git").apply { mkdirs() }.let { File(it, "inside.md").writeText("d") }
+        File(dir, "keep.yml").writeText("c")
+        File(dir, "keep.json").writeText("d")
+        File(dir, "ignore.txt").writeText("e")
+        File(dir, ".git").apply { mkdirs() }.let { File(it, "inside.md").writeText("f") }
         val snap = WatchPolling.scanSnapshot(dir)
-        assertEquals(2, snap.size, "只計入 .md/.yaml 且跳過 dotdir")
+        // Markdown plus every data artifact extension is watched, so editing a .yml / .json artifact
+        // changes the snapshot and fires a refresh. A non-artifact (.txt) and dotdirs stay out.
+        assertEquals(4, snap.size, "計入 .md 與所有 data 副檔名，跳過非 artifact 與 dotdir")
         assertTrue(snap.keys.any { it.endsWith("keep.md") })
         assertTrue(snap.keys.any { it.endsWith("keep.yaml") })
+        assertTrue(snap.keys.any { it.endsWith("keep.yml") })
+        assertTrue(snap.keys.any { it.endsWith("keep.json") })
+        assertFalse(snap.keys.any { it.endsWith("ignore.txt") })
     }
 }

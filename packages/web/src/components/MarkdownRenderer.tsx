@@ -3,6 +3,7 @@ import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
 import { type ReactNode } from "react";
 import { slugifyHeading, specHeadingLabel } from "@spekjs/core/headings";
+import { rehypeHighlightNarrow } from "../utils/highlight";
 import {
   rehypeSpekFoldSections,
   type FoldOptions,
@@ -210,6 +211,11 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
   //    requirement 的 id 都會變，而走 `extractHeadings`（直接解析原始 markdown）的 TOC 與 VS Code
   //    側欄仍然產出原本的 slug —— 兩邊從此指向不同的錨點，畫面上完全看不出來，只是連結再也跳不到。
   const rehypePlugins: NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]> = [
+    // Syntax highlighting for fenced blocks with a language hint. Never auto-detects, so a language-less
+    // fence stays plain. An unregistered language renders plain too, never throwing. It is orthogonal to
+    // the heading/fold plugins below (it only touches `pre > code`), so its position ahead of them does
+    // not affect heading-id dedup.
+    rehypeHighlightNarrow,
     [rehypeSpekHeadingIds, { idPrefix }],
   ];
   if (specShaped) rehypePlugins.push([rehypeSpekElideHeadingKeyword]);
@@ -274,10 +280,31 @@ export function MarkdownRenderer({ content, specTopics, idPrefix, fold, specShap
           },
           // 程式碼區塊 — 不做 BDD 高亮
           code({ className, children }) {
-            const isBlock = className?.startsWith("language-");
+            // A fenced block with a language hint carries a `language-*` class (rehypeHighlightNarrow puts
+            // `hljs` first, so match `language-` anywhere, not with startsWith). A bare ``` fence with no
+            // language gets no such class, and the plugin never auto-detects. Tell it apart from inline
+            // code another way: mdast-util-to-hast appends a trailing newline to every code *block*'s
+            // text. An inline code span never has one, because its source line breaks fold to spaces. A
+            // source-span check is wrong here: multi-line inline code (`` `a\nb` ``) spans two lines yet is
+            // inline. Without this test a language-less block renders as an inline chip (amber text, pill
+            // padding). The markdown-renderer spec forbids that ("plain, uncolored code").
+            const classList = className?.split(/\s+/) ?? [];
+            const hasLang = classList.some((c) => c.startsWith("language-"));
+            const rawText = typeof children === "string" ? children : "";
+            // A code block's text carries a trailing newline (mdast-util-to-hast appends one), except an
+            // EMPTY fence, whose value is "" with no newline. So treat empty string as a block too — an
+            // inline code span is never empty (`` `` `` is literal backticks, not a code node), so this
+            // cannot misclassify inline code.
+            const isBlock = hasLang || rawText === "" || rawText.endsWith("\n");
             if (isBlock) {
+              // `bg-bg-tertiary` is required, not decorative. The VS Code webview injects its own
+              // stylesheet onto a bare `<code>`. That paints the editor's code background, which is
+              // dark even under a light theme. It shows through a highlighted block that sets no
+              // background, and the block then reads dark on a light panel. The inline chip below uses
+              // the same fix. This does not reproduce in a browser, which has no host stylesheet.
+              // See CLAUDE.md.
               return (
-                <code className={`${className} block`}>
+                <code className={`${className ?? ""} block bg-bg-tertiary`}>
                   {children}
                 </code>
               );

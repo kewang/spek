@@ -16,6 +16,11 @@ import java.io.File
  * 分離，方便單元測試。
  */
 object WatchPolling {
+    /** The file extensions a change edit can touch: markdown plus every data artifact extension. It comes
+     *  from ArtifactFiles' one source, so the snapshot cannot drift from what discovery treats as an
+     *  artifact. */
+    private val WATCHED_EXTENSIONS = listOf(".md") + ArtifactFiles.DATA_EXTENSIONS
+
     /** 不傳遞原生事件、需改用 polling 的 fstype（小寫比對；`fuse.*` 另以前綴判定） */
     private val NON_EVENT_FS_TYPES = setOf(
         "9p", "v9fs", "drvfs", "cifs", "smb3", "smbfs",
@@ -141,7 +146,8 @@ object WatchPolling {
     }
 
     /**
-     * 遞迴掃描 dir 下 `.md` / `.yaml` 的 `絕對路徑 -> "lastModified:size"` 快照（跳過 dotfile / dotdir）。
+     * 遞迴掃描 dir 下 WATCHED_EXTENSIONS（`.md` + data artifact 副檔名）的 `絕對路徑 -> "lastModified:size"`
+     * 快照（跳過 dotfile / dotdir）。
      * 輪詢時比對前後兩次快照：不相等即代表有新增 / 刪除 / 修改，需重新整理。無 IDE 相依，可單元測試。
      *
      * 值同時納入 size：9p / NFS 等網路掛載常是整秒 mtime，就地 append 若同秒內完成、mtime 不進位，
@@ -151,7 +157,7 @@ object WatchPolling {
         val result = HashMap<String, String>()
         dir.walkTopDown()
             .onEnter { !it.name.startsWith(".") }
-            .filter { it.isFile && (it.name.endsWith(".md") || it.name.endsWith(".yaml")) }
+            .filter { f -> f.isFile && WATCHED_EXTENSIONS.any { ext -> f.name.lowercase().endsWith(ext) } }
             .forEach { result[it.absolutePath] = "${it.lastModified()}:${it.length()}" }
         return result
     }

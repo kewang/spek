@@ -62,6 +62,19 @@
    * 雙向都過非文字對比的 3:1。若日後動到任一主題的 bg-primary，請重新量而不是沿用。
    */
   --color-fold-rule: #62748e;
+
+  /*
+   * 語法高亮的 token 顏色（fenced code block 與 data artifact 共用）。程式碼是有意義的文字，故每個
+   * 值都當文字量測，過 WCAG AA（不走 BDD 那種裝飾性豁免）；深色以三個表面中最亮的 bg-tertiary 為
+   * worst case，最緊的一項仍有 7.76:1。hljs class 對應見下方 `.hljs-*` 規則。新增/更動任一色都要同步
+   * 更新 `[data-theme="light"]` 與 `contrast.test.ts` 的 TEXT_TOKENS。
+   */
+  --color-hl-base: #e6edf3;
+  --color-hl-keyword: #ff9a90;
+  --color-hl-string: #8fd0ff;
+  --color-hl-number: #f0b866;
+  --color-hl-comment: #a7b1bd;
+  --color-hl-punctuation: #c9d3de;
 }
 
 /*
@@ -136,6 +149,15 @@
   --color-badge-renamed: #a3004c;
   --color-code-text: #92400e;
   /* `--color-fold-rule` 沒有列在這裡：見 @theme 內的說明，同一個中灰在兩個主題都過 3:1。 */
+
+  /* 語法高亮（淺色）：worst case 是三表面中最暗的 bg-tertiary #f1f5f9（深色文字在其上對比最低），
+     最緊的一項（comment）仍有 5.49:1。 */
+  --color-hl-base: #1f2328;
+  --color-hl-keyword: #b21226;
+  --color-hl-string: #0a3069;
+  --color-hl-number: #7a3d00;
+  --color-hl-comment: #5a6470;
+  --color-hl-punctuation: #33393f;
 }
 
 body {
@@ -150,6 +172,65 @@ code, pre {
 }
 
 /* No `code` background rule here on purpose — each `<code>` sets its own. See CLAUDE.md. */
+
+/*
+ * Syntax highlighting. The rehypeHighlightNarrow plugin (highlight.js via lowlight) writes `hljs-*`
+ * classes. This maps them to the
+ * `--color-hl-*` tokens. It does not import the highlight.js theme, on purpose. That theme is a set of
+ * hard-coded, non-tokenized colours. It would bypass the site-wide contrast discipline (see D5). A
+ * scope with no mapping falls to the `.hljs` base colour, which is always readable.
+ * JSON/YAML keys (`hljs-attr`) keep the neutral base colour. A data artifact is mostly keys. A tint on
+ * the keys would flood the view with one hue. So only the values (`hljs-string` and `hljs-number`) and
+ * the comments carry colour.
+ */
+.hljs {
+  color: var(--color-hl-base);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--color-hl-comment);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-type,
+.hljs-literal,
+.hljs-name,
+.hljs-tag,
+.hljs-selector-attr,
+.hljs-section,
+.hljs-doctag {
+  color: var(--color-hl-keyword);
+}
+/* JSON/YAML object keys use the neutral base colour, not the keyword tint (see the comment above). */
+.hljs-attr,
+.hljs-attribute {
+  color: var(--color-hl-base);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-symbol,
+.hljs-link,
+.hljs-selector-pseudo {
+  color: var(--color-hl-string);
+}
+.hljs-number,
+.hljs-variable,
+.hljs-template-variable {
+  color: var(--color-hl-number);
+}
+.hljs-punctuation,
+.hljs-operator,
+.hljs-bullet,
+.hljs-meta {
+  color: var(--color-hl-punctuation);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
 
 /*
  * 摺疊區塊的縮排與範圍線。

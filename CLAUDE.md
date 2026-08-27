@@ -69,7 +69,7 @@ change to those still needs manual verification — a temporary `workflow_dispat
 
 ```
 packages/
-├── core/       # @spekjs/core — pure logic (scanner.ts, tasks.ts, artifacts.ts, schema-order.ts, schemas.ts,
+├── core/       # @spekjs/core — pure logic (scanner.ts, tasks.ts, artifact-files.ts, artifact-discovery.ts, schema-order.ts, schemas.ts,
 │            #   schema-flow.ts, openspec-cli.ts, git-cache.ts, types.ts)
 ├── ui/         # @spekjs/ui — visual components (SpecGraph.tsx, timeline/*, theme.ts=color contract, styles.css)
 ├── web/        # @spekjs/web — server/ (Express API) + src/ (React SPA + API adapters)
@@ -150,9 +150,15 @@ behavior lives in `openspec/specs/`; the key entry points:
 - `readChange(basePath, slug, orderProvider?)` — returns `ChangeDetail`: disk-discovered `artifacts` (mtime order),
   `schema` / `defaultSchema` (that worktree's default, read from `openspec/config.yaml` once per worktree; the badge is
   hidden when a change's schema == its own `defaultSchema`), and `schemaOrder` (see below)
-- `discoverArtifacts(changePath)` / `countArtifacts` — discover artifacts from the filesystem (each root `*.md` + a
-  non-empty `specs/`, classified `markdown` / `tasks` / `specs`). mtime newest-first, with a stable tiebreak on ties
-  (`proposal, design, specs, tasks` first, then alphabetical)
+- `discoverArtifacts(changePath)` (in `artifact-discovery.ts`) — discover artifacts from the filesystem (each root
+  `*.md`, each root `.yaml` / `.yml` / `.json`, and a non-empty `specs/`, classified `markdown` / `tasks` / `data` /
+  `specs`). mtime newest-first, with a stable tiebreak on ties (`proposal, design, specs, tasks` first, then
+  alphabetical). **Two layers, split by caller:** `artifact-files.ts` is the filesystem view (reads no content) and
+  owns the cheap functions — `countArtifacts`, `changeDirMtime`, `listChangeArtifactFiles`, `listChangeMarkdownFiles`
+  — plus the one `rootKind` classifier that decides which root file is which kind; `artifact-discovery.ts` reads
+  content and builds the objects. count, search, and discovery all derive from `rootKind`, so a shown tab is always
+  counted and searchable. Kotlin mirrors the pair: `ArtifactFiles.kt` + `ArtifactDiscovery.kt`. A `data` artifact
+  renders as a syntax-highlighted code block (fence language from the extension), with no TOC and no folding
 - `readSpec` / `readSpecAtChange`, `buildGraphData` / `buildGraphDataAggregated` (aggregated node ids
   `change:<wtKey>:<slug>` avoid collisions), `listWorktrees`, `parseTasks`
 - **jj workspace support (EXPERIMENTAL)**: `listJjWorkspaces(dir)` (`jj workspace list`),
@@ -400,7 +406,9 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
 ## Key Design Decisions
 
 - **Security**: **no arbitrary file access.** For repo-local reads that is achieved by containment —
-  Express only reads `.md` / `.yaml` files under `openspec/`. Schema reading is the one path that
+  Express only reads markdown and data-artifact files (`.md` / `.yaml` / `.yml` / `.json`) under
+  `openspec/` (search reads every root artifact file a change holds, data artifacts included). Schema
+  reading is the one path that
   reaches outside it: a package schema lives wherever npm installed the CLI, so the path comes from
   `openspec schema which <name> --json` and the `schema.yaml` there is read directly. Containment
   cannot be the guard there, so **name validation is** — an explicit allowlist
@@ -422,6 +430,16 @@ GET /api/openspec/search?dir=...&q=...              # full-text search
   highlight must never *lower* the weight it found — a keyword inside `**bold**` inherits instead
   (`BDD_WEIGHTS` is suppressed inside `<strong>`), or the emphasised word renders lighter than the
   emphasis around it
+- **Syntax highlighting** (fenced code blocks + `data` artifacts): `rehype-highlight` (`detect: false`) maps
+  highlight.js `hljs-*` classes to per-theme `--color-hl-*` tokens (base, keyword, string, number, comment,
+  punctuation). highlight.js's own theme is deliberately **not** imported — its hard-coded colours bypass the
+  contrast discipline. Code is meaningful text, so each token clears WCAG AA in both themes (measured in
+  `contrast.test.ts`), unlike the decorative BDD marks. JSON/YAML **keys** (`hljs-attr`) stay the neutral base
+  colour, not the keyword tint, because a data file is mostly keys and one hue would flood the view. **A
+  highlighted block's `<code>` must carry `bg-bg-tertiary`**: the VS Code webview injects a bare-`code`
+  background that otherwise shows through and makes the block read dark on a light panel — a host-only bug no
+  browser test can see (same class as the inline-`<code>` chip rule above). A `data` artifact renders through
+  the same pipeline as a fenced block, with the fence language derived from its extension
 - **Spec section folding**: `### Requirement:` / `#### Scenario:` render as native `<details>` —
   requirements open, scenarios closed — so a spec opens as an outline with substance rather than a wall.
   `rehypeSpekFoldSections` (pure, in `utils/foldSections.ts`) regroups the hast tree and **must run

@@ -6,7 +6,7 @@
 // change-detail view offers on every surface (see openspec/specs/custom-schema-artifacts).
 //
 // Both live here, in one file, on purpose. The constant was originally lifted out of the server-only
-// artifacts.ts so a webview bundle could reach it "without duplicating the frontend's ordering logic" —
+// artifact-discovery.ts so a webview bundle could reach it "without duplicating the frontend's ordering logic" —
 // but only the constant came, and the function stayed in packages/web where nothing outside that package
 // could import it. Splitting the vocabulary from the rule is what let the duplication happen anyway.
 //

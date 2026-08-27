@@ -1,0 +1,16 @@
+# A .yml file, to show the alias maps to the same yaml highlighting as .yaml.
+service: user-signup
+replicas: 3
+resources:
+  cpu: "500m"       # quoted string
+  memory: 512Mi     # unquoted scalar
+features:
+  - syntax-highlighting
+  - full-text-search
+  - artifact-tabs
+flags:
+  debug: false
+  experimental: true
+thresholds:
+  latencyMs: 250
+  errorRate: 0.01

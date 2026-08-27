@@ -1,0 +1,54 @@
+# Example AsyncAPI artifact — the kind of non-Markdown file the event-driven schema
+# declares via `generates: asyncapi.yaml`. spek now renders this as a highlighted tab.
+asyncapi: 3.0.0
+info:
+  title: User Signup Service
+  version: 1.4.0
+  description: Emits domain events when a user signs up or is removed.
+  contact:
+    name: Platform Team
+    email: platform@example.com
+
+servers:
+  production:
+    host: broker.example.com:9092
+    protocol: kafka
+    description: Primary Kafka cluster
+
+channels:
+  userSignedUp:
+    address: user.signedup
+    messages:
+      userSignedUp:
+        $ref: '#/components/messages/UserSignedUp'
+
+operations:
+  onUserSignedUp:
+    action: receive
+    channel:
+      $ref: '#/channels/userSignedUp'
+
+components:
+  messages:
+    UserSignedUp:
+      name: userSignedUp
+      title: User signed up
+      contentType: application/json
+      payload:
+        type: object
+        required:
+          - userId
+          - signedUpAt
+        properties:
+          userId:
+            type: string
+            format: uuid
+          signedUpAt:
+            type: string
+            format: date-time
+          retries:
+            type: integer
+            default: 0
+          isVerified:
+            type: boolean
+            default: false

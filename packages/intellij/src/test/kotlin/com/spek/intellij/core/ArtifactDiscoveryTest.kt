@@ -5,6 +5,8 @@ import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ArtifactDiscoveryTest {
 
@@ -147,7 +149,7 @@ class ArtifactDiscoveryTest {
         val rootDoc = arts.first { it.kind == "markdown" && it.content == "## Root specs doc\n" }
         assertEquals("specs-2", rootDoc.id) // content preserved, not overwritten by the tree
         assertEquals(3, arts.size)
-        assertEquals(3, ArtifactDiscovery.count(changeDir))
+        assertEquals(3, ArtifactFiles.count(changeDir))
         // mtime keyed by the ALLOCATED id: root specs.md (2000) must sort above the tree (1000)
         assertEquals(listOf("proposal", "specs-2", "specs"), arts.map { it.id })
     }
@@ -166,7 +168,7 @@ class ArtifactDiscoveryTest {
         val specsDoc = arts.first { it.content == "## Root specs doc\n" }
         assertEquals("specs", specsDoc.id) // no tree to collide with → no disambiguating suffix
         assertEquals(2, arts.size)
-        assertEquals(2, ArtifactDiscovery.count(changeDir))
+        assertEquals(2, ArtifactFiles.count(changeDir))
     }
 
     @Test
@@ -184,7 +186,7 @@ class ArtifactDiscoveryTest {
         // tree = "specs"; the two root files take "specs-2" and "specs-3" — no collision, no loss
         assertEquals(listOf("specs", "specs-2", "specs-3"), arts.map { it.id }.sorted())
         assertEquals(3, arts.size)
-        assertEquals(3, ArtifactDiscovery.count(changeDir))
+        assertEquals(3, ArtifactFiles.count(changeDir))
         val contents = arts.filter { it.kind == "markdown" }.mapNotNull { it.content }.sorted()
         assertEquals(listOf("root\n", "sibling\n"), contents)
     }
@@ -246,6 +248,124 @@ class ArtifactDiscoveryTest {
                 "notes.txt" to "x\n",
             ),
         )
-        assertEquals(4, ArtifactDiscovery.count(changeDir))
+        assertEquals(4, ArtifactFiles.count(changeDir))
+    }
+
+    // --- data artifacts (.yaml / .yml / .json) ---
+
+    @Test
+    fun rootYamlYmlJsonSurfaceAsDataArtifactsTitledWithExtension() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "event-change",
+            mapOf(
+                "proposal.md" to "## Why\n",
+                "asyncapi.yaml" to "asyncapi: 3.0.0\n",
+                "config.yml" to "a: 1\n",
+                "schema.json" to "{\"x\":1}\n",
+            ),
+        )
+        val arts = ArtifactDiscovery.discover(changeDir)
+        val async = arts.first { it.title == "asyncapi.yaml" }
+        assertEquals("data", async.kind)
+        assertEquals("asyncapi", async.id) // id is the stem; title keeps the extension
+        assertEquals("asyncapi: 3.0.0\n", async.content)
+        assertEquals("data", arts.first { it.title == "config.yml" }.kind)
+        assertEquals("data", arts.first { it.title == "schema.json" }.kind)
+        assertEquals("markdown", arts.first { it.id == "proposal" }.kind)
+        assertEquals(4, arts.size)
+    }
+
+    @Test
+    fun openspecYamlDotfileIsNeverADataArtifact() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "c",
+            mapOf("proposal.md" to "## Why\n", ".openspec.yaml" to "schema: spec-driven\n"),
+        )
+        val arts = ArtifactDiscovery.discover(changeDir)
+        assertEquals(listOf("proposal"), arts.map { it.id })
+        assertFalse(arts.any { it.kind == "data" })
+    }
+
+    @Test
+    fun jsonInASubdirectoryIsNotDiscovered() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "c",
+            mapOf("proposal.md" to "## Why\n", "nested/data.json" to "{\"deep\":true}\n"),
+        )
+        val arts = ArtifactDiscovery.discover(changeDir)
+        assertEquals(listOf("proposal"), arts.map { it.id }) // subdir json ignored (root-only)
+    }
+
+    @Test
+    fun specMdAndSpecJsonGetDifferentIdsMarkdownWinsTheStem() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "c",
+            mapOf("spec.md" to "## markdown\n", "spec.json" to "{\"data\":1}\n"),
+        )
+        val arts = ArtifactDiscovery.discover(changeDir)
+        val md = arts.first { it.kind == "markdown" }
+        val data = arts.first { it.kind == "data" }
+        assertEquals("spec", md.id) // markdown producer runs before data → keeps the bare stem
+        assertEquals("spec-2", data.id) // data disambiguated, no content lost
+        assertEquals("spec.json", data.title) // tab label keeps the extension
+        assertEquals(2, arts.size)
+    }
+
+    @Test
+    fun dataArtifactsAreCountedCountEqualsTabCount() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "c",
+            mapOf(
+                "proposal.md" to "## Why\n",
+                "asyncapi.yaml" to "asyncapi: 3.0.0\n",
+                "specs/foo/spec.md" to "## ADDED\n",
+            ),
+        )
+        val arts = ArtifactDiscovery.discover(changeDir)
+        assertEquals(3, arts.size) // proposal + asyncapi (data) + specs
+        assertEquals(3, ArtifactFiles.count(changeDir))
+    }
+
+    @Test
+    fun artifactFilesIncludesMarkdownTasksDataExcludesDotfilesAndSubdirs() {
+        val repo = mkRepo()
+        val changeDir = writeChange(
+            repo, "c",
+            mapOf(
+                "proposal.md" to "## Why\n",
+                "tasks.md" to "- [ ] a\n",
+                "asyncapi.yaml" to "asyncapi: 3.0.0\n",
+                "schema.json" to "{}\n",
+                ".openspec.yaml" to "schema: spec-driven\n",
+                "nested/data.json" to "{}\n",
+                "specs/foo/spec.md" to "## ADDED\n",
+            ),
+        )
+        assertEquals(
+            listOf("asyncapi.yaml", "proposal.md", "schema.json", "tasks.md"),
+            ArtifactFiles.artifactFiles(changeDir).map { it.name },
+        )
+    }
+
+    @Test
+    fun searchFindsContentInsideADataArtifact() {
+        val repo = mkRepo()
+        writeChange(
+            repo, "add-events",
+            mapOf(
+                "proposal.md" to "## Why\n",
+                "asyncapi.yaml" to "asyncapi: 3.0.0\nchannels:\n  userSignedUp:\n    address: user.signedup\n",
+            ),
+        )
+        val results = SearchService.search(repo.absolutePath, "userSignedUp")
+        assertTrue(
+            results.any { it.type == "change" && it.slug == "add-events" },
+            "the change whose asyncapi.yaml holds the match is returned",
+        )
     }
 }

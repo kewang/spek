@@ -73,9 +73,11 @@ change in parallel.
 Key properties spek relies on:
 
 - **Artifacts are discovered from disk, not hard-coded.** A change's tabs come from what actually
-  exists: every root `*.md` is an artifact, a non-empty `specs/` is one artifact, classified by kind
-  (`markdown` / `tasks` / `specs`). This is what lets **custom OpenSpec schemas** render their own
-  artifacts as tabs without spek knowing them in advance.
+  exists: every root `*.md` is an artifact, every root `.yaml` / `.yml` / `.json` is a `data` artifact,
+  and a non-empty `specs/` is one artifact, classified by kind (`markdown` / `tasks` / `data` /
+  `specs`). A `data` artifact renders as a syntax-highlighted code block. This is what lets **custom
+  OpenSpec schemas** render their own artifacts as tabs without spek knowing them in advance — including
+  schemas whose artifacts are not Markdown, such as `event-driven`'s `asyncapi.yaml`.
 - **Schema-aware.** A change's schema is read from `.openspec.yaml` (`schema:`), falling back to
   `openspec/config.yaml`. The schema badge is hidden when a change matches its worktree's default.
 - **Default sort is file mtime (newest first)**, so an artifact being actively edited (e.g.
