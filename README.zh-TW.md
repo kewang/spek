@@ -377,6 +377,7 @@ spek 會監看 `openspec/` 並在檔案變更時即時重載。在不傳遞原�
 
 - [@nthansen](https://github.com/nthansen)（Norman Hansen）
   - **自訂 schema 支援** —— 從磁碟探索 change 的 artifact，任何 schema 的 artifact 都能各自成為分頁；每個 change 的 schema badge 對照自己所在 worktree 的預設判斷，分頁可依最後修改 / Schema order / A–Z 排序，其中權威順序取自 OpenSpec CLI 並以 schema 為單位快取
+  - **非 Markdown artifact** —— change 根目錄的 `.yaml` / `.yml` / `.json` 各自成為語法高亮的分頁，依 schema 宣告的位置排序，計入 changes 列表的數量並可被搜尋；Markdown artifact 內的程式碼區塊也走同一條高亮管線
   - **Schemas 頁面** —— 列出每個可用 schema 定義了什麼，詳情頁把一份 schema 畫成可讀的流程，包含只在實作之後才產出的步驟
   - **Markdown 呈現的忠實度** —— task 的續行不再被 parser 丟棄，改以 Markdown 呈現；清單的項目符號與編號留在項目首行；TOC 與 `#hash` 導覽把目標標題落在 sticky header 下方
   - **平台涵蓋** —— 無原生檔案事件的檔案系統（devcontainer / WSL / 網路掛載）改用 polling 即時重載，建置指令在 Windows `cmd.exe` 下也能運作

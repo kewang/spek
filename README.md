@@ -382,6 +382,7 @@ Thanks to everyone who has contributed to spek:
 
 - [@nthansen](https://github.com/nthansen) (Norman Hansen)
   - **Custom schema support** — a change's artifacts are discovered from disk, so any schema renders its own tabs; each change carries a schema badge judged against its own worktree's default, and tabs sort by last-modified / schema order / A–Z, with the authoritative order taken from the OpenSpec CLI and cached per schema
+  - **Non-Markdown artifacts** — a change's root `.yaml` / `.yml` / `.json` files render as their own syntax-highlighted tabs, sorting into the position their schema declares, counted in the change-list badge and reachable by search; code fences inside the Markdown artifacts are highlighted through the same pipeline
   - **The Schemas pages** — a list of what every available schema defines, and a detail view drawing one as a readable flow, including the steps a schema produces only after implementation
   - **Markdown fidelity** — a task's continuation lines survive the parser and render as Markdown, list markers stay inline with their item's first line, and TOC / `#hash` navigation lands the target heading below the sticky header
   - **Platform reach** — polling live-reload for filesystems without native change events (devcontainer / WSL / network mounts), and build scripts that work under Windows `cmd.exe`
